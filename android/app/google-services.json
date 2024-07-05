@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "645162960578",
+    "project_id": "shuffl-c2c6b",
+    "storage_bucket": "shuffl-c2c6b.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:645162960578:android:b238c4c9e5cd2601e91d5b",
+        "android_client_info": {
+          "package_name": "com.shufflmobility.my_flutter_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhSanV7LQeFZR3mz_vbAx-Kdcnzw6ZbiY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
