@@ -71,12 +71,14 @@ class GreyTextField extends StatelessWidget {
   final String labelText;
   final bool isPassword;
   final int maxLines;
+  final TextEditingController? controller;
 
   const GreyTextField({
     super.key,
     required this.labelText,
     this.isPassword = false,
     this.maxLines = 1,
+    this.controller,
   });
 
   @override
@@ -84,6 +86,7 @@ class GreyTextField extends StatelessWidget {
     return TextField(
       obscureText: isPassword,
       maxLines: maxLines,
+      controller: controller,
       decoration: InputDecoration(
         labelText: labelText,
         labelStyle: const TextStyle(color: Colors.white),

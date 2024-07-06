@@ -4,8 +4,39 @@ import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:my_flutter_app/widgets.dart';
 
-class Login extends StatelessWidget {
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_flutter_app/firestore_service.dart';
+
+class Login extends StatefulWidget {
   const Login({super.key});
+
+  @override
+  _LoginState createState() => _LoginState();
+}
+
+class _LoginState extends State<Login> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirestoreService _firestoreService = FirestoreService();
+
+  void _register() async {
+    try {
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      await _firestoreService.addUser(userCredential.user!.uid, _emailController.text);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const CreateProfile(),
+        ),
+      );
+    } catch (e) {
+      print('Failed to register: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,20 +72,20 @@ class Login extends StatelessWidget {
                       style: TextStyle(color: Colors.white),
                     ),
                     const SizedBox(height: 20),
-                    const GreyTextField(labelText: 'Email'),
+                    GreyTextField(
+                      labelText: 'Email',
+                      controller: _emailController,
+                    ),
                     const SizedBox(height: 20),
-                    const GreyTextField(labelText: 'Password', isPassword: true),
+                    GreyTextField(
+                      labelText: 'Password',
+                      isPassword: true,
+                      controller: _passwordController,
+                    ),
                     const SizedBox(height: 20),
                     GreenActionButton(
                       text: 'Create Account',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CreateProfile(),
-                          ),
-                        );
-                      },
+                      onPressed: _register,
                     ),
                     const SizedBox(height: 20),
                     Center(
@@ -111,8 +142,7 @@ class Login extends StatelessWidget {
                               builder: (context) => const SignIn(),
                             ),
                           );
-                        
-                        }, 
+                        },
                         child: const Text(
                           'Already have an account? Sign in here',
                           style: TextStyle(color: Colors.white),
