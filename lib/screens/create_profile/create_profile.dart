@@ -2,9 +2,66 @@ import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/widgets.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 
-class CreateProfile extends StatelessWidget {
+class CreateProfile extends StatefulWidget {
   const CreateProfile({super.key});
+
+  @override
+  _CreateProfileState createState() => _CreateProfileState();
+}
+
+class _CreateProfileState extends State<CreateProfile> {
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _phoneNumberController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirestoreService _firestoreService = FirestoreService();
+
+  String? _errorMessage;
+
+  void _saveProfile() async {
+    setState(() {
+      _errorMessage = null;
+    });
+
+    if (_fullNameController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Full Name is required.';
+      });
+      return;
+    }
+
+    if (_descriptionController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Description is required.';
+      });
+      return;
+    }
+
+    try {
+      User? user = _auth.currentUser;
+      if (user != null) {
+        await _firestoreService.updateUserProfile(
+          user.uid,
+          _fullNameController.text,
+          _phoneNumberController.text,
+          _descriptionController.text,
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const HomePage(),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to save profile: $e';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,18 +114,30 @@ class CreateProfile extends StatelessWidget {
                       child: const Text('Change Photo'),
                     ),
                     const SizedBox(height: 20),
-                    const GreyTextField(labelText: 'Full Name'),
+                    GreyTextField(
+                      labelText: 'Full Name',
+                      controller: _fullNameController,
+                    ),
                     const SizedBox(height: 20),
-                    const GreyTextField(labelText: 'Phone Number'),
+                    GreyTextField(
+                      labelText: 'Phone Number (optional - lets implement this later)',
+                      controller: _phoneNumberController,
+                    ),
                     const SizedBox(height: 20),
-                    const GreyTextField(labelText: 'Short Description'), // Max lines konulabilinir
+                    GreyTextField(
+                      labelText: 'Short Description',
+                      controller: _descriptionController,
+                    ),
+                    const SizedBox(height: 20),
+                    if (_errorMessage != null)
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     const SizedBox(height: 20),
                     GreenActionButton(
                       text: 'Save & Continue',
-                      onPressed: () {
-                        Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => const HomePage()));
-                      },
+                      onPressed: _saveProfile,
                     ),
                   ],
                 ),

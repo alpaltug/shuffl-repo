@@ -8,4 +8,11 @@ class FirestoreService {
       'email': email,
     });
   }
+    Future<void> updateUserProfile(String uid, String fullName, String phoneNumber, String description) async {
+    await _db.collection('users').doc(uid).update({
+      'fullName': fullName,
+      'phoneNumber': phoneNumber,
+      'description': description,
+    });
+  }
 }
