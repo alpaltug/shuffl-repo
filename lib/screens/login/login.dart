@@ -44,7 +44,7 @@ class _LoginState extends State<Login> {
           case 'email-already-in-use':
             _errorMessage = 'The email address is already in use by another account.';
             break;
-          case 'invalid-email':
+          case 'invalid-email': //canruso@gmail7.com kabul edildi arastir
             _errorMessage = 'The email address is not valid.';
             break;
           case 'weak-password':
