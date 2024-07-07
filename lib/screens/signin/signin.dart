@@ -4,9 +4,52 @@ import 'package:my_flutter_app/screens/forgot_password/forgot_password.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/login/login.dart';
 import 'package:my_flutter_app/widgets.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class SignIn extends StatelessWidget {
+class SignIn extends StatefulWidget {
   const SignIn({super.key});
+
+  @override
+  _SignInState createState() => _SignInState();
+}
+
+class _SignInState extends State<SignIn> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  String? _errorMessage;
+
+  void _signIn() async {
+    setState(() {
+      _errorMessage = null; // Clear the previous error message
+    });
+    try {
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      // Navigate to the home page if the sign-in is successful
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HomePage(),
+        ),
+      );
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        setState(() {
+          if (e.code == 'user-not-found') {
+            _errorMessage = 'Email does not exist. Please check your email.';
+          } else if (e.code == 'wrong-password') {
+            _errorMessage = 'Incorrect password. Please try again.';
+          } else {
+            _errorMessage = 'Failed to sign in: ${e.message}';
+          }
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,16 +84,26 @@ class SignIn extends StatelessWidget {
                       style: TextStyle(color: Colors.white),
                     ),
                     const SizedBox(height: 20),
-                    const GreyTextField(labelText: 'Email'),
+                    GreyTextField(
+                      labelText: 'Email',
+                      controller: _emailController,
+                    ),
                     const SizedBox(height: 20),
-                    const GreyTextField(labelText: 'Password', isPassword: true),
+                    GreyTextField(
+                      labelText: 'Password',
+                      isPassword: true,
+                      controller: _passwordController,
+                    ),
+                    const SizedBox(height: 20),
+                    if (_errorMessage != null)
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     const SizedBox(height: 20),
                     GreenActionButton(
                       text: 'Sign In',
-                      onPressed: () {
-                        Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => const HomePage()));
-                      },
+                      onPressed: _signIn,
                     ),
                     const SizedBox(height: 20),
                     Center(
@@ -103,7 +156,7 @@ class SignIn extends StatelessWidget {
                         onPressed: () {
                           Navigator.push(context,
                             MaterialPageRoute(builder: (context) => const Login()));
-                        }, 
+                        },
                         child: const Text(
                           "Don't have an account? Create Account",
                           style: TextStyle(color: Colors.green),
@@ -116,7 +169,7 @@ class SignIn extends StatelessWidget {
                         onPressed: () {
                           Navigator.push(context,
                             MaterialPageRoute(builder: (context) => const ForgotPassword()));
-                        }, 
+                        },
                         child: const Text(
                           'Forgot password?',
                           style: TextStyle(color: Colors.white),
