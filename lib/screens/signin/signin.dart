@@ -5,6 +5,7 @@ import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/login/login.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -22,7 +23,7 @@ class _SignInState extends State<SignIn> {
 
   void _signIn() async {
     setState(() {
-      _errorMessage = null; 
+      _errorMessage = null;
     });
     try {
       await _auth.signInWithEmailAndPassword(
@@ -35,7 +36,6 @@ class _SignInState extends State<SignIn> {
           builder: (context) => const HomePage(),
         ),
       );
-      // https://pub.dev/documentation/firebase_auth/latest/firebase_auth/FirebaseAuth/signInWithEmailAndPassword.html
     } on FirebaseAuthException catch (e) {
       setState(() {
         switch (e.code) {
@@ -55,6 +55,35 @@ class _SignInState extends State<SignIn> {
             _errorMessage = 'Failed to sign in: ${e.message}';
             break;
         }
+      });
+    }
+  }
+
+  void _signInWithGoogle() async {
+    setState(() {
+      _errorMessage = null;
+    });
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        idToken: googleAuth?.idToken,
+        accessToken: googleAuth?.accessToken,
+      );
+      await _auth.signInWithCredential(credential);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HomePage(),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _errorMessage = null; //'Failed to sign in with Google: ${e.message}';
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = null; //'Failed to sign in with Google: $e';
       });
     }
   }
@@ -124,7 +153,7 @@ class _SignInState extends State<SignIn> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () {}, // BACKEND
+                        onPressed: _signInWithGoogle,
                         icon: const Icon(Icons.g_translate, color: Colors.white),
                         label: const Text(
                           'Continue with Google',

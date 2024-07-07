@@ -4,6 +4,7 @@ import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 
 class Login extends StatefulWidget {
@@ -23,7 +24,7 @@ class _LoginState extends State<Login> {
 
   void _register() async {
     setState(() {
-      _errorMessage = null; 
+      _errorMessage = null;
     });
     try {
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
@@ -53,6 +54,36 @@ class _LoginState extends State<Login> {
             _errorMessage = 'Failed to register: ${e.message}';
             break;
         }
+      });
+    }
+  }
+
+  void _signInWithGoogle() async {
+    setState(() {
+      _errorMessage = null;
+    });
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        idToken: googleAuth?.idToken,
+        accessToken: googleAuth?.accessToken,
+      );
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      await _firestoreService.addUser(userCredential.user!.uid, userCredential.user!.email!);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const CreateProfile(),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _errorMessage = null; //'Failed to sign in with Google: ${e.message}';
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = null; //'Failed to sign in with Google: $e';
       });
     }
   }
@@ -123,7 +154,7 @@ class _LoginState extends State<Login> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () {}, // BACKEND - Google Sign In API
+                        onPressed: _signInWithGoogle,
                         icon: const Icon(Icons.g_translate_rounded, color: Colors.white),
                         label: const Text(
                           'Continue with Google',
