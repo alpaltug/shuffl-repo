@@ -25,7 +25,7 @@ class _SignInState extends State<SignIn> {
       _errorMessage = null; // Clear the previous error message
     });
     try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+      await _auth.signInWithEmailAndPassword(
         email: _emailController.text,
         password: _passwordController.text,
       );
@@ -36,18 +36,26 @@ class _SignInState extends State<SignIn> {
           builder: (context) => const HomePage(),
         ),
       );
-    } catch (e) {
-      if (e is FirebaseAuthException) {
-        setState(() {
-          if (e.code == 'user-not-found') {
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        switch (e.code) {
+          case 'user-not-found':
             _errorMessage = 'Email does not exist. Please check your email.';
-          } else if (e.code == 'wrong-password') {
+            break;
+          case 'invalid-email':
+            _errorMessage = 'The email address is not valid.';
+            break;
+          case 'wrong-password':
             _errorMessage = 'Incorrect password. Please try again.';
-          } else {
+            break;
+          case 'user-disabled':
+            _errorMessage = 'This user has been disabled. Please contact support.';
+            break;
+          default:
             _errorMessage = 'Failed to sign in: ${e.message}';
-          }
-        });
-      }
+            break;
+        }
+      });
     }
   }
 
@@ -156,7 +164,7 @@ class _SignInState extends State<SignIn> {
                         onPressed: () {
                           Navigator.push(context,
                             MaterialPageRoute(builder: (context) => const Login()));
-                        },
+                        }, 
                         child: const Text(
                           "Don't have an account? Create Account",
                           style: TextStyle(color: Colors.green),
@@ -169,7 +177,7 @@ class _SignInState extends State<SignIn> {
                         onPressed: () {
                           Navigator.push(context,
                             MaterialPageRoute(builder: (context) => const ForgotPassword()));
-                        },
+                        }, 
                         child: const Text(
                           'Forgot password?',
                           style: TextStyle(color: Colors.white),
