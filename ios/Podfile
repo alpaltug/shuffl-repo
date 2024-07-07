@@ -33,9 +33,10 @@ target 'Runner' do
   use_modular_headers!
 
   pod 'Firebase/Analytics'
-  pod 'Firebase/Auth'
-  pod 'Firebase/Firestore'
-  
+  pod 'Firebase/Auth', '~> 10.27.0'
+  pod 'Firebase/Firestore', '~> 10.27.0'
+  pod 'GoogleSignIn', '~> 7.1.0'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   
   target 'RunnerTests' do
