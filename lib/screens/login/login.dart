@@ -3,9 +3,7 @@ import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:my_flutter_app/widgets.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 
 class Login extends StatefulWidget {
@@ -21,7 +19,12 @@ class _LoginState extends State<Login> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
 
+  String? _errorMessage;
+
   void _register() async {
+    setState(() {
+      _errorMessage = null; 
+    });
     try {
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text,
@@ -34,29 +37,23 @@ class _LoginState extends State<Login> {
           builder: (context) => const CreateProfile(),
         ),
       );
-    } catch (e) {
-      print('Failed to register: $e'); // we can change later and reflect a message on the screen
-    }
-  }
-
-  void _signInWithGoogle() async {
-    try {
-      final googleUser = await GoogleSignIn().signIn();
-      final googleAuth = await googleUser?.authentication;
-      final credential = GoogleAuthProvider.credential(
-        idToken: googleAuth?.idToken,
-        accessToken: googleAuth?.accessToken,
-      );
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      await _firestoreService.addUser(userCredential.user!.uid, userCredential.user!.email!);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const CreateProfile(),
-        ),
-      );
-    } catch (e) {
-      print('Failed to sign in with Google: $e'); // we can change later and reflect a message on the screen
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        switch (e.code) {
+          case 'email-already-in-use':
+            _errorMessage = 'The email address is already in use by another account.';
+            break;
+          case 'invalid-email':
+            _errorMessage = 'The email address is not valid.';
+            break;
+          case 'weak-password':
+            _errorMessage = 'The password is not strong enough.';
+            break;
+          default:
+            _errorMessage = 'Failed to register: ${e.message}';
+            break;
+        }
+      });
     }
   }
 
@@ -105,6 +102,12 @@ class _LoginState extends State<Login> {
                       controller: _passwordController,
                     ),
                     const SizedBox(height: 20),
+                    if (_errorMessage != null)
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    const SizedBox(height: 20),
                     GreenActionButton(
                       text: 'Create Account',
                       onPressed: _register,
@@ -120,7 +123,7 @@ class _LoginState extends State<Login> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: _signInWithGoogle,
+                        onPressed: () {}, // BACKEND - Google Sign In API
                         icon: const Icon(Icons.g_translate_rounded, color: Colors.white),
                         label: const Text(
                           'Continue with Google',

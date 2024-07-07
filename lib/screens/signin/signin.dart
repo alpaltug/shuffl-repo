@@ -22,20 +22,20 @@ class _SignInState extends State<SignIn> {
 
   void _signIn() async {
     setState(() {
-      _errorMessage = null; // Clear the previous error message
+      _errorMessage = null; 
     });
     try {
       await _auth.signInWithEmailAndPassword(
         email: _emailController.text,
         password: _passwordController.text,
       );
-      // Navigate to the home page if the sign-in is successful
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const HomePage(),
         ),
       );
+      // https://pub.dev/documentation/firebase_auth/latest/firebase_auth/FirebaseAuth/signInWithEmailAndPassword.html
     } on FirebaseAuthException catch (e) {
       setState(() {
         switch (e.code) {
