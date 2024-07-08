@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
+import 'package:my_flutter_app/screens/verification/verification_screen.dart';  // added the import for verification_screen.dart
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -26,16 +27,32 @@ class _LoginState extends State<Login> {
     setState(() {
       _errorMessage = null;
     });
+
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
+
+    if (!email.endsWith('.edu')) {
+      setState(() {
+        _errorMessage = 'Please use a school email address ending with .edu';
+      });
+      return;
+    }
+
     try {
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text,
-        password: _passwordController.text,
+        email: email,
+        password: password,
       );
-      await _firestoreService.addUser(userCredential.user!.uid, _emailController.text);
+
+      User user = userCredential.user!;
+      await user.sendEmailVerification();
+
+      await _firestoreService.addUser(user.uid, _emailController.text);
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => const CreateProfile(),
+          builder: (context) => const VerificationScreen(),
         ),
       );
     } on FirebaseAuthException catch (e) {
@@ -44,7 +61,7 @@ class _LoginState extends State<Login> {
           case 'email-already-in-use':
             _errorMessage = 'The email address is already in use by another account.';
             break;
-          case 'invalid-email': //canruso@gmail7.com kabul edildi arastir
+          case 'invalid-email':
             _errorMessage = 'The email address is not valid.';
             break;
           case 'weak-password':

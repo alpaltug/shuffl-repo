@@ -26,10 +26,20 @@ class _SignInState extends State<SignIn> {
       _errorMessage = null;
     });
     try {
-      await _auth.signInWithEmailAndPassword(
+      //alp added the emailVerified check for signin
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text,
         password: _passwordController.text,
       );
+
+      User user = userCredential.user!;
+      //not emmmitted via error handling because not an error
+      if (!user.emailVerified) {
+        setState(() {
+          _errorMessage = 'Please verify your email before logging in.';
+        });
+        return;
+      }
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
