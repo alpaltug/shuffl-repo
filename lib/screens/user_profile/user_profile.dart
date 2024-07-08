@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/widgets.dart';
-import 'package:my_flutter_app/screens/user_public_profile/profile.dart';
+import 'package:my_flutter_app/screens/user_public_profile/user_public_profile.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -20,6 +19,7 @@ class _UserProfileState extends State<UserProfile> {
 
   String? _displayName;
   String? _email;
+  String? _imageUrl;
 
   @override
   void initState() {
@@ -34,6 +34,7 @@ class _UserProfileState extends State<UserProfile> {
       setState(() {
         _displayName = userProfile['fullName'];
         _email = userProfile['email'];
+        _imageUrl = userProfile['imageUrl'];
       });
     }
   }
@@ -57,9 +58,11 @@ class _UserProfileState extends State<UserProfile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 50,
-                      backgroundImage: AssetImage('assets/icons/ShuffleLogo.jpeg'), // PULL USER PP
+                      backgroundImage: _imageUrl != null && _imageUrl!.isNotEmpty
+                          ? NetworkImage(_imageUrl!)
+                          : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
                     ),
                     const SizedBox(height: 10),
                     Text(

@@ -31,17 +31,17 @@ dependencies:
   flutter:
     sdk: flutter
   google_maps_flutter: ^2.1.1
+  # https://pub.dev/packages/location
+  # location: ^7.0.0 - BUGS OUT ANDROID - Your project requires a newer version of the Kotlin Gradle plugin. 
+  #location: ^5.0.0  - this too 
   firebase_core: ^3.1.1
   firebase_auth: ^5.1.1
   cloud_firestore: ^5.0.2
   google_sign_in: ^6.2.1
   # https://pub.dev/packages/image_picker
   image_picker: ^1.1.2 
-
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.6
+  firebase_storage: ^12.1.0
 
 dev_dependencies:
   flutter_test:
