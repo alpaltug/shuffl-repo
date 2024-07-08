@@ -8,11 +8,15 @@ class FirestoreService {
       'email': email,
     });
   }
-    Future<void> updateUserProfile(String uid, String fullName, String phoneNumber, String description) async {
-    await _db.collection('users').doc(uid).update({
+
+  Future<void> updateUserProfile(String uid, String fullName, String phoneNumber, String description, [String? imageUrl]) async {
+    Map<String, dynamic> data = {
       'fullName': fullName,
       'phoneNumber': phoneNumber,
       'description': description,
-    });
+      'imageUrl': imageUrl != null && imageUrl.isNotEmpty ? imageUrl : null,
+    };
+
+    await _db.collection('users').doc(uid).update(data);
   }
 }

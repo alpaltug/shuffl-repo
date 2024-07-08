@@ -4,6 +4,9 @@ import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class CreateProfile extends StatefulWidget {
   const CreateProfile({super.key});
@@ -18,8 +21,59 @@ class _CreateProfileState extends State<CreateProfile> {
   final TextEditingController _descriptionController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
-
+  final ImagePicker _picker = ImagePicker();
+  File? _imageFile;
+  String? _imageUrl;
   String? _errorMessage;
+
+  Future<void> _pickImage(ImageSource source) async {
+    final pickedFile = await _picker.pickImage(source: source);
+
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _showImageSourceActionSheet(BuildContext context) async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo_library),
+              title: Text('Photo Library'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.camera_alt),
+              title: Text('Camera'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickImage(ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadImage() async {
+    if (_imageFile != null) {
+      String uid = _auth.currentUser!.uid;
+      Reference storageRef = FirebaseStorage.instance.ref().child('profile_pics/$uid');
+      UploadTask uploadTask = storageRef.putFile(_imageFile!);
+      TaskSnapshot taskSnapshot = await uploadTask;
+      _imageUrl = await taskSnapshot.ref.getDownloadURL();
+    }
+  }
 
   void _saveProfile() async {
     setState(() {
@@ -41,6 +95,8 @@ class _CreateProfileState extends State<CreateProfile> {
     }
 
     try {
+      await _uploadImage();
+
       User? user = _auth.currentUser;
       if (user != null) {
         await _firestoreService.updateUserProfile(
@@ -48,6 +104,7 @@ class _CreateProfileState extends State<CreateProfile> {
           _fullNameController.text,
           _phoneNumberController.text,
           _descriptionController.text,
+          _imageUrl,
         );
         Navigator.pushReplacement(
           context,
@@ -97,13 +154,15 @@ class _CreateProfileState extends State<CreateProfile> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 50,
-                      backgroundImage: AssetImage('assets/icons/ShuffleLogo.jpeg'),
+                      backgroundImage: _imageFile != null 
+                          ? FileImage(_imageFile!)
+                          : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
                     ),
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: () => _showImageSourceActionSheet(context),
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.white,
                         backgroundColor: Colors.grey[800],
