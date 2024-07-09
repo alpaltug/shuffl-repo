@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:my_flutter_app/screens/search_users/search_users.dart';  // Import the search users screen
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -60,7 +61,36 @@ class _HomePageState extends State<HomePage> {
           )
         ],
       ),
-      drawer: const Drawer(),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                color: Colors.blue,
+              ),
+              child: Text(
+                'Menu',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.search),
+              title: const Text('Search Users'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SearchUsers()),
+                );
+              },
+            ),
+            // Add more drawer options here
+          ],
+        ),
+      ),
       body: Column(
         children: [
           Padding(
