@@ -20,6 +20,10 @@ class _LoginState extends State<Login> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _userNameController = TextEditingController();
+  final TextEditingController _phoneNumberController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -33,6 +37,11 @@ class _LoginState extends State<Login> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String confirmPassword = _confirmPasswordController.text.trim();
+    String firstName = _firstNameController.text.trim();
+    String lastName = _lastNameController.text.trim();
+    String userName = _userNameController.text.trim();
+    String phoneNumber = _phoneNumberController.text.trim();
+    String name = firstName + " " + lastName;
 
     if (!email.endsWith('.edu')) {
       setState(() {
@@ -179,11 +188,31 @@ class _LoginState extends State<Login> {
                       'Create an account or sign in if you already have an existing account. Please enter a school designated email to get verified!',
                       style: TextStyle(color: Colors.white),
                     ),
+                    /*const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'First Name',
+                      controller: _firstNameController,
+                    ),*/
+                    /*const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Last Name',
+                      controller: _lastNameController,
+                    ),*/
                     const SizedBox(height: 20),
                     GreyTextField(
                       labelText: 'Email',
                       controller: _emailController,
                     ),
+                    /*const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Username',
+                      controller: _userNameController,
+                    ),*/
+                    /*const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Phone Number',
+                      controller: _phoneNumberController,
+                    ),*/
                     const SizedBox(height: 20),
                     GreyTextField(
                       labelText: 'Password',
