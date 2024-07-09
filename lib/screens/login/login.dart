@@ -52,7 +52,7 @@ class _LoginState extends State<Login> {
 
     if (password != confirmPassword) {
       setState(() {
-        _errorMessage = 'Passwords do not match.';
+        _errorMessage = 'Passwords do not match. Please try again.';
       });
       return;
     }
