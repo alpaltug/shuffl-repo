@@ -4,10 +4,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:profanity_filter/profanity_filter.dart';
 
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/widgets.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 
 class UserPublicProfile extends StatefulWidget {
   const UserPublicProfile({super.key});
@@ -20,13 +22,16 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ProfanityFilter _profanityFilter = ProfanityFilter();
+  final FirestoreService _firestoreService = FirestoreService();
 
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
 
   String? _displayName;
   String? _email;
-  String? _phoneNumber;
+  String? _username;
   String? _description;
   String? _imageUrl;
   XFile? _imageFile;
@@ -44,11 +49,12 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
       setState(() {
         _displayName = userProfile['fullName'];
         _email = userProfile['email'];
-        _phoneNumber = userProfile['phoneNumber'];
+        _username = userProfile['username'];
         _description = userProfile['description'];
         _imageUrl = userProfile['imageUrl'];
         _descriptionController.text = _description ?? '';
         _nameController.text = _displayName ?? '';
+        _usernameController.text = _username ?? '';
       });
     }
   }
@@ -62,10 +68,27 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
     });
   }
 
+  bool _containsProfanity(String input) {
+    final words = input.split(RegExp(r'\s+'));
+    for (var word in words) {
+      if (_profanityFilter.hasProfanity(word)) {
+        return true;
+      }
+    }
+    return _profanityFilter.hasProfanity(input);
+  }
+
   void _saveProfile() async {
     if (_nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Full Name is required.')),
+      );
+      return;
+    }
+
+    if (_usernameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Username is required.')),
       );
       return;
     }
@@ -75,6 +98,26 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
         const SnackBar(content: Text('Description is required.')),
       );
       return;
+    }
+
+    if (_containsProfanity(_nameController.text) ||
+        _containsProfanity(_usernameController.text) ||
+        _containsProfanity(_descriptionController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please remove profanity from your profile details.')),
+      );
+      return;
+    }
+
+    User? user = _auth.currentUser;
+    if (user != null && _usernameController.text != _username) {
+      bool usernameExists = await _firestoreService.checkIfUsernameExists(_usernameController.text);
+      if (usernameExists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('The username already exists. Please choose a different username.')),
+        );
+        return;
+      }
     }
 
     String? imageUrl;
@@ -87,10 +130,10 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
     }
 
     try {
-      User? user = _auth.currentUser;
       if (user != null) {
         await _firestore.collection('users').doc(user.uid).update({
           'fullName': _nameController.text,
+          'username': _usernameController.text,
           'description': _descriptionController.text,
           'imageUrl': imageUrl != null && imageUrl.isNotEmpty ? imageUrl : _imageUrl,
         });
@@ -177,79 +220,34 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
                       ),
                       child: const Text('Change Photo'),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _nameController,
-                            decoration: const InputDecoration(
-                              hintText: 'Enter your full name',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _email ?? '[Email]',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.green,
-                      ),
+                    const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Full Name',
+                      controller: _nameController,
                     ),
                     const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
+                    GreyTextField(
+                      labelText: 'Username',
+                      controller: _usernameController,
+                    ),
+                    const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Short Description',
+                      controller: _descriptionController,
+                    ),
+                    const SizedBox(height: 20),
+                    if (_email != null)
+                      Text(
+                        _email!,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.green,
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Profile Information',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          GreyTextField(
-                            labelText: 'Short Description',
-                            controller: _descriptionController,
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.phone, color: Colors.white),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _phoneNumber ?? '[Phone Number]',
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          GreenActionButton(
-                            text: 'Save',
-                            onPressed: _saveProfile,
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 20),
+                    GreenActionButton(
+                      text: 'Save',
+                      onPressed: _saveProfile,
                     ),
                   ],
                 ),

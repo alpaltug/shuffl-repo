@@ -34,6 +34,8 @@ class LogoAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   
 
+  
+
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight); // Constant from Flutter
 }
@@ -99,4 +101,36 @@ class GreyTextField extends StatelessWidget {
       ),
     );
   }
+}
+
+class LogolessAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+  const LogolessAppBar({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      backgroundColor: kBackgroundColor,
+      elevation: 0,
+      centerTitle: true,
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  @override
+  // TODO: implement preferredSize
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }

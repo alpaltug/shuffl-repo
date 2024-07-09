@@ -3,9 +3,11 @@ import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/forgot_password/forgot_password.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/login/login.dart';
+import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -18,6 +20,7 @@ class _SignInState extends State<SignIn> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirestoreService _firestoreService = FirestoreService();
 
   String? _errorMessage;
 
@@ -26,14 +29,20 @@ class _SignInState extends State<SignIn> {
       _errorMessage = null;
     });
     try {
-      //alp added the emailVerified check for signin
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text,
         password: _passwordController.text,
       );
 
       User user = userCredential.user!;
-      //not emmmitted via error handling because not an error
+      if (!user.email!.endsWith('.edu')) {
+        setState(() {
+          _errorMessage = 'Please use a school email address ending with .edu';
+        });
+        await _auth.signOut();
+        return;
+      }
+
       if (!user.emailVerified) {
         setState(() {
           _errorMessage = 'Please verify your email before logging in.';
@@ -80,21 +89,53 @@ class _SignInState extends State<SignIn> {
         idToken: googleAuth?.idToken,
         accessToken: googleAuth?.accessToken,
       );
-      await _auth.signInWithCredential(credential);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const HomePage(),
-        ),
-      );
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+
+      User? user = userCredential.user;
+
+      if (user != null && user.email != null && user.email!.endsWith('.edu')) {
+        final userExists = await _firestoreService.checkIfUserExists(user.uid);
+        if (userExists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomePage(),
+            ),
+          );
+        } else {
+          await _firestoreService.addUser(user.uid, user.email!);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreateProfile(),
+            ),
+          );
+        }
+      } else {
+        await _deleteUser(user);
+        await _auth.signOut();
+        setState(() {
+          _errorMessage = 'Please use a school email address ending with .edu';
+        });
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = null; //'Failed to sign in with Google: ${e.message}';
+        _errorMessage = 'Failed to sign in with Google: ${e.message}';
       });
     } catch (e) {
       setState(() {
-        _errorMessage = null; //'Failed to sign in with Google: $e';
+        _errorMessage = 'Failed to sign in with Google: $e';
       });
+    }
+  }
+
+  Future<void> _deleteUser(User? user) async {
+    if (user != null) {
+      try {
+        await user.delete();
+      } catch (e) {
+        print('Failed to delete user: $e');
+      }
     }
   }
 
@@ -178,25 +219,25 @@ class _SignInState extends State<SignIn> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {}, // BACKEND
-                        icon: const Icon(Icons.apple, color: Colors.white),
-                        label: const Text(
-                          'Continue with Apple',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
+                    // const SizedBox(height: 20),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: OutlinedButton.icon(
+                    //     onPressed: () {}, // BACKEND
+                    //     icon: const Icon(Icons.apple, color: Colors.white),
+                    //     label: const Text(
+                    //       'Continue with Apple',
+                    //       style: TextStyle(color: Colors.white),
+                    //     ),
+                    //     style: OutlinedButton.styleFrom(
+                    //       side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                    //       padding: const EdgeInsets.symmetric(vertical: 16),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(10),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                     const SizedBox(height: 20),
                     Center(
                       child: TextButton(

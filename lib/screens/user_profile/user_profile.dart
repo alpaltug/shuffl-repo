@@ -18,7 +18,7 @@ class _UserProfileState extends State<UserProfile> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String? _displayName;
-  String? _email;
+  String? _username;
   String? _imageUrl;
 
   @override
@@ -33,7 +33,7 @@ class _UserProfileState extends State<UserProfile> {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
       setState(() {
         _displayName = userProfile['fullName'];
-        _email = userProfile['email'];
+        _username = userProfile['username'];
         _imageUrl = userProfile['imageUrl'];
       });
     }
@@ -74,7 +74,7 @@ class _UserProfileState extends State<UserProfile> {
                       ),
                     ),
                     Text(
-                      _email ?? '[Email]',
+                      _username ?? '[username]',
                       style: const TextStyle(
                         fontSize: 16,
                         color: Colors.green,

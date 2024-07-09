@@ -7,6 +7,7 @@ import 'package:my_flutter_app/firestore_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'package:profanity_filter/profanity_filter.dart';
 
 class CreateProfile extends StatefulWidget {
   const CreateProfile({super.key});
@@ -17,7 +18,7 @@ class CreateProfile extends StatefulWidget {
 
 class _CreateProfileState extends State<CreateProfile> {
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _phoneNumberController = TextEditingController();
+  final TextEditingController _userNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
@@ -25,6 +26,7 @@ class _CreateProfileState extends State<CreateProfile> {
   File? _imageFile;
   String? _imageUrl;
   String? _errorMessage;
+  final filter = ProfanityFilter();
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source);
@@ -44,16 +46,16 @@ class _CreateProfileState extends State<CreateProfile> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.photo_library),
-              title: Text('Photo Library'),
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Photo Library'),
               onTap: () {
                 Navigator.of(context).pop();
                 _pickImage(ImageSource.gallery);
               },
             ),
             ListTile(
-              leading: Icon(Icons.camera_alt),
-              title: Text('Camera'),
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
               onTap: () {
                 Navigator.of(context).pop();
                 _pickImage(ImageSource.camera);
@@ -75,7 +77,7 @@ class _CreateProfileState extends State<CreateProfile> {
     }
   }
 
-  void _saveProfile() async {
+  Future<void> _saveProfile() async {
     setState(() {
       _errorMessage = null;
     });
@@ -87,6 +89,13 @@ class _CreateProfileState extends State<CreateProfile> {
       return;
     }
 
+    if (_userNameController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'A username is required.';
+      });
+      return;
+    }
+
     if (_descriptionController.text.isEmpty) {
       setState(() {
         _errorMessage = 'Description is required.';
@@ -94,7 +103,22 @@ class _CreateProfileState extends State<CreateProfile> {
       return;
     }
 
+    if (filter.hasProfanity(_fullNameController.text) || filter.hasProfanity(_userNameController.text) || filter.hasProfanity(_descriptionController.text)) {
+      setState(() {
+        _errorMessage = 'Please remove profanity from your profile details.';
+      });
+      return;
+    }
+
     try {
+      bool usernameExists = await _firestoreService.checkIfUsernameExists(_userNameController.text);
+      if (usernameExists) {
+        setState(() {
+          _errorMessage = 'The username already exists. Please choose a different username.';
+        });
+        return;
+      }
+
       await _uploadImage();
 
       User? user = _auth.currentUser;
@@ -102,7 +126,7 @@ class _CreateProfileState extends State<CreateProfile> {
         await _firestoreService.updateUserProfile(
           user.uid,
           _fullNameController.text,
-          _phoneNumberController.text,
+          _userNameController.text,
           _descriptionController.text,
           _imageUrl,
         );
@@ -179,8 +203,8 @@ class _CreateProfileState extends State<CreateProfile> {
                     ),
                     const SizedBox(height: 20),
                     GreyTextField(
-                      labelText: 'Phone Number (optional - lets implement this later)',
-                      controller: _phoneNumberController,
+                      labelText: 'Username',
+                      controller: _userNameController,
                     ),
                     const SizedBox(height: 20),
                     GreyTextField(
