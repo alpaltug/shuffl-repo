@@ -33,4 +33,24 @@ class FirestoreService {
     final result = await _db.collection('users').where('email', isEqualTo: email).get();
     return result.docs.isNotEmpty;
   }
+  Future<void> sendFriendRequest(String fromUid, String toUid) async {
+    await _db.collection('users').doc(toUid).collection('notifications').add({
+      'type': 'friend_request',
+      'fromUid': fromUid,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> acceptFriendRequest(String currentUserUid, String friendUid) async {
+    await _db.collection('users').doc(currentUserUid).update({
+      'friends': FieldValue.arrayUnion([friendUid]),
+    });
+    await _db.collection('users').doc(friendUid).update({
+      'friends': FieldValue.arrayUnion([currentUserUid]),
+    });
+  }
+
+  Future<void> declineFriendRequest(String notificationId, String userUid) async {
+    await _db.collection('users').doc(userUid).collection('notifications').doc(notificationId).delete();
+  }
 }

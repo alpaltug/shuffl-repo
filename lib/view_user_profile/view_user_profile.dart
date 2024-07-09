@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:my_flutter_app/widgets.dart'; // Make sure to import the widgets file where ShufflLogoAppBar is defined
+import 'package:my_flutter_app/widgets.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 
 class ViewUserProfile extends StatefulWidget {
   final String uid;
@@ -12,6 +14,8 @@ class ViewUserProfile extends StatefulWidget {
 
 class _ViewUserProfileState extends State<ViewUserProfile> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirestoreService _firestoreService = FirestoreService();
   DocumentSnapshot? userProfile;
   bool isLoading = true;
   String? _displayName;
@@ -46,8 +50,14 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
   }
 
   void _addFriend() async {
-    // Implement the logic for adding a friend here later hehe
-    print('Add friend button clicked');
+    User? currentUser = _auth.currentUser;
+
+    if (currentUser != null) {
+      await _firestoreService.sendFriendRequest(currentUser.uid, widget.uid);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Friend request sent')),
+      );
+    }
   }
 
   @override

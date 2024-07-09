@@ -3,7 +3,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:my_flutter_app/screens/search_users/search_users.dart';  // Import the search users screen
+import 'package:my_flutter_app/screens/search_users/search_users.dart';
+import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart'; // Import the notifications screen
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -47,6 +48,15 @@ class _HomePageState extends State<HomePage> {
         title: const Text('Shuffl'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+              );
+            },
+          ),
+          IconButton(
             icon: CircleAvatar(
               backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
                   ? NetworkImage(_profileImageUrl!)
@@ -58,7 +68,7 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (context) => const UserProfile()),
               );
             },
-          )
+          ),
         ],
       ),
       drawer: Drawer(
