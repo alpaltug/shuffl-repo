@@ -103,6 +103,7 @@ class _SignInState extends State<SignIn> {
             ),
           );
         } else {
+          await _firestoreService.addUser(user.uid, user.email!);
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -218,25 +219,25 @@ class _SignInState extends State<SignIn> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {}, // BACKEND
-                        icon: const Icon(Icons.apple, color: Colors.white),
-                        label: const Text(
-                          'Continue with Apple',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
+                    // const SizedBox(height: 20),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: OutlinedButton.icon(
+                    //     onPressed: () {}, // BACKEND
+                    //     icon: const Icon(Icons.apple, color: Colors.white),
+                    //     label: const Text(
+                    //       'Continue with Apple',
+                    //       style: TextStyle(color: Colors.white),
+                    //     ),
+                    //     style: OutlinedButton.styleFrom(
+                    //       side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                    //       padding: const EdgeInsets.symmetric(vertical: 16),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(10),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                     const SizedBox(height: 20),
                     Center(
                       child: TextButton(

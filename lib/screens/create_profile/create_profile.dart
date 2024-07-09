@@ -17,7 +17,7 @@ class CreateProfile extends StatefulWidget {
 
 class _CreateProfileState extends State<CreateProfile> {
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _phoneNumberController = TextEditingController();
+  final TextEditingController _userNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
@@ -44,16 +44,16 @@ class _CreateProfileState extends State<CreateProfile> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.photo_library),
-              title: Text('Photo Library'),
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Photo Library'),
               onTap: () {
                 Navigator.of(context).pop();
                 _pickImage(ImageSource.gallery);
               },
             ),
             ListTile(
-              leading: Icon(Icons.camera_alt),
-              title: Text('Camera'),
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
               onTap: () {
                 Navigator.of(context).pop();
                 _pickImage(ImageSource.camera);
@@ -75,7 +75,7 @@ class _CreateProfileState extends State<CreateProfile> {
     }
   }
 
-  void _saveProfile() async {
+  Future<void> _saveProfile() async {
     setState(() {
       _errorMessage = null;
     });
@@ -83,6 +83,13 @@ class _CreateProfileState extends State<CreateProfile> {
     if (_fullNameController.text.isEmpty) {
       setState(() {
         _errorMessage = 'Full Name is required.';
+      });
+      return;
+    }
+
+    if (_userNameController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'A username is required.';
       });
       return;
     }
@@ -95,6 +102,14 @@ class _CreateProfileState extends State<CreateProfile> {
     }
 
     try {
+      bool usernameExists = await _firestoreService.checkIfUsernameExists(_userNameController.text);
+      if (usernameExists) {
+        setState(() {
+          _errorMessage = 'The username already exists. Please choose a different username.';
+        });
+        return;
+      }
+
       await _uploadImage();
 
       User? user = _auth.currentUser;
@@ -102,7 +117,7 @@ class _CreateProfileState extends State<CreateProfile> {
         await _firestoreService.updateUserProfile(
           user.uid,
           _fullNameController.text,
-          _phoneNumberController.text,
+          _userNameController.text,
           _descriptionController.text,
           _imageUrl,
         );
@@ -179,8 +194,8 @@ class _CreateProfileState extends State<CreateProfile> {
                     ),
                     const SizedBox(height: 20),
                     GreyTextField(
-                      labelText: 'Phone Number (optional - lets implement this later)',
-                      controller: _phoneNumberController,
+                      labelText: 'Username',
+                      controller: _userNameController,
                     ),
                     const SizedBox(height: 20),
                     GreyTextField(

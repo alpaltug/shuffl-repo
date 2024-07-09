@@ -3,24 +3,35 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<void> addUser(String? userId, String email) {
-    return _db.collection('users').doc(userId).set({
+  Future<void> addUser(String uid, String email) async {
+    await _db.collection('users').doc(uid).set({
       'email': email,
+      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Future<void> updateUserProfile(String uid, String fullName, String phoneNumber, String description, [String? imageUrl]) async {
-    Map<String, dynamic> data = {
+  Future<void> updateUserProfile(
+      String uid, String fullName, String username, String description, String? imageUrl) async {
+    await _db.collection('users').doc(uid).update({
       'fullName': fullName,
-      'phoneNumber': phoneNumber,
+      'username': username,
       'description': description,
-      'imageUrl': imageUrl != null && imageUrl.isNotEmpty ? imageUrl : null,
-    };
-
-    await _db.collection('users').doc(uid).update(data);
+      'imageUrl': imageUrl,
+    });
   }
+
   Future<bool> checkIfUserExists(String uid) async {
-    final doc = await _db.collection('users').doc(uid).get();
+    DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
     return doc.exists;
+  }
+
+  Future<bool> checkIfUsernameExists(String username) async {
+    print('Checking if username exists: $username');
+    final result = await _db.collection('users').where('username', isEqualTo: username).get();
+    print('Username check result: ${result.docs}');
+    if (result.docs.isEmpty) {
+      return false;
+    }
+    return true;
   }
 }
