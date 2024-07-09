@@ -3,9 +3,11 @@ import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/forgot_password/forgot_password.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/login/login.dart';
+import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -18,6 +20,7 @@ class _SignInState extends State<SignIn> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirestoreService _firestoreService = FirestoreService();
 
   String? _errorMessage;
 
