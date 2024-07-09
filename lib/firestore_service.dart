@@ -27,9 +27,10 @@ class FirestoreService {
 
   Future<bool> checkIfUsernameExists(String username) async {
     final result = await _db.collection('users').where('username', isEqualTo: username).get();
-    if (result.docs.isEmpty) {
-      return false;
-    }
-    return true;
+    return result.docs.isNotEmpty;
+  }
+  Future<bool> checkIfEmailExists(String email) async {
+    final result = await _db.collection('users').where('email', isEqualTo: email).get();
+    return result.docs.isNotEmpty;
   }
 }
