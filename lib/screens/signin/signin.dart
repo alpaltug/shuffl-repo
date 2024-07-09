@@ -80,20 +80,31 @@ class _SignInState extends State<SignIn> {
         idToken: googleAuth?.idToken,
         accessToken: googleAuth?.accessToken,
       );
-      await _auth.signInWithCredential(credential);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const HomePage(),
-        ),
-      );
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      
+      User? user = userCredential.user;
+
+      if (user != null && user.email != null && user.email!.endsWith('.edu')) {
+        await _firestoreService.addUser(user.uid, user.email!);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const CreateProfile(),
+          ),
+        );
+      } else {
+        await _auth.signOut();
+        setState(() {
+          _errorMessage = 'Please use a school email address ending with .edu';
+        });
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = null; //'Failed to sign in with Google: ${e.message}';
+        _errorMessage = 'Failed to sign in with Google: ${e.message}';
       });
     } catch (e) {
       setState(() {
-        _errorMessage = null; //'Failed to sign in with Google: $e';
+        _errorMessage = 'Failed to sign in with Google: $e';
       });
     }
   }
