@@ -7,6 +7,7 @@ import 'package:my_flutter_app/firestore_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'package:profanity_filter/profanity_filter.dart';
 
 class CreateProfile extends StatefulWidget {
   const CreateProfile({super.key});
@@ -25,6 +26,7 @@ class _CreateProfileState extends State<CreateProfile> {
   File? _imageFile;
   String? _imageUrl;
   String? _errorMessage;
+  final filter = ProfanityFilter();
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source);
@@ -97,6 +99,13 @@ class _CreateProfileState extends State<CreateProfile> {
     if (_descriptionController.text.isEmpty) {
       setState(() {
         _errorMessage = 'Description is required.';
+      });
+      return;
+    }
+
+    if (filter.hasProfanity(_fullNameController.text) || filter.hasProfanity(_userNameController.text) || filter.hasProfanity(_descriptionController.text)) {
+      setState(() {
+        _errorMessage = 'Please remove profanity from your profile details.';
       });
       return;
     }

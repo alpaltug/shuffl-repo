@@ -26,9 +26,7 @@ class FirestoreService {
   }
 
   Future<bool> checkIfUsernameExists(String username) async {
-    print('Checking if username exists: $username');
     final result = await _db.collection('users').where('username', isEqualTo: username).get();
-    print('Username check result: ${result.docs}');
     if (result.docs.isEmpty) {
       return false;
     }
