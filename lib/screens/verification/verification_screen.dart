@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
+import 'package:my_flutter_app/widgets.dart'; 
 
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
@@ -43,9 +44,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Email Verification'),
-      ),
+      appBar: const LogoAppBar(title: 'Email Verification'),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -54,13 +53,13 @@ class _VerificationScreenState extends State<VerificationScreen> {
             children: [
               const Text(
                 'A verification email has been sent to your email address.',
-                style: TextStyle(fontSize: 18),
+                style: TextStyle(fontSize: 18, color: Colors.black),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               const Text(
                 'Please check your email and verify your account before logging in.',
-                style: TextStyle(fontSize: 16),
+                style: TextStyle(fontSize: 16, color: Colors.black),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),

@@ -19,6 +19,7 @@ class Login extends StatefulWidget {
 class _LoginState extends State<Login> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -31,10 +32,18 @@ class _LoginState extends State<Login> {
 
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
+    String confirmPassword = _confirmPasswordController.text.trim();
 
     if (!email.endsWith('.edu')) {
       setState(() {
         _errorMessage = 'Please use a school email address ending with .edu';
+      });
+      return;
+    }
+
+    if (password != confirmPassword) {
+      setState(() {
+        _errorMessage = 'Passwords do not match.';
       });
       return;
     }
@@ -48,7 +57,7 @@ class _LoginState extends State<Login> {
       User user = userCredential.user!;
       await user.sendEmailVerification();
 
-      await _firestoreService.addUser(user.uid, _emailController.text);
+      await _firestoreService.addUser(user.uid, email);
 
       Navigator.push(
         context,
@@ -182,6 +191,12 @@ class _LoginState extends State<Login> {
                       controller: _passwordController,
                     ),
                     const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Confirm Password',
+                      isPassword: true,
+                      controller: _confirmPasswordController,
+                    ),
+                    const SizedBox(height: 20),
                     if (_errorMessage != null)
                       Text(
                         _errorMessage!,
@@ -218,25 +233,6 @@ class _LoginState extends State<Login> {
                         ),
                       ),
                     ),
-                    // const SizedBox(height: 20),
-                    // SizedBox(
-                    //   width: double.infinity,
-                    //   child: OutlinedButton.icon(
-                    //     onPressed: () {}, // BACKEND - Apple Sign In API
-                    //     icon: const Icon(Icons.apple, color: Colors.white),
-                    //     label: const Text(
-                    //       'Continue with Apple',
-                    //       style: TextStyle(color: Colors.white),
-                    //     ),
-                    //     style: OutlinedButton.styleFrom(
-                    //       side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                    //       padding: const EdgeInsets.symmetric(vertical: 16),
-                    //       shape: RoundedRectangleBorder(
-                    //         borderRadius: BorderRadius.circular(10),
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
                     const SizedBox(height: 20),
                     Center(
                       child: TextButton(
@@ -264,3 +260,24 @@ class _LoginState extends State<Login> {
     );
   }
 }
+
+// APPLE SIGN IN BUTTON
+  // const SizedBox(height: 20),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: OutlinedButton.icon(
+                    //     onPressed: () {}, // BACKEND - Apple Sign In API
+                    //     icon: const Icon(Icons.apple, color: Colors.white),
+                    //     label: const Text(
+                    //       'Continue with Apple',
+                    //       style: TextStyle(color: Colors.white),
+                    //     ),
+                    //     style: OutlinedButton.styleFrom(
+                    //       side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                    //       padding: const EdgeInsets.symmetric(vertical: 16),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(10),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
