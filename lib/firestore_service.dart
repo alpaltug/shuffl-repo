@@ -19,4 +19,8 @@ class FirestoreService {
 
     await _db.collection('users').doc(uid).update(data);
   }
+  Future<bool> checkIfUserExists(String uid) async {
+    final doc = await _db.collection('users').doc(uid).get();
+    return doc.exists;
+  }
 }

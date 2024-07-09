@@ -29,14 +29,20 @@ class _SignInState extends State<SignIn> {
       _errorMessage = null;
     });
     try {
-      //alp added the emailVerified check for signin
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text,
         password: _passwordController.text,
       );
 
       User user = userCredential.user!;
-      //not emmmitted via error handling because not an error
+      if (!user.email!.endsWith('.edu')) {
+        setState(() {
+          _errorMessage = 'Please use a school email address ending with .edu';
+        });
+        await _auth.signOut();
+        return;
+      }
+
       if (!user.emailVerified) {
         setState(() {
           _errorMessage = 'Please verify your email before logging in.';
@@ -84,18 +90,28 @@ class _SignInState extends State<SignIn> {
         accessToken: googleAuth?.accessToken,
       );
       UserCredential userCredential = await _auth.signInWithCredential(credential);
-      
+
       User? user = userCredential.user;
 
       if (user != null && user.email != null && user.email!.endsWith('.edu')) {
-        await _firestoreService.addUser(user.uid, user.email!);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const CreateProfile(),
-          ),
-        );
+        final userExists = await _firestoreService.checkIfUserExists(user.uid);
+        if (userExists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomePage(),
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreateProfile(),
+            ),
+          );
+        }
       } else {
+        await _deleteUser(user);
         await _auth.signOut();
         setState(() {
           _errorMessage = 'Please use a school email address ending with .edu';
@@ -109,6 +125,16 @@ class _SignInState extends State<SignIn> {
       setState(() {
         _errorMessage = 'Failed to sign in with Google: $e';
       });
+    }
+  }
+
+  Future<void> _deleteUser(User? user) async {
+    if (user != null) {
+      try {
+        await user.delete();
+      } catch (e) {
+        print('Failed to delete user: $e');
+      }
     }
   }
 

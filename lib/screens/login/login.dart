@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
+import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:my_flutter_app/screens/verification/verification_screen.dart';  // added the import for verification_screen.dart
 import 'package:my_flutter_app/widgets.dart';
@@ -87,21 +88,51 @@ class _LoginState extends State<Login> {
         accessToken: googleAuth?.accessToken,
       );
       UserCredential userCredential = await _auth.signInWithCredential(credential);
-      await _firestoreService.addUser(userCredential.user!.uid, userCredential.user!.email!);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const CreateProfile(),
-        ),
-      );
+
+      User? user = userCredential.user;
+
+      if (user != null && user.email != null && user.email!.endsWith('.edu')) {
+        final userExists = await _firestoreService.checkIfUserExists(user.uid);
+        if (userExists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomePage(),
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreateProfile(),
+            ),
+          );
+        }
+      } else {
+        await _deleteUser(user);
+        await _auth.signOut();
+        setState(() {
+          _errorMessage = 'Please use a school email address ending with .edu';
+        });
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = null; //'Failed to sign in with Google: ${e.message}';
+        _errorMessage = 'Failed to sign in with Google: ${e.message}';
       });
     } catch (e) {
       setState(() {
-        _errorMessage = null; //'Failed to sign in with Google: $e';
+        _errorMessage = 'Failed to sign in with Google: $e';
       });
+    }
+  }
+
+  Future<void> _deleteUser(User? user) async {
+    if (user != null) {
+      try {
+        await user.delete();
+      } catch (e) {
+        print('Failed to delete user: $e');
+      }
     }
   }
 
