@@ -1,12 +1,13 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
+import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:my_flutter_app/screens/verification/verification_screen.dart';  // added the import for verification_screen.dart
 import 'package:my_flutter_app/widgets.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:my_flutter_app/firestore_service.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -18,6 +19,7 @@ class Login extends StatefulWidget {
 class _LoginState extends State<Login> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -30,10 +32,18 @@ class _LoginState extends State<Login> {
 
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
+    String confirmPassword = _confirmPasswordController.text.trim();
 
     if (!email.endsWith('.edu')) {
       setState(() {
         _errorMessage = 'Please use a school email address ending with .edu';
+      });
+      return;
+    }
+
+    if (password != confirmPassword) {
+      setState(() {
+        _errorMessage = 'Passwords do not match.';
       });
       return;
     }
@@ -47,7 +57,7 @@ class _LoginState extends State<Login> {
       User user = userCredential.user!;
       await user.sendEmailVerification();
 
-      await _firestoreService.addUser(user.uid, _emailController.text);
+      await _firestoreService.addUser(user.uid, email);
 
       Navigator.push(
         context,
@@ -87,28 +97,59 @@ class _LoginState extends State<Login> {
         accessToken: googleAuth?.accessToken,
       );
       UserCredential userCredential = await _auth.signInWithCredential(credential);
-      await _firestoreService.addUser(userCredential.user!.uid, userCredential.user!.email!);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const CreateProfile(),
-        ),
-      );
+
+      User? user = userCredential.user;
+
+      if (user != null && user.email != null && user.email!.endsWith('.edu')) {
+        final userExists = await _firestoreService.checkIfUserExists(user.uid);
+        if (userExists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomePage(),
+            ),
+          );
+        } else {
+          await _firestoreService.addUser(user.uid, user.email!);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreateProfile(),
+            ),
+          );
+        }
+      } else {
+        await _deleteUser(user);
+        await _auth.signOut();
+        setState(() {
+          _errorMessage = 'Please use a school email address ending with .edu';
+        });
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = null; //'Failed to sign in with Google: ${e.message}';
+        _errorMessage = 'Failed to sign in with Google: ${e.message}';
       });
     } catch (e) {
       setState(() {
-        _errorMessage = null; //'Failed to sign in with Google: $e';
+        _errorMessage = 'Failed to sign in with Google: $e';
       });
+    }
+  }
+
+  Future<void> _deleteUser(User? user) async {
+    if (user != null) {
+      try {
+        await user.delete();
+      } catch (e) {
+        print('Failed to delete user: $e');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogoAppBar(title: 'Shuffl'),
+      appBar: const LogolessAppBar(title: 'Shuffl'),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
@@ -150,6 +191,12 @@ class _LoginState extends State<Login> {
                       controller: _passwordController,
                     ),
                     const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Confirm Password',
+                      isPassword: true,
+                      controller: _confirmPasswordController,
+                    ),
+                    const SizedBox(height: 20),
                     if (_errorMessage != null)
                       Text(
                         _errorMessage!,
@@ -175,25 +222,6 @@ class _LoginState extends State<Login> {
                         icon: const Icon(Icons.g_translate_rounded, color: Colors.white),
                         label: const Text(
                           'Continue with Google',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {}, // BACKEND - Apple Sign In API
-                        icon: const Icon(Icons.apple, color: Colors.white),
-                        label: const Text(
-                          'Continue with Apple',
                           style: TextStyle(color: Colors.white),
                         ),
                         style: OutlinedButton.styleFrom(
@@ -232,3 +260,24 @@ class _LoginState extends State<Login> {
     );
   }
 }
+
+// APPLE SIGN IN BUTTON
+  // const SizedBox(height: 20),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: OutlinedButton.icon(
+                    //     onPressed: () {}, // BACKEND - Apple Sign In API
+                    //     icon: const Icon(Icons.apple, color: Colors.white),
+                    //     label: const Text(
+                    //       'Continue with Apple',
+                    //       style: TextStyle(color: Colors.white),
+                    //     ),
+                    //     style: OutlinedButton.styleFrom(
+                    //       side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                    //       padding: const EdgeInsets.symmetric(vertical: 16),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(10),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
