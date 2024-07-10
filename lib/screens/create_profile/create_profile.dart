@@ -77,6 +77,11 @@ class _CreateProfileState extends State<CreateProfile> {
     }
   }
 
+  bool _isValidUsername(String username) {
+    final RegExp usernameRegExp = RegExp(r'^[a-zA-Z0-9]+$');
+    return username.length >= 6 && username.length <= 20 && usernameRegExp.hasMatch(username);
+  }
+
   Future<void> _saveProfile() async {
     setState(() {
       _errorMessage = null;
@@ -103,9 +108,18 @@ class _CreateProfileState extends State<CreateProfile> {
       return;
     }
 
-    if (filter.hasProfanity(_fullNameController.text) || filter.hasProfanity(_userNameController.text) || filter.hasProfanity(_descriptionController.text)) {
+    if (filter.hasProfanity(_fullNameController.text) ||
+        filter.hasProfanity(_userNameController.text) ||
+        filter.hasProfanity(_descriptionController.text)) {
       setState(() {
         _errorMessage = 'Please remove profanity from your profile details.';
+      });
+      return;
+    }
+
+    if (!_isValidUsername(_userNameController.text)) {
+      setState(() {
+        _errorMessage = 'Username must be 6-20 characters long and can only contain alphabetic characters and numbers.';
       });
       return;
     }
@@ -180,7 +194,7 @@ class _CreateProfileState extends State<CreateProfile> {
                     const SizedBox(height: 20),
                     CircleAvatar(
                       radius: 50,
-                      backgroundImage: _imageFile != null 
+                      backgroundImage: _imageFile != null
                           ? FileImage(_imageFile!)
                           : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
                     ),
