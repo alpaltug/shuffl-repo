@@ -1,13 +1,13 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:my_flutter_app/screens/verification/verification_screen.dart';  // added the import for verification_screen.dart
 import 'package:my_flutter_app/widgets.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:my_flutter_app/firestore_service.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -20,6 +20,10 @@ class _LoginState extends State<Login> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _userNameController = TextEditingController();
+  final TextEditingController _phoneNumberController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -33,6 +37,11 @@ class _LoginState extends State<Login> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String confirmPassword = _confirmPasswordController.text.trim();
+    String firstName = _firstNameController.text.trim();
+    String lastName = _lastNameController.text.trim();
+    String userName = _userNameController.text.trim();
+    String phoneNumber = _phoneNumberController.text.trim();
+    String name = firstName + " " + lastName;
 
     if (!email.endsWith('.edu')) {
       setState(() {
@@ -43,7 +52,7 @@ class _LoginState extends State<Login> {
 
     if (password != confirmPassword) {
       setState(() {
-        _errorMessage = 'Passwords do not match.';
+        _errorMessage = 'Passwords do not match. Please try again.';
       });
       return;
     }
@@ -179,11 +188,31 @@ class _LoginState extends State<Login> {
                       'Create an account or sign in if you already have an existing account. Please enter a school designated email to get verified!',
                       style: TextStyle(color: Colors.white),
                     ),
+                    /*const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'First Name',
+                      controller: _firstNameController,
+                    ),*/
+                    /*const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Last Name',
+                      controller: _lastNameController,
+                    ),*/
                     const SizedBox(height: 20),
                     GreyTextField(
                       labelText: 'Email',
                       controller: _emailController,
                     ),
+                    /*const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Username',
+                      controller: _userNameController,
+                    ),*/
+                    /*const SizedBox(height: 20),
+                    GreyTextField(
+                      labelText: 'Phone Number',
+                      controller: _phoneNumberController,
+                    ),*/
                     const SizedBox(height: 20),
                     GreyTextField(
                       labelText: 'Password',
