@@ -53,4 +53,7 @@ class FirestoreService {
   Future<void> declineFriendRequest(String notificationId, String userUid) async {
     await _db.collection('users').doc(userUid).collection('notifications').doc(notificationId).delete();
   }
+  Future<QuerySnapshot> getUserByUsername(String username) {
+    return _db.collection('users').where('username', isEqualTo: username).get();
+  }
 }

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/forgot_password/forgot_password.dart';
@@ -24,13 +25,42 @@ class _SignInState extends State<SignIn> {
 
   String? _errorMessage;
 
+  Future<String?> _getEmailFromUsername(String username) async {
+    try {
+      QuerySnapshot snapshot = await _firestoreService.getUserByUsername(username);
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.first['email'];
+      }
+    } catch (e) {
+      print('Error fetching email from username: $e');
+    }
+    return null;
+  }
+
   void _signIn() async {
     setState(() {
       _errorMessage = null;
     });
+
+    String input = _emailController.text.trim();
+    String email;
+
+    if (input.contains('@')) {
+      email = input;
+    } else {
+      email = await _getEmailFromUsername(input) ?? '';
+    }
+
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage = 'Invalid email or username';
+      });
+      return;
+    }
+
     try {
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: _emailController.text,
+        email: email,
         password: _passwordController.text,
       );
 
@@ -59,7 +89,7 @@ class _SignInState extends State<SignIn> {
       setState(() {
         switch (e.code) {
           case 'user-not-found':
-            _errorMessage = 'Email does not exist. Please check your email.';
+            _errorMessage = 'Email or username does not exist. Please check your input.';
             break;
           case 'invalid-email':
             _errorMessage = 'The email address is not valid.';
@@ -173,7 +203,7 @@ class _SignInState extends State<SignIn> {
                     ),
                     const SizedBox(height: 20),
                     GreyTextField(
-                      labelText: 'Email',
+                      labelText: 'Email or Username',
                       controller: _emailController,
                     ),
                     const SizedBox(height: 20),
@@ -219,25 +249,6 @@ class _SignInState extends State<SignIn> {
                         ),
                       ),
                     ),
-                    // const SizedBox(height: 20),
-                    // SizedBox(
-                    //   width: double.infinity,
-                    //   child: OutlinedButton.icon(
-                    //     onPressed: () {}, // BACKEND
-                    //     icon: const Icon(Icons.apple, color: Colors.white),
-                    //     label: const Text(
-                    //       'Continue with Apple',
-                    //       style: TextStyle(color: Colors.white),
-                    //     ),
-                    //     style: OutlinedButton.styleFrom(
-                    //       side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                    //       padding: const EdgeInsets.symmetric(vertical: 16),
-                    //       shape: RoundedRectangleBorder(
-                    //         borderRadius: BorderRadius.circular(10),
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
                     const SizedBox(height: 20),
                     Center(
                       child: TextButton(
