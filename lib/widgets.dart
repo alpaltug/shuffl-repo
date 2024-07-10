@@ -3,7 +3,8 @@ import 'package:my_flutter_app/constants.dart';
 
 class LogoAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
-  const LogoAppBar({super.key, required this.title});
+  final List<Widget>? actions;
+  const LogoAppBar({super.key, required this.title, this.actions});
 
   @override
   Widget build(BuildContext context) {
@@ -11,6 +12,7 @@ class LogoAppBar extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: kBackgroundColor,
       elevation: 0,
       centerTitle: true,
+      actions: actions,
       title: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

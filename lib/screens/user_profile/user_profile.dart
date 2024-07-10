@@ -5,6 +5,8 @@ import 'package:my_flutter_app/screens/user_public_profile/user_public_profile.d
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:my_flutter_app/screens/user_friends/user_friends.dart';
+import 'package:my_flutter_app/screens/search_users/search_users.dart';
 
 class UserProfile extends StatefulWidget {
   const UserProfile({super.key});
@@ -42,7 +44,20 @@ class _UserProfileState extends State<UserProfile> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogoAppBar(title: 'Shuffl'),
+      appBar: AppBar(
+        title: const Text('Shuffl'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchUsers()),
+              );
+            },
+          ),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
@@ -120,6 +135,36 @@ class _UserProfileState extends State<UserProfile> {
                                   SizedBox(width: 10),
                                   Text(
                                     'Edit Profile',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  Spacer(),
+                                  Icon(Icons.arrow_forward_ios, color: Colors.white),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const UserFriends(),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.people, color: Colors.white),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Friends',
                                     style: TextStyle(color: Colors.white),
                                   ),
                                   Spacer(),
