@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:profanity_filter/profanity_filter.dart';
+import 'package:intl/intl.dart';
 
 class CreateProfile extends StatefulWidget {
   const CreateProfile({super.key});
@@ -20,6 +21,8 @@ class _CreateProfileState extends State<CreateProfile> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _userNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _birthdayController = TextEditingController();
+  String? _sexAssignedAtBirth;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
   final ImagePicker _picker = ImagePicker();
@@ -108,6 +111,20 @@ class _CreateProfileState extends State<CreateProfile> {
       return;
     }
 
+    if (_birthdayController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Birthday is required.';
+      });
+      return;
+    }
+
+    if (_sexAssignedAtBirth == null) {
+      setState(() {
+        _errorMessage = 'Sex assigned at birth is required.';
+      });
+      return;
+    }
+
     if (filter.hasProfanity(_fullNameController.text) ||
         filter.hasProfanity(_userNameController.text) ||
         filter.hasProfanity(_descriptionController.text)) {
@@ -143,6 +160,8 @@ class _CreateProfileState extends State<CreateProfile> {
           _userNameController.text,
           _descriptionController.text,
           _imageUrl,
+          _sexAssignedAtBirth!,
+          _birthdayController.text,
         );
         Navigator.pushReplacement(
           context,
@@ -154,6 +173,20 @@ class _CreateProfileState extends State<CreateProfile> {
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to save profile: $e';
+      });
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _birthdayController.text = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
   }
@@ -224,6 +257,37 @@ class _CreateProfileState extends State<CreateProfile> {
                     GreyTextField(
                       labelText: 'Short Description',
                       controller: _descriptionController,
+                    ),
+                    const SizedBox(height: 20),
+                    GreyDatePickerField(
+                      labelText: 'Birthday',
+                      controller: _birthdayController,
+                      onTap: () => _selectDate(context),
+                    ),
+                    const SizedBox(height: 20),
+                    DropdownButtonFormField<String>(
+                      value: _sexAssignedAtBirth,
+                      items: ['Male', 'Female']
+                          .map((label) => DropdownMenuItem(
+                                child: Text(label),
+                                value: label,
+                              ))
+                          .toList(),
+                      hint: const Text('Select Sex Assigned at Birth'),
+                      onChanged: (value) {
+                        setState(() {
+                          _sexAssignedAtBirth = value;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.grey[800],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      dropdownColor: Colors.grey[800],
+                      style: const TextStyle(color: Colors.white),
                     ),
                     const SizedBox(height: 20),
                     if (_errorMessage != null)
