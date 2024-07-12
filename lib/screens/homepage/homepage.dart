@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart';
-import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart'; // Import the location search screen
+import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -18,17 +19,17 @@ class _HomePageState extends State<HomePage> {
   late GoogleMapController mapController;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String? _profileImageUrl;
-
-  final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
-
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropoffController = TextEditingController();
+  String? _profileImageUrl;
+  LatLng? _currentPosition;
+  final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
 
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
+    _determinePosition();
   }
 
   void _loadUserProfile() async {
@@ -41,8 +42,41 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return Future.error('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return Future.error('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error('Location permissions are permanently denied, we cannot request permissions.');
+    }
+
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    setState(() {
+      _currentPosition = LatLng(position.latitude, position.longitude);
+      _pickupController.text = '${position.latitude}, ${position.longitude}';
+    });
+  }
+
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+    if (_currentPosition != null) {
+      mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
+      );
+    }
   }
 
   void _navigateToLocationSearch(bool isPickup) {
@@ -164,6 +198,8 @@ class _HomePageState extends State<HomePage> {
                 target: _center,
                 zoom: 15.0,
               ),
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
             ),
           ),
         ],
