@@ -2,7 +2,7 @@
     package="com.shufflmobility.my_flutter_app">
 
     <application
-        android:label="my_flutter_app"
+        android:label="Shuffl"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
