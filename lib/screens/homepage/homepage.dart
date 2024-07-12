@@ -97,18 +97,65 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Stream<int> _getNotificationCountStream() {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      return _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('notifications')
+          .snapshots()
+          .map((snapshot) => snapshot.docs.length);
+    }
+    return Stream.value(0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Shuffl'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+          StreamBuilder<int>(
+            stream: _getNotificationCountStream(),
+            builder: (context, snapshot) {
+              int notificationCount = snapshot.data ?? 0;
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                      );
+                    },
+                  ),
+                  if (notificationCount > 0)
+                    Positioned(
+                      right: 11,
+                      top: 11,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
+                        child: Text(
+                          '$notificationCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           ),
@@ -207,132 +254,3 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
-
-
-/*
-import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
-import 'package:location/location.dart';
-
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  late GoogleMapController mapController;
-  final Location location = Location();
-  bool _serviceEnabled = false;
-  PermissionStatus _permissionGranted = PermissionStatus.denied;
-  LocationData? _locationData;
-  final LatLng _initialPosition = const LatLng(37.8715, -122.2730); // our campus :) 
-
-  @override
-  void initState() {
-    super.initState();
-    _getLocationPermission();
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-    if (_locationData != null) {
-      mapController.animateCamera(CameraUpdate.newLatLng(
-        LatLng(_locationData!.latitude!, _locationData!.longitude!),
-      ));
-    }
-  }
-
-  Future<void> _getLocationPermission() async {
-    print('Requesting location service...');
-    _serviceEnabled = await location.serviceEnabled();
-    if (!_serviceEnabled) {
-      _serviceEnabled = await location.requestService();
-      if (!_serviceEnabled) {
-        print('Location service not enabled');
-        return;
-      }
-    }
-
-    print('Requesting location permission...');
-    _permissionGranted = await location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      _permissionGranted = await location.requestPermission();
-      if (_permissionGranted != PermissionStatus.granted) {
-        print('Location permission not granted');
-        return;
-      }
-    }
-
-    _locationData = await location.getLocation();
-    if (_locationData != null) {
-      mapController.animateCamera(CameraUpdate.newLatLng(
-        LatLng(_locationData!.latitude!, _locationData!.longitude!),
-      ));
-      print('Location obtained: ${_locationData!.latitude}, ${_locationData!.longitude}');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Shuffl'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle),
-            onPressed: () {
-              Navigator.push(context,
-              MaterialPageRoute(builder: (context) => const UserProfile()));
-            },
-          )
-        ],
-      ),
-      drawer: const Drawer(),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Enter pick-up location',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Enter destination',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GoogleMap(
-              onMapCreated: _onMapCreated,
-              initialCameraPosition: CameraPosition(
-                target: _initialPosition,
-                zoom: 15.0,
-              ),
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-*/
-
-
