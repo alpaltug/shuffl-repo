@@ -98,6 +98,54 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
     }
   }
 
+  Future<void> _unfriend() async {
+    User? currentUser = _auth.currentUser;
+
+    if (currentUser != null) {
+      await _firestore.collection('users').doc(currentUser.uid).update({
+        'friends': FieldValue.arrayRemove([widget.uid])
+      });
+      await _firestore.collection('users').doc(widget.uid).update({
+        'friends': FieldValue.arrayRemove([currentUser.uid])
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unfriended successfully')),
+      );
+
+      setState(() {
+        isAlreadyFriend = false;
+      });
+    }
+  }
+
+  void _showUnfriendConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Unfriend Confirmation', style: TextStyle(color: Colors.black)),
+          content: const Text('Are you sure you want to remove this friend?', style: TextStyle(color: Colors.black)),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Yes'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _unfriend();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,7 +154,7 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
         actions: [
           IconButton(
             icon: Icon(Icons.search),
-            onPressed: null, // Add navigation to search users page if needed
+            onPressed: null, 
           ),
         ],
       ),
@@ -148,16 +196,9 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
                   ),
                   const Spacer(),
                   GreenActionButton(
-                    text: isAlreadyFriend
-                        ? 'Already Friends'
-                        : isFriendRequestSent
-                            ? 'Request Sent'
-                            : 'Add Friend',
-                    onPressed: () {
-                      if (!isAlreadyFriend && !isFriendRequestSent) {
-                        _addFriend();
-                      }
-                    },
+                    text: isAlreadyFriend ? 'Unfriend' : isFriendRequestSent ? 'Request Sent' : 'Add Friend',
+                    onPressed: isAlreadyFriend ? _showUnfriendConfirmationDialog : _addFriend,
+                    color: isAlreadyFriend ? Colors.red : Colors.green,
                   ),
                 ],
               ),

@@ -42,14 +42,16 @@ class LogoAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight); // Constant from Flutter
 }
 
-class GreenActionButton extends StatelessWidget { // yesil dugmeler - backend isi cikaracak
+class GreenActionButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
+  final Color color; // Added color parameter
 
   const GreenActionButton({
     super.key,
     required this.text,
     required this.onPressed,
+    this.color = Colors.green, // Default color is green
   });
 
   @override
@@ -59,7 +61,7 @@ class GreenActionButton extends StatelessWidget { // yesil dugmeler - backend is
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
+          backgroundColor: color,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
