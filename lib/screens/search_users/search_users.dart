@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/widgets.dart';
+import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 
 class SearchUsers extends StatefulWidget {
   const SearchUsers({super.key});
@@ -13,9 +15,17 @@ class SearchUsers extends StatefulWidget {
 class _SearchUsersState extends State<SearchUsers> {
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   List<DocumentSnapshot> _users = [];
   bool _isLoading = false;
   String? _errorMessage;
+  User? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = _auth.currentUser;
+  }
 
   void _searchUsers(String query) async {
     setState(() {
@@ -60,6 +70,7 @@ class _SearchUsersState extends State<SearchUsers> {
                 ),
               ),
               onChanged: _searchUsers,
+              style: const TextStyle(color: Colors.black),
             ),
             const SizedBox(height: 16),
             if (_isLoading)
@@ -67,7 +78,7 @@ class _SearchUsersState extends State<SearchUsers> {
             else if (_errorMessage != null)
               Text(_errorMessage!, style: const TextStyle(color: Colors.red))
             else if (_users.isEmpty)
-              const Text('No users found.')
+              const Text('No users found.', style: TextStyle(color: Colors.black))
             else
               Expanded(
                 child: ListView.builder(
@@ -87,12 +98,21 @@ class _SearchUsersState extends State<SearchUsers> {
                       title: Text(fullName),
                       subtitle: Text('@$username'),
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ViewUserProfile(uid: user.id),
-                          ),
-                        );
+                        if (user.id == _currentUser?.uid) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const UserProfile(),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ViewUserProfile(uid: user.id),
+                            ),
+                          );
+                        }
                       },
                     );
                   },

@@ -113,6 +113,7 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
+              style: const TextStyle(color: Colors.black),
             ),
           ),
           Padding(
@@ -125,6 +126,7 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
+              style: const TextStyle(color: Colors.black),
             ),
           ),
           Expanded(
