@@ -44,6 +44,7 @@ dependencies:
   firebase_storage: ^12.1.0
   # https://pub.dev/packages/profanity_filter/versions/2.0.0
   profanity_filter: ^2.0.0
+  http: ^1.2.1
 
 dev_dependencies:
   flutter_test:

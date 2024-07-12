@@ -4,7 +4,8 @@ import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
-import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart'; // Import the notifications screen
+import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart';
+import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart'; // Import the location search screen
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,6 +21,9 @@ class _HomePageState extends State<HomePage> {
   String? _profileImageUrl;
 
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
+
+  final TextEditingController _pickupController = TextEditingController();
+  final TextEditingController _dropoffController = TextEditingController();
 
   @override
   void initState() {
@@ -39,6 +43,24 @@ class _HomePageState extends State<HomePage> {
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+  }
+
+  void _navigateToLocationSearch(bool isPickup) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LocationSearchScreen(
+          isPickup: isPickup,
+          onSelectAddress: (address) {
+            if (isPickup) {
+              _pickupController.text = address;
+            } else {
+              _dropoffController.text = address;
+            }
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -106,6 +128,7 @@ class _HomePageState extends State<HomePage> {
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
+              controller: _pickupController,
               decoration: InputDecoration(
                 hintText: 'Enter pick-up location',
                 prefixIcon: const Icon(Icons.location_on),
@@ -114,11 +137,14 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               style: const TextStyle(color: Colors.black),
+              readOnly: true,
+              onTap: () => _navigateToLocationSearch(true),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
+              controller: _dropoffController,
               decoration: InputDecoration(
                 hintText: 'Enter destination',
                 prefixIcon: const Icon(Icons.location_on),
@@ -127,6 +153,8 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               style: const TextStyle(color: Colors.black),
+              readOnly: true,
+              onTap: () => _navigateToLocationSearch(false),
             ),
           ),
           Expanded(
