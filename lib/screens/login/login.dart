@@ -20,10 +20,10 @@ class _LoginState extends State<Login> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
-  final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _lastNameController = TextEditingController();
-  final TextEditingController _userNameController = TextEditingController();
-  final TextEditingController _phoneNumberController = TextEditingController();
+  // final TextEditingController _firstNameController = TextEditingController();
+  // final TextEditingController _lastNameController = TextEditingController();
+  // final TextEditingController _userNameController = TextEditingController();
+  // final TextEditingController _phoneNumberController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -37,11 +37,11 @@ class _LoginState extends State<Login> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String confirmPassword = _confirmPasswordController.text.trim();
-    String firstName = _firstNameController.text.trim();
-    String lastName = _lastNameController.text.trim();
-    String userName = _userNameController.text.trim();
-    String phoneNumber = _phoneNumberController.text.trim();
-    String name = firstName + " " + lastName;
+    // String firstName = _firstNameController.text.trim();
+    // String lastName = _lastNameController.text.trim();
+    // String userName = _userNameController.text.trim();
+    // String phoneNumber = _phoneNumberController.text.trim();
+    // String name = firstName + " " + lastName;
 
     if (!email.endsWith('.edu')) {
       setState(() {
