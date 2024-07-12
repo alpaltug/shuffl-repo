@@ -1,9 +1,9 @@
-// user_friends.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
+import 'package:my_flutter_app/view_user_profile/view_user_profile.dart';
 
 class UserFriends extends StatefulWidget {
   const UserFriends({super.key});
@@ -77,6 +77,12 @@ class _UserFriendsState extends State<UserFriends> {
                       ? NetworkImage(friend['imageUrl'])
                       : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
                 ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ViewUserProfile(uid: friend.id)),
+                  );
+                },
               );
             },
           );
