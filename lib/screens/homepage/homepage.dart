@@ -7,6 +7,7 @@ import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart';
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
+import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart'; 
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,6 +23,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropoffController = TextEditingController();
   String? _profileImageUrl;
+  String? _username;
   LatLng? _currentPosition;
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
 
@@ -38,6 +40,7 @@ class _HomePageState extends State<HomePage> {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
       setState(() {
         _profileImageUrl = userProfile['imageUrl'];
+        _username = userProfile['username'];
       });
     }
   }
@@ -115,6 +118,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Shuffl'),
+        backgroundColor: Colors.yellow,
         actions: [
           StreamBuilder<int>(
             stream: _getNotificationCountStream(),
@@ -160,15 +164,11 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           IconButton(
-            icon: CircleAvatar(
-              backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
-                  ? NetworkImage(_profileImageUrl!)
-                  : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-            ),
+            icon: const Icon(Icons.chat),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const UserProfile()),
+                MaterialPageRoute(builder: (context) => const ChatsScreen()),
               );
             },
           ),
@@ -178,15 +178,35 @@ class _HomePageState extends State<HomePage> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: <Widget>[
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                color: Colors.yellow,
               ),
-              child: Text(
-                'Menu',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const UserProfile()),
+                  );
+                },
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                          ? NetworkImage(_profileImageUrl!)
+                          : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _username ?? 'amk',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

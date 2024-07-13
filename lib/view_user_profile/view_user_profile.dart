@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
+import 'package:my_flutter_app/screens/friend_chat_screen/friend_chat_screen.dart';
 
 class ViewUserProfile extends StatefulWidget {
   final String uid;
@@ -146,6 +147,15 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
     );
   }
 
+  void _navigateToChat() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(friendUid: widget.uid),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,7 +164,7 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
         actions: [
           IconButton(
             icon: Icon(Icons.search),
-            onPressed: null, 
+            onPressed: null, // Add navigation to search users page if needed
           ),
         ],
       ),
@@ -195,11 +205,31 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
                     textAlign: TextAlign.center,
                   ),
                   const Spacer(),
-                  GreenActionButton(
-                    text: isAlreadyFriend ? 'Unfriend' : isFriendRequestSent ? 'Request Sent' : 'Add Friend',
-                    onPressed: isAlreadyFriend ? _showUnfriendConfirmationDialog : _addFriend,
-                    color: isAlreadyFriend ? Colors.red : Colors.green,
-                  ),
+                  if (isAlreadyFriend)
+                    Column(
+                      children: [
+                        GreenActionButton(
+                          text: 'Message',
+                          color: Colors.blue,
+                          onPressed: _navigateToChat,
+                        ),
+                        const SizedBox(height: 10),
+                        GreenActionButton(
+                          text: 'Unfriend',
+                          color: Colors.red,
+                          onPressed: _showUnfriendConfirmationDialog,
+                        ),
+                      ],
+                    )
+                  else
+                    GreenActionButton(
+                      text: isFriendRequestSent ? 'Request Sent' : 'Add Friend',
+                      onPressed: () {
+                        if (!isFriendRequestSent) {
+                          _addFriend();
+                        }
+                      },
+                    ),
                 ],
               ),
             ),

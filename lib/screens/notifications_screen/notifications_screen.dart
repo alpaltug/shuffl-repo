@@ -57,9 +57,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 var notifications = snapshot.data!.docs;
 
                 if (notifications.isEmpty) {
-                  return const Center(child: Text('No notifications'));
+                  // make text black
+                  return const Center(child: Text('No notifications', style: TextStyle(color: Colors.black)));
                 }
-
                 return ListView.builder(
                   itemCount: notifications.length,
                   itemBuilder: (context, index) {
