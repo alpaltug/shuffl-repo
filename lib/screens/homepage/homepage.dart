@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +12,9 @@ import 'package:my_flutter_app/screens/notifications_screen/notifications_screen
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart';
 import 'package:my_flutter_app/firestore_service.dart';
+import 'package:http/http.dart' as http;
+
+final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -68,33 +73,52 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
   }
 
-  Future<void> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  Future<String> _getAddressFromLatLng(LatLng position) async {
+  final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$google_maps_api_key';
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled.');
+  final response = await http.get(Uri.parse(url));
+  if (response.statusCode == 200) {
+    final jsonResponse = json.decode(response.body);
+    if (jsonResponse['status'] == 'OK') {
+      return jsonResponse['results'][0]['formatted_address'];
+    } else {
+      return 'Unknown location';
     }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error('Location permissions are permanently denied, we cannot request permissions.');
-    }
-
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    setState(() {
-      _currentPosition = LatLng(position.latitude, position.longitude);
-      _pickupController.text = '${position.latitude}, ${position.longitude}';
-    });
+  } else {
+    return 'Failed to get address';
   }
+}
+
+  Future<void> _determinePosition() async {
+  bool serviceEnabled;
+  LocationPermission permission;
+
+  serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!serviceEnabled) {
+    return Future.error('Location services are disabled.');
+  }
+
+  permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) {
+      return Future.error('Location permissions are denied');
+    }
+  }
+
+  if (permission == LocationPermission.deniedForever) {
+    return Future.error('Location permissions are permanently denied, we cannot request permissions.');
+  }
+
+  Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+  LatLng currentPosition = LatLng(position.latitude, position.longitude);
+  String address = await _getAddressFromLatLng(currentPosition);
+
+  setState(() {
+    _currentPosition = currentPosition;
+    _pickupController.text = address;
+  });
+}
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;

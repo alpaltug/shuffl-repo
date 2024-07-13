@@ -60,7 +60,6 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isPickup ? 'Pick-up Location' : 'Drop-off Location'),
-        // make background color yellow
         backgroundColor: Colors.yellow,
       ),
       body: Padding(
