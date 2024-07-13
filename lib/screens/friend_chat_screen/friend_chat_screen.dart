@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String friendUid;
@@ -14,6 +15,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _controller = TextEditingController();
   late String chatId;
   String? friendUsername;
@@ -30,6 +32,7 @@ class _ChatScreenState extends State<ChatScreen> {
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
       chatId = _getChatId(currentUser.uid, widget.friendUid);
+      _firestoreService.markMessagesAsRead(chatId, currentUser.uid);
       setState(() {});
     }
   }
@@ -48,50 +51,23 @@ class _ChatScreenState extends State<ChatScreen> {
     return uid1.hashCode <= uid2.hashCode ? '$uid1-$uid2' : '$uid2-$uid1';
   }
 
-  void _sendMessage() {
+  void _sendMessage() async {
     if (_controller.text.isEmpty) return;
 
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
-      final message = {
-        'senderId': currentUser.uid,
-        'content': _controller.text,
-        'timestamp': FieldValue.serverTimestamp(),
-      };
-
-      _firestore.collection('users').doc(currentUser.uid)
-          .collection('chats').doc(chatId)
-          .collection('messages').add(message);
-
-      _firestore.collection('users').doc(widget.friendUid)
-          .collection('chats').doc(chatId)
-          .collection('messages').add(message);
-
-      final lastMessage = {
-        'participants': [currentUser.uid, widget.friendUid],
-        'lastMessage': {
-          'content': _controller.text,
-          'timestamp': FieldValue.serverTimestamp(),
-        },
-      };
-
-      _firestore.collection('users').doc(currentUser.uid)
-          .collection('chats').doc(chatId)
-          .set(lastMessage, SetOptions(merge: true));
-
-      _firestore.collection('users').doc(widget.friendUid)
-          .collection('chats').doc(chatId)
-          .set(lastMessage, SetOptions(merge: true));
+      await _firestoreService.sendMessage(chatId, currentUser.uid, widget.friendUid, _controller.text);
+      // Mark the message as read for the sender
+      await _firestoreService.markMessagesAsRead(chatId, currentUser.uid);
+      _controller.clear();
     }
-
-    _controller.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.yellow, // Set background color to black
+        backgroundColor: Colors.yellow, // Set background color to yellow
         title: Row(
           children: [
             CircleAvatar(
@@ -100,7 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
             ),
             const SizedBox(width: 10),
-            Text(friendUsername ?? 'Shuffl User', style: const TextStyle(color: Colors.black)), // Set text color to white
+            Text(friendUsername ?? 'Shuffl User', style: const TextStyle(color: Colors.black)), // Set text color to black
           ],
         ),
       ),

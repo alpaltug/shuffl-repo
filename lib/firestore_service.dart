@@ -44,14 +44,14 @@ class FirestoreService {
   }
 
   Future<void> sendFriendRequest(String fromUid, String toUid) async {
-  DocumentReference notificationRef = await _db.collection('users').doc(toUid).collection('notifications').add({
-    'type': 'friend_request',
-    'fromUid': fromUid,
-    'timestamp': FieldValue.serverTimestamp(),
-  });
+    DocumentReference notificationRef = await _db.collection('users').doc(toUid).collection('notifications').add({
+      'type': 'friend_request',
+      'fromUid': fromUid,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
 
-  await notificationRef.update({'id': notificationRef.id});
-}
+    await notificationRef.update({'id': notificationRef.id});
+  }
 
   Future<void> acceptFriendRequest(String currentUserUid, String friendUid) async {
     await _db.collection('users').doc(currentUserUid).update({
@@ -114,17 +114,20 @@ class FirestoreService {
   }
 
   Future<void> sendMessage(String chatId, String currentUserId, String friendUserId, String messageContent) async {
+    final messageData = {
+      'content': messageContent,
+      'timestamp': FieldValue.serverTimestamp(),
+      'senderId': currentUserId,
+      'read': currentUserId == friendUserId,
+    };
+
     await _db
         .collection('users')
         .doc(currentUserId)
         .collection('chats')
         .doc(chatId)
         .collection('messages')
-        .add({
-      'content': messageContent,
-      'timestamp': FieldValue.serverTimestamp(),
-      'senderId': currentUserId,
-    });
+        .add(messageData);
 
     await _db
         .collection('users')
@@ -136,30 +139,76 @@ class FirestoreService {
       'content': messageContent,
       'timestamp': FieldValue.serverTimestamp(),
       'senderId': currentUserId,
+      'read': false,
     });
+
+    final lastMessageData = {
+      'lastMessage': {
+        'content': messageContent,
+        'timestamp': FieldValue.serverTimestamp(),
+      },
+      'participants': [currentUserId, friendUserId],
+    };
 
     await _db
         .collection('users')
         .doc(currentUserId)
         .collection('chats')
         .doc(chatId)
-        .update({
-      'lastMessage': {
-        'content': messageContent,
-        'timestamp': FieldValue.serverTimestamp(),
-      }
-    });
+        .set(lastMessageData, SetOptions(merge: true));
 
     await _db
         .collection('users')
         .doc(friendUserId)
         .collection('chats')
         .doc(chatId)
-        .update({
-      'lastMessage': {
-        'content': messageContent,
-        'timestamp': FieldValue.serverTimestamp(),
+        .set(lastMessageData, SetOptions(merge: true));
+  }
+
+  Future<void> markMessagesAsRead(String chatId, String userId) async {
+    final unreadMessages = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .where('read', isEqualTo: false)
+        .get();
+
+    for (var message in unreadMessages.docs) {
+      await _db
+          .collection('users')
+          .doc(userId)
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc(message.id)
+          .update({'read': true});
+    }
+  }
+
+  Future<int> getUnreadMessageSenderCount(String userId) async {
+    final messagesSnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('chats')
+        .get();
+
+    Set<String> uniqueSenders = {};
+    for (var doc in messagesSnapshot.docs) {
+      var chatDoc = await _db
+          .collection('users')
+          .doc(userId)
+          .collection('chats')
+          .doc(doc.id)
+          .collection('messages')
+          .where('read', isEqualTo: false)
+          .where('senderId', isNotEqualTo: userId)
+          .get();
+      for (var message in chatDoc.docs) {
+        uniqueSenders.add(message['senderId']);
       }
-    });
+    }
+    return uniqueSenders.length;
   }
 }

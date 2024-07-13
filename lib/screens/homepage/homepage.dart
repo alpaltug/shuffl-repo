@@ -3,11 +3,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:my_flutter_app/main.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart';
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
-import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart'; 
+import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,15 +18,17 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with RouteAware {
   late GoogleMapController mapController;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropoffController = TextEditingController();
+  final FirestoreService _firestoreService = FirestoreService();
   String? _profileImageUrl;
   String? _username;
   LatLng? _currentPosition;
+  int _uniqueMessageSenderCount = 0;
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
 
   @override
@@ -32,6 +36,24 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadUserProfile();
     _determinePosition();
+    _listenToUnreadMessageSenderCount();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute<dynamic>);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    _getUniqueUnreadMessageSenderCount();
   }
 
   void _loadUserProfile() async {
@@ -113,6 +135,25 @@ class _HomePageState extends State<HomePage> {
     return Stream.value(0);
   }
 
+  void _listenToUnreadMessageSenderCount() {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      _firestore.collection('users').doc(currentUser.uid).collection('chats').snapshots().listen((snapshot) {
+        _getUniqueUnreadMessageSenderCount();
+      });
+    }
+  }
+
+  Future<void> _getUniqueUnreadMessageSenderCount() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      int count = await _firestoreService.getUnreadMessageSenderCount(currentUser.uid);
+      setState(() {
+        _uniqueMessageSenderCount = count;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -163,14 +204,42 @@ class _HomePageState extends State<HomePage> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.chat),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ChatsScreen()),
-              );
-            },
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chat),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ChatsScreen()),
+                  );
+                },
+              ),
+              if (_uniqueMessageSenderCount > 0)
+                Positioned(
+                  right: 11,
+                  top: 11,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 14,
+                      minHeight: 14,
+                    ),
+                    child: Text(
+                      '$_uniqueMessageSenderCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

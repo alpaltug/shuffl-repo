@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:my_flutter_app/screens/friend_chat_screen/friend_chat_screen.dart'; // Import ChatScreen
+import 'package:my_flutter_app/screens/friend_chat_screen/friend_chat_screen.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({super.key});
@@ -44,15 +44,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
               return FutureBuilder<DocumentSnapshot>(
                 future: _firestore.collection('users').doc(friendUid).get(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
+                builder: (context, friendSnapshot) {
+                  if (!friendSnapshot.hasData) {
                     return const ListTile();
                   }
 
-                  var friendData = snapshot.data!;
+                  var friendData = friendSnapshot.data!;
                   var friendUsername = friendData['username'];
                   var friendImageUrl = friendData['imageUrl'];
-                  var lastMessage = chat['lastMessage']['content'];
+                  var lastMessage = chat['lastMessage']?['content'] ?? 'No message';
 
                   return ListTile(
                     leading: CircleAvatar(
