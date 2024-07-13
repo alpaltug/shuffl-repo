@@ -53,6 +53,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   @override
   void didPopNext() {
+    _loadUserProfile();
     _getUniqueUnreadMessageSenderCount();
   }
 
