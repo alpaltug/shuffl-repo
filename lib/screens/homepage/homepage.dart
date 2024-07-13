@@ -111,6 +111,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       MaterialPageRoute(
         builder: (context) => LocationSearchScreen(
           isPickup: isPickup,
+          currentPosition: _currentPosition,
           onSelectAddress: (address) {
             if (isPickup) {
               _pickupController.text = address;
