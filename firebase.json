@@ -1,1 +1,57 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"shuffl-c2c6b","appId":"1:645162960578:android:b238c4c9e5cd2601e91d5b","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"shuffl-c2c6b","appId":"1:645162960578:ios:d8841e684b98e766e91d5b","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"shuffl-c2c6b","appId":"1:645162960578:ios:d8841e684b98e766e91d5b","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"shuffl-c2c6b","configurations":{"android":"1:645162960578:android:b238c4c9e5cd2601e91d5b","ios":"1:645162960578:ios:d8841e684b98e766e91d5b","macos":"1:645162960578:ios:d8841e684b98e766e91d5b","web":"1:645162960578:web:5d35f096cbd2ae7ae91d5b","windows":"1:645162960578:web:91dd9386b14a1821e91d5b"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "shuffl-c2c6b",
+          "appId": "1:645162960578:android:b238c4c9e5cd2601e91d5b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "shuffl-c2c6b",
+          "appId": "1:645162960578:ios:d8841e684b98e766e91d5b",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "shuffl-c2c6b",
+          "appId": "1:645162960578:ios:d8841e684b98e766e91d5b",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "shuffl-c2c6b",
+          "configurations": {
+            "android": "1:645162960578:android:b238c4c9e5cd2601e91d5b",
+            "ios": "1:645162960578:ios:d8841e684b98e766e91d5b",
+            "macos": "1:645162960578:ios:d8841e684b98e766e91d5b",
+            "web": "1:645162960578:web:5d35f096cbd2ae7ae91d5b",
+            "windows": "1:645162960578:web:91dd9386b14a1821e91d5b"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "echo Skipping lint step"
+      ]
+    }
+  ]
+}

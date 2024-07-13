@@ -44,12 +44,14 @@ class FirestoreService {
   }
 
   Future<void> sendFriendRequest(String fromUid, String toUid) async {
-    await _db.collection('users').doc(toUid).collection('notifications').add({
-      'type': 'friend_request',
-      'fromUid': fromUid,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-  }
+  DocumentReference notificationRef = await _db.collection('users').doc(toUid).collection('notifications').add({
+    'type': 'friend_request',
+    'fromUid': fromUid,
+    'timestamp': FieldValue.serverTimestamp(),
+  });
+
+  await notificationRef.update({'id': notificationRef.id});
+}
 
   Future<void> acceptFriendRequest(String currentUserUid, String friendUid) async {
     await _db.collection('users').doc(currentUserUid).update({
