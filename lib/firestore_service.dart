@@ -211,4 +211,35 @@ class FirestoreService {
     }
     return uniqueSenders.length;
   }
+  Future<List<Map<String, dynamic>>> getUsersBySex(String sex) async {
+    final result = await _db.collection('users')
+        .where('sexAssignedAtBirth', isEqualTo: sex)
+        .get();
+    return result.docs.map((doc) => doc.data()).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getUsersByAgeRange(int minAge, int maxAge) async {
+    DateTime now = DateTime.now();
+    DateTime minDate = now.subtract(Duration(days: maxAge * 365));
+    DateTime maxDate = now.subtract(Duration(days: minAge * 365));
+
+    final result = await _db.collection('users')
+        .where('birthday', isLessThanOrEqualTo: maxDate.toIso8601String())
+        .where('birthday', isGreaterThanOrEqualTo: minDate.toIso8601String())
+        .get();
+    return result.docs.map((doc) => doc.data()).toList();
+  }
+
+  Future<List<String>> getUsersBySchoolDomain(String email) async {
+  final domain = _extractDomainFromEmail(email);
+  final result = await _db.collection('users')
+      .where('email', arrayContains: '@$domain.edu')
+      .get();
+  return result.docs.map((doc) => doc.id).toList();
+  }
+  String _extractDomainFromEmail(String email) {
+  final RegExp regExp = RegExp(r'@([a-zA-Z0-9]+)\.edu$');
+  final match = regExp.firstMatch(email);
+  return match != null ? match.group(1) ?? '' : '';
+  }
 }
