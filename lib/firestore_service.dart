@@ -7,6 +7,7 @@ class FirestoreService {
     await _db.collection('users').doc(uid).set({
       'email': email,
       'createdAt': FieldValue.serverTimestamp(),
+      'domain': _extractDomainFromEmail(email),
     });
   }
 
@@ -230,16 +231,18 @@ class FirestoreService {
     return result.docs.map((doc) => doc.data()).toList();
   }
 
-  Future<List<String>> getUsersBySchoolDomain(String email) async {
-  final domain = _extractDomainFromEmail(email);
-  final result = await _db.collection('users')
-      .where('email', arrayContains: '@$domain.edu')
-      .get();
-  return result.docs.map((doc) => doc.id).toList();
+  Future<List<Map<String, dynamic>>> getUsersBySchoolDomain(String domain) async {
+    final result = await _db.collection('users')
+        .where('domain', isEqualTo: domain)
+        .get();
+    return result.docs.map((doc) => doc.data()).toList();
   }
+
   String _extractDomainFromEmail(String email) {
-  final RegExp regExp = RegExp(r'@([a-zA-Z0-9]+)\.edu$');
-  final match = regExp.firstMatch(email);
-  return match != null ? match.group(1) ?? '' : '';
+    final RegExp regExp = RegExp(r'@([a-zA-Z0-9]+)\.edu$');
+    final match = regExp.firstMatch(email);
+    final domain = match != null ? match.group(1) ?? '' : '';
+    print('Extracted domain from email $email: $domain');
+    return domain;
   }
 }
