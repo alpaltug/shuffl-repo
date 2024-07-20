@@ -8,6 +8,11 @@ class FirestoreService {
       'email': email,
       'createdAt': FieldValue.serverTimestamp(),
       'domain': _extractDomainFromEmail(email),
+      'preferences': {
+        'ageRange': {'min': 18, 'max': 80},
+        'schoolToggle': false,
+        'sameGenderToggle': false,
+      },
     });
   }
 
