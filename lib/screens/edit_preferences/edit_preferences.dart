@@ -45,25 +45,25 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
       'preferences.schoolToggle': _sameSchoolToggle,
     });
 
-    // Navigate to the homepage after saving preferences
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => HomePage()),  // Replace HomePage with your actual homepage widget
+      MaterialPageRoute(builder: (context) => HomePage()),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) { 
     return Scaffold(
       appBar: AppBar(
         title: Text('Edit Preferences'),
+        backgroundColor: Colors.yellow,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Age Range: ${_currentMinAge.toInt()} - ${_currentMaxAge.toInt()}'),
+            Text('Age Range: ${_currentMinAge.toInt()} - ${_currentMaxAge.toInt()}', style: TextStyle(color: Colors.black)),
             RangeSlider(
               values: RangeValues(_currentMinAge, _currentMaxAge),
               min: 18,

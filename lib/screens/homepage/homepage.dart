@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:my_flutter_app/main.dart';
+import 'package:my_flutter_app/screens/edit_preferences/edit_preferences.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart';
@@ -182,190 +183,203 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Shuffl'),
-        backgroundColor: Colors.yellow,
-        actions: [
-          StreamBuilder<int>(
-            stream: _getNotificationCountStream(),
-            builder: (context, snapshot) {
-              int notificationCount = snapshot.data ?? 0;
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                      );
-                    },
-                  ),
-                  if (notificationCount > 0)
-                    Positioned(
-                      right: 11,
-                      top: 11,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 14,
-                          minHeight: 14,
-                        ),
-                        child: Text(
-                          '$notificationCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Shuffl'),
+      backgroundColor: Colors.yellow,
+      actions: [
+        StreamBuilder<int>(
+          stream: _getNotificationCountStream(),
+          builder: (context, snapshot) {
+            int notificationCount = snapshot.data ?? 0;
+            return Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                    );
+                  },
+                ),
+                if (notificationCount > 0)
+                  Positioned(
+                    right: 11,
+                    top: 11,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    ),
-                ],
-              );
-            },
-          ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chat),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ChatsScreen()),
-                  );
-                },
-              ),
-              if (_uniqueMessageSenderCount > 0)
-                Positioned(
-                  right: 11,
-                  top: 11,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 14,
-                      minHeight: 14,
-                    ),
-                    child: Text(
-                      '$_uniqueMessageSenderCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
+                      constraints: const BoxConstraints(
+                        minWidth: 14,
+                        minHeight: 14,
                       ),
-                      textAlign: TextAlign.center,
+                      child: Text(
+                        '$notificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: <Widget>[
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Colors.yellow,
-              ),
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const UserProfile()),
-                  );
-                },
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
-                          ? NetworkImage(_profileImageUrl!)
-                          : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _username ?? 'amk',
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.search),
-              title: const Text('Search Users'),
-              onTap: () {
+              ],
+            );
+          },
+        ),
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chat),
+              onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SearchUsers()),
+                  MaterialPageRoute(builder: (context) => const ChatsScreen()),
                 );
               },
             ),
-            // Add more drawer options here
+            if (_uniqueMessageSenderCount > 0)
+              Positioned(
+                right: 11,
+                top: 11,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 14,
+                    minHeight: 14,
+                  ),
+                  child: Text(
+                    '$_uniqueMessageSenderCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
           ],
         ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _pickupController,
-              decoration: InputDecoration(
-                hintText: 'Enter pick-up location',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+      ],
+    ),
+    drawer: Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: <Widget>[
+          DrawerHeader(
+            decoration: const BoxDecoration(
+              color: Colors.yellow,
+            ),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const UserProfile()),
+                );
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                        ? NetworkImage(_profileImageUrl!)
+                        : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _username ?? 'amk',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
               ),
-              style: const TextStyle(color: Colors.black),
-              readOnly: true,
-              onTap: () => _navigateToLocationSearch(true),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _dropoffController,
-              decoration: InputDecoration(
-                hintText: 'Enter destination',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              style: const TextStyle(color: Colors.black),
-              readOnly: true,
-              onTap: () => _navigateToLocationSearch(false),
-            ),
+          ListTile(
+            leading: const Icon(Icons.search),
+            title: const Text('Search Users'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchUsers()),
+              );
+            },
           ),
-          Expanded(
-            child: GoogleMap(
-              onMapCreated: _onMapCreated,
-              initialCameraPosition: CameraPosition(
-                target: _center,
-                zoom: 15.0,
-              ),
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-            ),
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text('Edit Preferences'),
+            onTap: () {
+              User? user = _auth.currentUser;
+              if (user != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => EditPreferencesPage(uid: user.uid)),
+                );
+              }
+            },
           ),
+          // Add more drawer options here
         ],
       ),
-    );
+    ),
+    body: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _pickupController,
+            decoration: InputDecoration(
+              hintText: 'Enter pick-up location',
+              prefixIcon: const Icon(Icons.location_on),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(true),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _dropoffController,
+            decoration: InputDecoration(
+              hintText: 'Enter destination',
+              prefixIcon: const Icon(Icons.location_on),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(false),
+          ),
+        ),
+        Expanded(
+          child: GoogleMap(
+            onMapCreated: _onMapCreated,
+            initialCameraPosition: CameraPosition(
+              target: _center,
+              zoom: 15.0,
+            ),
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+          ),
+        ),
+      ],
+    ),
+  );
   }
 }
