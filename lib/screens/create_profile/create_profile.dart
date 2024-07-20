@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
-import 'package:my_flutter_app/screens/homepage/homepage.dart';
+import 'package:my_flutter_app/screens/edit_preferences/edit_preferences.dart';
+// import 'package:my_flutter_app/screens/homepage/homepage.dart';
+
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
@@ -166,9 +168,9 @@ class _CreateProfileState extends State<CreateProfile> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const HomePage(),
-          ),
-        );
+            builder: (context) => EditPreferencesPage(uid: user.uid), 
+  ),
+);
       }
     } catch (e) {
       setState(() {
