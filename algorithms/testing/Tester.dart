@@ -34,7 +34,18 @@ Person generate_passenger(int id){
   int school = rand.nextInt(10);
   int drop;
   var schools = [];
-  schools.add(school_library[school]);
+  if(rand.nextInt(2) == 1){
+    for (int i = 0; i < 10; i++){
+      schools.add(school_library[i]);
+    }
+  } else {
+    schools.add(school_library[school]);
+    for (int i = 0; i < 10; i++){
+      if(i != school && rand.nextInt(10) == 7){
+        schools.add(school_library[i]);
+      }
+    }
+  }
   while (true){
     drop = rand.nextInt(dim);//dropoff
     if(dist(pick, drop) > walk){
