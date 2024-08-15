@@ -4,7 +4,7 @@ class Person {
   int? dropoff;
   int? current_location;
   bool? is_male;
-  String? school;
+  String school = "";
   int? age;
   int? min_age;
   int? max_age;
@@ -17,6 +17,9 @@ class Person {
   
   void Move(int location){
     this.current_location = location;
+  }
+  String getSchool(){
+    return school;
   }
   /*bool operator ==(Object other) {
     // TODO: implement ==
