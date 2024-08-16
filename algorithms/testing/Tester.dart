@@ -1,5 +1,7 @@
 import "dart:math";
 
+//import "dart:collection";
+
 import "Car.dart";
 import "Person.dart";
 
@@ -11,7 +13,13 @@ var school_library = ["UC Berkeley", "Contra Costa", "Stanford", "UCSB", "UCLA",
 //below: our map as a distance array
 var ourMap =  List<List>.generate(dim, (i) => List<dynamic>.generate(dim, (index) => null, growable: false), growable: false);
 
-Person generate_passenger(int id){
+//NOT NECESSARY, SHOULD SUPPORT REPRIORITIZING
+/*class PriorityQueue {//for Djikstra's
+  Queue ourQueue = new Queue();
+  PriorityQueue();
+}*/
+
+Person generate_passenger(){
   //randomly generate: pickup, dropoff (sufficiently far away), age, sex, school, school/age/sex/walking preferences
   //age design: tend to be in 20s, with variance from 18 to 50
   //formula: rand(0, 10) + 18 + max(0, rand(0, 200) - 160)
@@ -52,7 +60,7 @@ Person generate_passenger(int id){
       break;
     }
   }
-  Person bob = new Person(id, pick, drop, (male != 0), school_library[school], age, minAge, maxAge, (sex_preference != 0), schools, walk);
+  Person bob = new Person(pick, drop, (male != 0), school_library[school], age, minAge, maxAge, (sex_preference != 0), schools, walk);
   return bob;
 }
 
@@ -72,7 +80,7 @@ void main() {
     fleet.add(car);
   }
   var bob_schools = ["UC Berkeley"];//placeholder person to get rid of later
-  Person bob = new Person(0, 0, 20, true, "UC Berkeley", 20, 18, 25, false, bob_schools, 5);
+  Person bob = new Person(0, 20, true, "UC Berkeley", 20, 18, 25, false, bob_schools, 5);
   ride_requests.add(bob);
   ride_requests.remove(bob);
   //create our map

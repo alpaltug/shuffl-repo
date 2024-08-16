@@ -1,8 +1,8 @@
 import "Person.dart";
 class Car {
-  int? id;
+  int id;
   var passengers = [];
-  int? current_location;
+  int current_location;
   var pickups = [];
   var dropoffs = []; //can start with one
 
