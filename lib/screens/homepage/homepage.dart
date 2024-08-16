@@ -130,6 +130,77 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
   }
 
+  String _generatePickupLocationId(LatLng location) {
+    // R latitude and longitude to 3 decimal places (~111 meters precision)
+    String lat = location.latitude.toStringAsFixed(3);
+    String lng = location.longitude.toStringAsFixed(3);
+    return '$lat,$lng';
+  }
+
+  //New method to call when a ride request is created
+  Future<void> _createRideRequest() async {
+  User? user = _auth.currentUser;
+  if (user == null) return;
+
+  String pickupLocationId = _generatePickupLocationId(_currentPosition!);
+
+  // Query ride requests with the same pickup location identifier
+  QuerySnapshot existingRides = await _firestore
+      .collection('rides')
+      .where('pickupLocationId', isEqualTo: pickupLocationId)
+      .get();
+
+  bool matched = false;
+
+  for (var doc in existingRides.docs) {
+    // Placeholder for matching logic based on user preferences, etc.
+    bool isMatch = _validateMatch(doc); // Implement this later
+
+    if (isMatch) {
+      // Add user to existing ride and update destinations
+      await doc.reference.update({
+        'participants': FieldValue.arrayUnion([user.uid]),
+        'dropoffLocations': FieldValue.arrayUnion([_dropoffController.text]),
+      });
+      matched = true;
+      break;
+    }
+  }
+
+  if (!matched) {
+    // Create a new ride request if no match was found
+    await _firestore.collection('rides').add({
+      'pickupLocationId': pickupLocationId,
+      'pickupLocation': _pickupController.text,
+      'dropoffLocations': [_dropoffController.text], // Store dropoff locations as an array
+      'participants': [user.uid],
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+}
+
+
+  bool _validateMatch(DocumentSnapshot rideRequest) {
+    // Implement the matching logic here in the future
+    return true;
+  }
+
+
+
+//New method to call when the user clicks the "Find Ride" button
+void _findRide() async {
+  if (_pickupController.text.isNotEmpty && _dropoffController.text.isNotEmpty) {
+    await _createRideRequest();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ride request sent!')),
+    );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please select both pickup and dropoff locations.')),
+    );
+  }
+}
+
   void _navigateToLocationSearch(bool isPickup) {
     Navigator.push(
       context,
@@ -366,6 +437,10 @@ class _HomePageState extends State<HomePage> with RouteAware {
             readOnly: true,
             onTap: () => _navigateToLocationSearch(false),
           ),
+        ),
+        ElevatedButton(
+          onPressed: _findRide,
+          child: const Text('Find Ride'),
         ),
         Expanded(
           child: GoogleMap(
