@@ -2,6 +2,8 @@ import "dart:math";
 
 //import "dart:collection";
 
+import "package:collection/collection.dart";
+
 import "Car.dart";
 import "Person.dart";
 
@@ -10,13 +12,14 @@ int dim = 1000; //how many nodes? can modify globally from here
 var rand = Random(); //random number Dart generator
 var school_library = ["UC Berkeley", "Contra Costa", "Stanford", "UCSB", "UCLA", "Diablo Valley", "Sierra CC", "Santa Barbara CC", "Westmont College", "Laguna Blanca School"];
 //above: schools passengers come from
-//below: our map as a distance array
+//below: our map as a weighted adjacency list (could convert to distance array if needed)
 var ourMap =  List<List>.generate(dim, (i) => List<dynamic>.generate(dim, (index) => null, growable: false), growable: false);
 
 //NOT NECESSARY, SHOULD SUPPORT REPRIORITIZING
-/*class PriorityQueue {//for Djikstra's
+/*class PQueue {//for Djikstra's
   Queue ourQueue = new Queue();
-  PriorityQueue();
+
+  PQueue();
 }*/
 
 Person generate_passenger(){
@@ -64,7 +67,53 @@ Person generate_passenger(){
   return bob;
 }
 
+//Setup for Djikstra's
+
+List<int> dists = [];
+
+var prev = [];
+
+bool update(int u, int v, int w){
+  bool updated = false;
+  if (dists[u] + w < dists[v]){
+    prev[v] = u;
+    updated = true;
+  }
+  dists[v] = min(dists[v], dists[u] + w);
+  return updated;
+}
+
 int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
+  dists = [];
+  prev = [];
+  for (int i = 0; i < dim; i++){
+    dists.add(double.maxFinite.toInt());
+  }
+  for (int i = 0; i < dim; i++){
+    prev.add(Null);
+  }
+  dists[a] = 0;
+  HeapPriorityQueue checkers = HeapPriorityQueue();
+  //checkers.add(0, a);
+  while (!checkers.isEmpty){
+    int u = checkers.removeFirst();
+    /*if (u == b){
+      int d = u;
+      while(d != s){
+
+      }
+    }*/
+    for (int i = 0; i < ourMap[u].length; i++){
+      /*
+      int v = G[u][i][0];
+      int w = G[u][i][1];
+      if update(u, v, w){
+        checkers.insert(dists[v], v);
+      }
+      */
+    }
+  }
+  //return dists[b];
   return 100;
 }
 

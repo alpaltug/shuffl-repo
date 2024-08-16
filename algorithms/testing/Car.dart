@@ -8,6 +8,14 @@ class Car {
 
   Car(this.id, this.current_location);
 
+  int getID(){
+    return id;
+  }
+
+  int getLoc(){
+    return current_location;
+  }
+
   void travel(int location){
     for (int i = 0; i < passengers.length; i++){
       passengers[i].Move(location);
