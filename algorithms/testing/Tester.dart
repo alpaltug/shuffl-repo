@@ -59,6 +59,7 @@ Person generate_passenger(){
   }
   while (true){
     drop = rand.nextInt(dim);//dropoff
+    assert(dim > walk);//could infinite loop otherwise
     if(dist(pick, drop) > walk){
       break;
     }
@@ -94,23 +95,22 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
   }
   dists[a] = 0;
   HeapPriorityQueue checkers = HeapPriorityQueue();
-  //checkers.add(0, a);
+  checkers.add((0, a));
   while (!checkers.isEmpty){
-    int u = checkers.removeFirst();
+    int u = checkers.removeFirst()[0];
     /*if (u == b){
       int d = u;
       while(d != s){
 
       }
-    }*/
+    }*///not needed
     for (int i = 0; i < ourMap[u].length; i++){
-      /*
-      int v = G[u][i][0];
-      int w = G[u][i][1];
-      if update(u, v, w){
-        checkers.insert(dists[v], v);
+      int v = ourMap[u][i][0];
+      int w = ourMap[u][i][1];
+      if (update(u, v, w)){
+        checkers.add((dists[v], v));
       }
-      */
+      
     }
   }
   //return dists[b];
