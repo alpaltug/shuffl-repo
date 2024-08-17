@@ -128,7 +128,7 @@ void generateMap() {
       if(i == j){
         ourMap[i][j] = (j, 0);
       }
-      else if (j % i == 0){
+      else if ((j + 1) % (i + 1) == 0){
         ourMap[i][j] = (j, rand.nextInt(100));
       }
     }
@@ -147,6 +147,7 @@ void main() {
   ride_requests.add(bob);
   ride_requests.remove(bob);
   //create our map
+  generateMap();
   /* 
   Create an nxn (maybe 1000x1000) nested 2-dimensional edge "distance" matrix
   We need a mechanism to somewhat represent "neighborhoods" of connected nodes, with the graph being fully connected
