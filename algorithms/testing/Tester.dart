@@ -43,7 +43,7 @@ Person generate_passenger(){
   int male = rand.nextInt(2);
   int sex_preference = rand.nextInt(2);
   int school = rand.nextInt(10);
-  int drop;
+  int drop = 0; //will reset it
   var schools = [];
   if(rand.nextInt(2) == 1){
     for (int i = 0; i < 10; i++){
@@ -57,13 +57,17 @@ Person generate_passenger(){
       }
     }
   }
-  while (true){
-    drop = rand.nextInt(dim);//dropoff
-    assert(dim > walk);//could infinite loop otherwise
+  //assert(dim > walk);//could infinite loop otherwise//IGNORE
+  int antiLoop = 0;
+  int probDim = 28 * dim;
+  while (antiLoop < probDim){
+    drop = rand.nextInt(dim); //dropoff
     if(dist(pick, drop) > walk){
       break;
     }
+    antiLoop++;
   }
+  assert(antiLoop < probDim);//test case valid?
   Person bob = new Person(pick, drop, (male != 0), school_library[school], age, minAge, maxAge, (sex_preference != 0), schools, walk);
   return bob;
 }
@@ -105,20 +109,30 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
       }
     }*///not needed
     for (int i = 0; i < ourMap[u].length; i++){
-      int v = ourMap[u][i][0];
-      int w = ourMap[u][i][1];
+      int v = ourMap[u][i][0];//node
+      int w = ourMap[u][i][1];//distance
       if (update(u, v, w)){
         checkers.add((dists[v], v));
       }
       
     }
   }
-  //return dists[b];
-  return 100;
+  return dists[b];
+  //return 100;
 }
 
 void generateMap() {
   //Here we generate our map
+  for(int i = 0; i < dim; i++){
+    for(int j = i; j < dim; j++){
+      if(i == j){
+        ourMap[i][j] = (j, 0);
+      }
+      else if (j % i == 0){
+        ourMap[i][j] = (j, rand.nextInt(100));
+      }
+    }
+  }
 }
 
 void main() {
