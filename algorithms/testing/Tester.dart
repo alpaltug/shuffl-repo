@@ -15,6 +15,8 @@ var school_library = ["UC Berkeley", "Contra Costa", "Stanford", "UCSB", "UCLA",
 //below: our map as a weighted adjacency list (could convert to distance array if needed)
 var ourMap =  List<List>.generate(dim, (i) => List<dynamic>.generate(dim, (index) => null, growable: false), growable: false);
 
+//var adMap = [];
+
 //NOT NECESSARY, SHOULD SUPPORT REPRIORITIZING
 /*class PQueue {//for Djikstra's
   Queue ourQueue = new Queue();
@@ -93,9 +95,8 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
   prev = [];
   for (int i = 0; i < dim; i++){
     dists.add(double.maxFinite.toInt());
-  }
-  for (int i = 0; i < dim; i++){
     prev.add(Null);
+    //adMap.add();
   }
   dists[a] = 0;
   HeapPriorityQueue checkers = HeapPriorityQueue();
@@ -120,16 +121,26 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
   return dists[b];
   //return 100;
 }
-
+//ideas: list of primes, randomly
+//generate random points, then randomly connect them until graph fully connected, feed into adjacency list
 void generateMap() {
   //Here we generate our map
   for(int i = 0; i < dim; i++){
     for(int j = i; j < dim; j++){
       if(i == j){
-        ourMap[i][j] = (j, 0);
+        //ourMap[i][j] = (j, 0);
+        ourMap[i].add((j, 0));
+      }/*(j + 1) % (i + 1) == 0 */
+      else if (i == 0){
+        //ourMap[i][j] = (j, rand.nextInt(100));
+        int dis = rand.nextInt(100);
+        ourMap[i].add((j, dis));
+        ourMap[j].add((i, dis));
       }
-      else if ((j + 1) % (i + 1) == 0){
-        ourMap[i][j] = (j, rand.nextInt(100));
+      else if (rand.nextInt(100) >= 80){
+        int dis = rand.nextInt(100);
+        ourMap[i].add((j, dis));
+        ourMap[j].add((i, dis));
       }
     }
   }
