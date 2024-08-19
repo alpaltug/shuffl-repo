@@ -8,10 +8,14 @@ class FirestoreService {
       'email': email,
       'createdAt': FieldValue.serverTimestamp(),
       'domain': _extractDomainFromEmail(email),
+      'rating': null, 
+      'numRides': 0, 
       'preferences': {
         'ageRange': {'min': 18, 'max': 80},
         'schoolToggle': false,
         'sameGenderToggle': false,
+        'minCarCapacity': 2, 
+        'maxCarCapacity': 5, 
       },
     });
   }
