@@ -99,10 +99,12 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
     //adMap.add();
   }
   dists[a] = 0;
-  HeapPriorityQueue checkers = HeapPriorityQueue();
+  HeapPriorityQueue checkers = HeapPriorityQueue();//must check this
   checkers.add((0, a));
   while (!checkers.isEmpty){
-    int u = checkers.removeFirst()[0];
+    var extract = checkers.removeFirst();
+    //int n = extract[0];
+    int u = extract[1];
     /*if (u == b){
       int d = u;
       while(d != s){
