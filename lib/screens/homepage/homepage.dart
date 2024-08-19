@@ -154,9 +154,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   for (var doc in existingRides.docs) {
     // Placeholder for matching logic based on user preferences, etc.
-    bool isMatch = _validateMatch(doc); // Implement this later
+    Future<bool> isMatch = _validateMatch(doc); // Implement this later
 
-    if (isMatch) {
+    if (await isMatch) {
       // Add user to existing ride and update destinations
       await doc.reference.update({
         'participants': FieldValue.arrayUnion([user.uid]),
@@ -179,12 +179,65 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 }
 
+Future<bool> _validateMatch(DocumentSnapshot rideRequest) async {
+  User? currentUser = _auth.currentUser;
+  if (currentUser == null) return false;
 
-  bool _validateMatch(DocumentSnapshot rideRequest) {
-    // Implement the matching logic here in the future
-    return true;
+  // Current user preferences
+  DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+  if (!currentUserDoc.exists) return false;
+  
+  Map<String, dynamic> currentUserPreferences = currentUserDoc['preferences'];
+
+  // Preferences of all participants in the ride
+  List<String> participants = List<String>.from(rideRequest['participants']);
+  for (String participantId in participants) {
+    if (participantId == currentUser.uid) continue;
+
+    DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
+    if (!participantDoc.exists) return false;
+
+    Map<String, dynamic> participantPreferences = participantDoc['preferences'];
+
+    if (!_doesUserMatchPreferences(currentUserPreferences, participantPreferences)) {
+      return false;
+    }
+    if (!_doesUserMatchPreferences(participantPreferences, currentUserPreferences)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _doesUserMatchPreferences(Map<String, dynamic> userPrefs, Map<String, dynamic> targetPrefs) {
+  int userMinAge = userPrefs['ageRange']['min'];
+  int userMaxAge = userPrefs['ageRange']['max'];
+  int targetMinAge = targetPrefs['ageRange']['min'];
+  int targetMaxAge = targetPrefs['ageRange']['max'];
+
+  if (userMinAge > targetMaxAge || userMaxAge < targetMinAge) {
+    return false;
   }
 
+  int userMinCapacity = userPrefs['minCarCapacity'];
+  int userMaxCapacity = userPrefs['maxCarCapacity'];
+  int targetMinCapacity = targetPrefs['minCarCapacity'];
+  int targetMaxCapacity = targetPrefs['maxCarCapacity'];
+
+  if (userMinCapacity > targetMaxCapacity || userMaxCapacity < targetMinCapacity) {
+    return false;
+  }
+
+  if (userPrefs['schoolToggle'] && userPrefs['domain'] != targetPrefs['domain']) {
+    return false;
+  }
+
+  if (userPrefs['sameGenderToggle'] && userPrefs['sexAssignedAtBirth'] != targetPrefs['sexAssignedAtBirth']) {
+    return false;
+  }
+
+  return true;
+}
 
 
 //New method to call when the user clicks the "Find Ride" button
