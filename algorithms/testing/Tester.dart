@@ -115,9 +115,22 @@ Person generate_passenger(){
 
 //Setup for Djikstra's
 
+int compList(List<int> a, List<int> b){
+  if (a[0] > b[0]){
+    return 1;
+  } else if (a[0] < b[0]){
+    return -1;
+  }
+  return 0;
+}
+
 List<int> dists = [];
 
 var prev = [];
+
+Map lookup = {
+  -1:-1
+};
 
 bool update(int u, int v, int w){
   bool updated = false;
@@ -139,11 +152,12 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
   }
   dists[a] = 0;
   HeapPriorityQueue checkers = HeapPriorityQueue();//PRIMARY ISSUE AT MOMENT: comparator
-  checkers.add([0, a]);
+  checkers.add(0);
+  lookup[0] = a;
   while (!checkers.isEmpty){
-    var extract = checkers.removeFirst();
+    int extract = checkers.removeFirst();
     //int n = extract[0];
-    int u = extract[1];
+    int u = lookup[extract];
     /*if (u == b){
       int d = u;
       while(d != s){
@@ -154,7 +168,8 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
       int v = ourMap[u][i][0];//node
       int w = ourMap[u][i][1];//distance
       if (update(u, v, w)){
-        checkers.add([dists[v], v]);
+        checkers.add(dists[v]);
+        lookup[dists[v]] = v;
       }
       
     }
