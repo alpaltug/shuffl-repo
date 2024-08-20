@@ -13,7 +13,13 @@ var rand = Random(); //random number Dart generator
 var school_library = ["UC Berkeley", "Contra Costa", "Stanford", "UCSB", "UCLA", "Diablo Valley", "Sierra CC", "Santa Barbara CC", "Westmont College", "Laguna Blanca School"];
 //above: schools passengers come from
 //below: our map as a weighted adjacency list (could convert to distance array if needed)
-var ourMap =  List<List>.generate(dim, (i) => List<dynamic>.generate(dim, (index) => null, growable: false), growable: false);
+//var ourMap =  List<List>.generate(dim, (i) => List<List>.generate(dim, (j) => null, growable: true), growable: false);
+
+//var ourMap = List.generate(dim, (i) => List.generate(dim, (j) => i + j));
+
+var ourMap = [];
+
+//var ourMap = List<List<List<int>>>;
 
 //var adMap = [];
 
@@ -23,6 +29,39 @@ var ourMap =  List<List>.generate(dim, (i) => List<dynamic>.generate(dim, (index
 
   PQueue();
 }*/
+
+//var testMap = [[(1, 3), (3, 1)], [(0, 3), (4, 2), (2, 4)], [(1, 4), (3, 6)], [(0, 1), (2, 6), (4, 2), (5, 6)], [(1, 2), (3, 2), (5, 3)], [(3, 6), (4, 3)]];
+
+var testMap = [
+  [
+    [1, 3],
+    [3, 1]
+  ],
+  [
+    [0, 3],
+    [4, 2],
+    [2, 4]
+  ],
+  [
+    [1, 4],
+    [3, 6]
+  ],
+  [
+    [0, 1],
+    [2, 6],
+    [4, 2],
+    [5, 6]
+  ],
+  [
+    [1, 2],
+    [3, 2],
+    [5, 3]
+  ],
+  [
+    [3, 6],
+    [4, 3]
+  ]
+];
 
 Person generate_passenger(){
   //randomly generate: pickup, dropoff (sufficiently far away), age, sex, school, school/age/sex/walking preferences
@@ -99,8 +138,8 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
     //adMap.add();
   }
   dists[a] = 0;
-  HeapPriorityQueue checkers = HeapPriorityQueue();//must check this
-  checkers.add((0, a));
+  HeapPriorityQueue checkers = HeapPriorityQueue();//PRIMARY ISSUE AT MOMENT: comparator
+  checkers.add([0, a]);
   while (!checkers.isEmpty){
     var extract = checkers.removeFirst();
     //int n = extract[0];
@@ -115,7 +154,7 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
       int v = ourMap[u][i][0];//node
       int w = ourMap[u][i][1];//distance
       if (update(u, v, w)){
-        checkers.add((dists[v], v));
+        checkers.add([dists[v], v]);
       }
       
     }
@@ -127,22 +166,26 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
 //generate random points, then randomly connect them until graph fully connected, feed into adjacency list
 void generateMap() {
   //Here we generate our map
+  for(int a = 0; a < dim; a++){
+    var eList = [];
+    ourMap.add(eList);
+  }
   for(int i = 0; i < dim; i++){
     for(int j = i; j < dim; j++){
       if(i == j){
         //ourMap[i][j] = (j, 0);
-        ourMap[i].add((j, 0));
+        ourMap[i].add([j, 0]);
       }/*(j + 1) % (i + 1) == 0 */
       else if (i == 0){
         //ourMap[i][j] = (j, rand.nextInt(100));
         int dis = rand.nextInt(100);
-        ourMap[i].add((j, dis));
-        ourMap[j].add((i, dis));
+        ourMap[i].add([j, dis]);
+        ourMap[j].add([i, dis]);
       }
       else if (rand.nextInt(100) >= 80){
         int dis = rand.nextInt(100);
-        ourMap[i].add((j, dis));
-        ourMap[j].add((i, dis));
+        ourMap[i].add([j, dis]);
+        ourMap[j].add([i, dis]);
       }
     }
   }
@@ -161,6 +204,8 @@ void main() {
   ride_requests.remove(bob);
   //create our map
   generateMap();
+  ourMap = testMap;
+  print(dist(3, 5));
   /* 
   Create an nxn (maybe 1000x1000) nested 2-dimensional edge "distance" matrix
   We need a mechanism to somewhat represent "neighborhoods" of connected nodes, with the graph being fully connected
