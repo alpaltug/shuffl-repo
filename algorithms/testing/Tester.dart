@@ -211,6 +211,34 @@ void generateMap() {
   }
 }
 
+int smallD = 40;
+
+void generateSmallMap() {
+  //Here we generate our map
+  for (int a = 0; a < smallD; a++) {
+    var eList = [];
+    ourMap.add(eList);
+  }
+  for (int i = 0; i < smallD; i++) {
+    for (int j = i; j < smallD; j++) {
+      if (i == j) {
+        //ourMap[i][j] = (j, 0);
+        //ourMap[i].add([j, 0]);
+      } /*(j + 1) % (i + 1) == 0 */
+      else if (i == 0) {
+        //ourMap[i][j] = (j, rand.nextInt(100));
+        int dis = rand.nextInt(100);
+        ourMap[i].add([j, dis]);
+        ourMap[j].add([i, dis]);
+      } else if (rand.nextInt(100) >= 90) {
+        int dis = rand.nextInt(100);
+        ourMap[i].add([j, dis]);
+        ourMap[j].add([i, dis]);
+      }
+    }
+  }
+}
+
 void main() {
   var ride_requests = [];
   var fleet = [];
