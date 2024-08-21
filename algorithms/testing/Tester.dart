@@ -143,6 +143,9 @@ bool update(int u, int v, int w){
 }
 
 int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
+  if(a == b){
+    return 0;
+  }
   dists = [];
   prev = [];
   for (int i = 0; i < dim; i++){
@@ -181,24 +184,26 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
 //generate random points, then randomly connect them until graph fully connected, feed into adjacency list
 void generateMap() {
   //Here we generate our map
+  ourMap =[];
   for(int a = 0; a < dim; a++){
     var eList = [];
     ourMap.add(eList);
   }
   for(int i = 0; i < dim; i++){
-    for(int j = i; j < dim; j++){
+    for(int j = i + 1; j < dim; j++){
       if(i == j){
         //ourMap[i][j] = (j, 0);
-        ourMap[i].add([j, 0]);
+        //ourMap[i].add([j, 0]);
+        //ourMap[j].add([i, 0]);
       }/*(j + 1) % (i + 1) == 0 */
       else if (i == 0){
         //ourMap[i][j] = (j, rand.nextInt(100));
-        int dis = rand.nextInt(100);
+        int dis = rand.nextInt(100) + 1;
         ourMap[i].add([j, dis]);
         ourMap[j].add([i, dis]);
       }
       else if (rand.nextInt(100) >= 80){
-        int dis = rand.nextInt(100);
+        int dis = rand.nextInt(30) + 1;
         ourMap[i].add([j, dis]);
         ourMap[j].add([i, dis]);
       }
@@ -219,8 +224,8 @@ void main() {
   ride_requests.remove(bob);
   //create our map
   generateMap();
-  ourMap = testMap;
-  print(dist(3, 5));
+  //ourMap = testMap;
+  //print(dist(3, 5));
   /* 
   Create an nxn (maybe 1000x1000) nested 2-dimensional edge "distance" matrix
   We need a mechanism to somewhat represent "neighborhoods" of connected nodes, with the graph being fully connected
