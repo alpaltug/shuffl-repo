@@ -132,6 +132,8 @@ Map lookup = {
   -1:-1
 };
 
+var look = [];
+
 bool update(int u, int v, int w){
   bool updated = false;
   if (dists[u] + w < dists[v]){
@@ -213,7 +215,60 @@ void generateMap() {
 
 int smallD = 40;
 
+int tinyD = 40;
+
+void generateTinyMap() {
+  ourMap = [];
+  //Here we generate our map
+  for (int a = 0; a < tinyD; a++) {
+    var eList = [];
+    ourMap.add(eList);
+  }
+  for (int i = 0; i < tinyD; i++) {
+    for (int j = i; j < tinyD; j++) {
+      if (i == j) {
+        //ourMap[i][j] = (j, 0);
+        //ourMap[i].add([j, 0]);
+      } /*(j + 1) % (i + 1) == 0 */
+      else if (i == 0) {
+        //ourMap[i][j] = (j, rand.nextInt(100));
+        int dis = rand.nextInt(100);
+        ourMap[i].add([j, dis]);
+        ourMap[j].add([i, dis]);
+      } else if (rand.nextInt(100) >= 90) {
+        int dis = rand.nextInt(100);
+        ourMap[i].add([j, dis]);
+        ourMap[j].add([i, dis]);
+      }
+    }
+  }
+}
+
+void generateLargeMap() {
+  ourMap = [];
+  //Here we generate our map
+  for (int a = 0; a < 100; a++) {
+    var eList = [];
+    ourMap.add(eList);
+  }
+  for (int i = 0; i < 100; i++) {
+    for (int j = i; j < 100; j++) {
+      if (i == j) {
+        //ourMap[i][j] = (j, 0);
+        //ourMap[i].add([j, 0]);
+      } /*(j + 1) % (i + 1) == 0 */
+      else {
+        //ourMap[i][j] = (j, rand.nextInt(100));
+        int dis = rand.nextInt(100);
+        ourMap[i].add([j, dis]);
+        ourMap[j].add([i, dis]);
+      }
+    }
+  }
+}
+
 void generateSmallMap() {
+  ourMap = [];
   //Here we generate our map
   for (int a = 0; a < smallD; a++) {
     var eList = [];
@@ -225,12 +280,8 @@ void generateSmallMap() {
         //ourMap[i][j] = (j, 0);
         //ourMap[i].add([j, 0]);
       } /*(j + 1) % (i + 1) == 0 */
-      else if (i == 0) {
+      else {
         //ourMap[i][j] = (j, rand.nextInt(100));
-        int dis = rand.nextInt(100);
-        ourMap[i].add([j, dis]);
-        ourMap[j].add([i, dis]);
-      } else if (rand.nextInt(100) >= 90) {
         int dis = rand.nextInt(100);
         ourMap[i].add([j, dis]);
         ourMap[j].add([i, dis]);
