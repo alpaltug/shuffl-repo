@@ -144,6 +144,10 @@ bool update(int u, int v, int w){
   return updated;
 }
 
+int d(a, b){
+  return min(dist(a, b), dist(b, a));
+}
+
 int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
   if(a == b){
     return 0;
@@ -303,6 +307,33 @@ void main() {
   ride_requests.remove(bob);
   //create our map
   generateMap();
+  int time = 0;
+  while (time < 1000000 || !ride_requests.isEmpty){
+    if(rand.nextInt(100) > 80){
+      Person p = generate_passenger();
+      int m = 0;
+      for (Car c in fleet) {
+        //
+      }
+    }
+  }
+  /*
+  generateSmallMap();
+  //ourMap = testMap;
+  //print(dist(3, 5));
+  print(dist(1, 4));
+  print(dist(0, 2));
+  print(dist(0, 3));
+  print("Next two");
+  print(dist(2, 3));
+  print(dist(3, 2));
+  print("Next three should be same");
+  print(dist(0, 4));
+  print(dist(4, 0));
+  print(dist(0, 4));
+  print(dist(37, 35));
+  print(dist(35, 37));
+  */
   //ourMap = testMap;
   //print(dist(3, 5));
   /* 
