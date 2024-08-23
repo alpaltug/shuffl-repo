@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:my_flutter_app/main.dart';
 import 'package:my_flutter_app/screens/edit_preferences/edit_preferences.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
@@ -13,7 +14,12 @@ import 'package:my_flutter_app/screens/notifications_screen/notifications_screen
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart';
 import 'package:my_flutter_app/firestore_service.dart';
+import 'package:my_flutter_app/screens/filtered_rides_page/filtered_rides_page.dart';
+import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:http/http.dart' as http;
+import 'dart:math';
+
+
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
@@ -34,6 +40,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   String? _profileImageUrl;
   String? _username;
   LatLng? _currentPosition;
+  DateTime? _selectedRideTime;
   int _uniqueMessageSenderCount = 0;
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
 
@@ -121,40 +128,64 @@ class _HomePageState extends State<HomePage> with RouteAware {
   });
 }
 
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-    if (_currentPosition != null) {
-      mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
+void _onMapCreated(GoogleMapController controller) {
+  mapController = controller;
+  if (_currentPosition != null) {
+    mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
+    );
+  }
+}
+
+Future<void> _showDateTimePicker() async {
+  DateTime? selectedDate = await showDatePicker(
+    context: context,
+    initialDate: DateTime.now(),
+    firstDate: DateTime.now(),
+    lastDate: DateTime.now().add(Duration(days: 365)),
+  );
+
+  if (selectedDate != null) {
+    TimeOfDay? selectedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+
+    if (selectedTime != null) {
+      _selectedRideTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        selectedTime.hour,
+        selectedTime.minute,
       );
     }
   }
+}
 
-  String _generatePickupLocationId(LatLng location) {
-    // R latitude and longitude to 3 decimal places (~111 meters precision)
-    String lat = location.latitude.toStringAsFixed(3);
-    String lng = location.longitude.toStringAsFixed(3);
-    return '$lat,$lng';
-  }
 
-  //New method to call when a ride request is created
-  Future<void> _createRideRequest() async {
+String _generatePickupLocationId(LatLng location) {
+  // R latitude and longitude to 3 decimal places (~111 meters precision)
+  String lat = location.latitude.toStringAsFixed(3);
+  String lng = location.longitude.toStringAsFixed(3);
+  return '$lat,$lng';
+}
+
+Future<void> _createRideRequest(DateTime timeOfRide) async {
   User? user = _auth.currentUser;
   if (user == null) return;
 
-  String pickupLocationId = _generatePickupLocationId(_currentPosition!);
-
-  // Query ride requests with the same pickup location identifier
+  // Query ride requests with the same time of ride within a certain range (e.g., +/- 15 minutes)
   QuerySnapshot existingRides = await _firestore
       .collection('rides')
-      .where('pickupLocationId', isEqualTo: pickupLocationId)
+      .where('timeOfRide', isGreaterThanOrEqualTo: timeOfRide.subtract(Duration(minutes: 15)))
+      .where('timeOfRide', isLessThanOrEqualTo: timeOfRide.add(Duration(minutes: 15)))
       .get();
 
   bool matched = false;
 
   for (var doc in existingRides.docs) {
-    // Placeholder for matching logic based on user preferences, etc.
-    Future<bool> isMatch = _validateMatch(doc); // Implement this later
+    Future<bool> isMatch = _validateMatch(doc, timeOfRide);
 
     if (await isMatch) {
       // Add user to existing ride and update destinations
@@ -170,26 +201,37 @@ class _HomePageState extends State<HomePage> with RouteAware {
   if (!matched) {
     // Create a new ride request if no match was found
     await _firestore.collection('rides').add({
-      'pickupLocationId': pickupLocationId,
+      'timeOfRide': timeOfRide,
       'pickupLocation': _pickupController.text,
       'dropoffLocations': [_dropoffController.text], // Store dropoff locations as an array
       'participants': [user.uid],
       'timestamp': FieldValue.serverTimestamp(),
     });
   }
+
+  // Reset the selected ride time after the request
+  _selectedRideTime = null;
 }
 
-Future<bool> _validateMatch(DocumentSnapshot rideRequest) async {
+
+Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) async {
   User? currentUser = _auth.currentUser;
   if (currentUser == null) return false;
 
-  // Current user preferences
+  // Check if the pickup locations are within 500 meters
+  LatLng existingPickupLocation = await _getLatLngFromAddress(rideRequest['pickupLocation']);
+  LatLng currentPickupLocation = await _getLatLngFromAddress(_pickupController.text);
+
+  if (!_isWithinProximity(existingPickupLocation, currentPickupLocation)) {
+    return false;
+  }
+
+  // Continue with the preference matching logic
   DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
   if (!currentUserDoc.exists) return false;
   
   Map<String, dynamic> currentUserPreferences = currentUserDoc['preferences'];
 
-  // Preferences of all participants in the ride
   List<String> participants = List<String>.from(rideRequest['participants']);
   for (String participantId in participants) {
     if (participantId == currentUser.uid) continue;
@@ -207,6 +249,45 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest) async {
     }
   }
   return true;
+}
+
+Future<LatLng> _getLatLngFromAddress(String address) async {
+  try {
+    List<Location> locations = await locationFromAddress(address);
+    if (locations.isNotEmpty) {
+      return LatLng(locations.first.latitude, locations.first.longitude);
+    } else {
+      throw Exception('No locations found for the given address.');
+    }
+  } catch (e) {
+    throw Exception('Failed to get location from address: $e');
+  }
+}
+
+bool _isWithinProximity(LatLng location1, LatLng location2) {
+  const double maxDistance = 500; // 500 meters (we can change later)
+  double distance = _calculateDistance(location1, location2);
+  return distance <= maxDistance;
+}
+
+double _calculateDistance(LatLng location1, LatLng location2) {
+  const double earthRadius = 6371000; // meters
+  double lat1 = location1.latitude;
+  double lon1 = location1.longitude;
+  double lat2 = location2.latitude;
+  double lon2 = location2.longitude;
+
+  double dLat = (lat2 - lat1) * (pi / 180.0);
+  double dLon = (lon2 - lon1) * (pi / 180.0);
+
+  double a = sin(dLat / 2) * sin(dLat / 2) +
+      cos(lat1 * (pi / 180.0)) * cos(lat2 * (pi / 180.0)) *
+      sin(dLon / 2) * sin(dLon / 2);
+
+  double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+  double distance = earthRadius * c;
+
+  return distance;
 }
 
 bool _doesUserMatchPreferences(Map<String, dynamic> userPrefs, Map<String, dynamic> targetPrefs) {
@@ -240,10 +321,10 @@ bool _doesUserMatchPreferences(Map<String, dynamic> userPrefs, Map<String, dynam
 }
 
 
-//New method to call when the user clicks the "Find Ride" button
 void _findRide() async {
   if (_pickupController.text.isNotEmpty && _dropoffController.text.isNotEmpty) {
-    await _createRideRequest();
+    DateTime rideTime = _selectedRideTime ?? DateTime.now(); // Use selected time or current time
+    await _createRideRequest(rideTime);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Ride request sent!')),
     );
@@ -253,6 +334,7 @@ void _findRide() async {
     );
   }
 }
+
 
   void _navigateToLocationSearch(bool isPickup) {
     Navigator.push(
@@ -453,6 +535,32 @@ void _findRide() async {
               }
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.directions_car),
+            title: const Text('Filtered Rides'),
+            onTap: () {
+              User? user = _auth.currentUser;
+              if (user != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const FilteredRidesPage()),
+                );
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('My Ride History'),
+            onTap: () {
+              User? user = _auth.currentUser;
+              if (user != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const UserRidesPage()),
+                );
+              }
+            },
+          ),
           // Add more drawer options here
         ],
       ),
@@ -490,6 +598,10 @@ void _findRide() async {
             readOnly: true,
             onTap: () => _navigateToLocationSearch(false),
           ),
+        ),
+        ElevatedButton(
+          onPressed: _showDateTimePicker,
+          child: const Text('Select Time of Ride'),
         ),
         ElevatedButton(
           onPressed: _findRide,
