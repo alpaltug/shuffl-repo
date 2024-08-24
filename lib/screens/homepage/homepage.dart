@@ -100,45 +100,35 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   Future<void> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+  LatLng currentPosition = LatLng(position.latitude, position.longitude);
+  String address = await _getAddressFromLatLng(currentPosition);
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled.');
-    }
+  setState(() {
+    _currentPosition = currentPosition;
+    _pickupController.text = address;
+    _addCurrentLocationMarker();
+  });
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error('Location permissions are permanently denied, we cannot request permissions.');
-    }
-
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    LatLng currentPosition = LatLng(position.latitude, position.longitude);
-    String address = await _getAddressFromLatLng(currentPosition);
-
-    setState(() {
-      _currentPosition = currentPosition;
-      _pickupController.text = address;
-      _addCurrentLocationMarker();
-    });
+  if (mapController != null) {
+    mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(currentPosition, 15.0),
+    );
   }
+}
 
   void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-    if (_currentPosition != null) {
-      mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
-      );
-    }
+  mapController = controller;
+  if (_currentPosition != null) {
+    mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
+    );
+  } else {
+    mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
+    );
   }
+}
 
   void _addCurrentLocationMarker() {
     if (_currentPosition != null) {
@@ -648,29 +638,13 @@ class _HomePageState extends State<HomePage> with RouteAware {
                 GoogleMap(
                   onMapCreated: _onMapCreated,
                   initialCameraPosition: CameraPosition(
-                    target: _center,
+                    target: _currentPosition ?? _center,
                     zoom: 15.0,
                   ),
                   myLocationEnabled: true,
                   myLocationButtonEnabled: true,
                   markers: _markers,
                 ),
-                if (_currentPosition != null)
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      color: Colors.black54,
-                      child: const Text(
-                        "You're here",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
