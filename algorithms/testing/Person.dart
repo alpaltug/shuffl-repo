@@ -1,5 +1,5 @@
 class Person {
-  int pickup;
+  //int pickup;
   int dropoff;
   int current_location;
   bool is_male;
@@ -11,8 +11,8 @@ class Person {
   var acceptable_schools = [];
   int acceptable_walking;
 
-  Person(this.pickup, this.dropoff, this.is_male, this.school, this.age, this.min_age, this.max_age, this.gender_preference, this.acceptable_schools, this.acceptable_walking) :
-    this.current_location = pickup; //Initialize
+  Person(this.current_location, this.dropoff, this.is_male, this.school, this.age, this.min_age, this.max_age, this.gender_preference, this.acceptable_schools, this.acceptable_walking);
+    //this.current_location; //Initialize
   
   void Move(int location){
     this.current_location = location;
@@ -50,9 +50,9 @@ class Person {
   int getLocation(){
     return current_location;
   }
-  int getPickUp(){
+  /*int getPickUp(){
     return pickup;
-  }
+  }*/
   /*bool operator ==(Object other) {
     // TODO: implement ==
     return super == other;

@@ -294,6 +294,19 @@ void generateSmallMap() {
   }
 }
 
+List routePeople(var p){
+  return [];
+}
+
+void carMap(Car c){
+  if(c.Empty()){
+    return;
+  }
+  if(!c.getPickups().isEmpty){
+    var d_list = routePeople(c.getPickups());
+  }
+}
+
 void main() {
   var ride_requests = [];
   var fleet = [];
@@ -301,13 +314,13 @@ void main() {
     Car car = new Car(i, 0);
     fleet.add(car);
   }
-  var bob_schools = ["UC Berkeley"];//placeholder person to get rid of later
-  Person bob = new Person(0, 20, true, "UC Berkeley", 20, 18, 25, false, bob_schools, 5);
-  ride_requests.add(bob);
-  ride_requests.remove(bob);
+  //var bob_schools = ["UC Berkeley"];//placeholder person to get rid of later
+  //Person bob = new Person(0, 20, true, "UC Berkeley", 20, 18, 25, false, bob_schools, 5);
+  //ride_requests.add(bob);
+  //ride_requests.remove(bob);
   //create our map
   generateMap();
-  //sum of squared differences is car selection?
+  //sum of squared differences is car selection? with limits
   int time = 0;
   while (time < 1000000 || !ride_requests.isEmpty){//version 1: just scan for closest available car
     if(rand.nextInt(100) > 80){

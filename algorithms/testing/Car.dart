@@ -15,13 +15,21 @@ class Car {
   int getLoc(){
     return current_location;
   }
-
+  List getPassengers(){
+    return passengers;
+  }
+  List getPickups(){
+    return pickups;
+  }
+  List getDropOffs(){
+    return dropoffs;
+  }
   bool Empty(){
-    return passengers.isEmpty;
+    return passengers.isEmpty && pickups.isEmpty;
   }
 
   void assign(Person p){
-    pickups.add(p.getPickUp());
+    pickups.add(p.getLocation());
   }
 
   void travel(int location){
