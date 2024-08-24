@@ -44,6 +44,15 @@ class Person {
   int walk(){
     return acceptable_walking;
   }
+  int getDropOff(){
+    return dropoff;
+  }
+  int getLocation(){
+    return current_location;
+  }
+  int getPickUp(){
+    return pickup;
+  }
   /*bool operator ==(Object other) {
     // TODO: implement ==
     return super == other;

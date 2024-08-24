@@ -308,12 +308,19 @@ void main() {
   //create our map
   generateMap();
   int time = 0;
-  while (time < 1000000 || !ride_requests.isEmpty){
+  while (time < 1000000 || !ride_requests.isEmpty){//version 1: just scan for closest available car
     if(rand.nextInt(100) > 80){
       Person p = generate_passenger();
-      int m = 0;
+      int m = double.maxFinite.toInt();
+      int n = 10;
+      int count = 0;
       for (Car c in fleet) {
-        //
+        int o =  d(p.getLocation(), c.getLoc());
+        if(o < m) {
+          m = o;
+          n = count;
+        }
+        count++;
       }
     }
   }
