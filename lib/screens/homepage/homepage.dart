@@ -42,6 +42,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   LatLng? _currentPosition;
   DateTime? _selectedRideTime;
   int _uniqueMessageSenderCount = 0;
+  bool _goOnline = false;
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
 
   Set<Marker> _markers = {}; // Store markers
@@ -79,6 +80,20 @@ class _HomePageState extends State<HomePage> with RouteAware {
       setState(() {
         _profileImageUrl = userProfile['imageUrl'];
         _username = userProfile['username'];
+        _goOnline = userProfile['goOnline'] ?? false;
+      });
+    }
+  }
+
+  Future<void> _toggleGoOnline(bool value) async {  
+    User? user = _auth.currentUser;
+    if (user != null) {
+      await _firestore.collection('users').doc(user.uid).update({
+        'goOnline': value,
+      });
+
+      setState(() {
+        _goOnline = value;
       });
     }
   }
@@ -508,94 +523,105 @@ class _HomePageState extends State<HomePage> with RouteAware {
         ],
       ),
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: <Widget>[
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Colors.yellow,
+  child: ListView(
+    padding: EdgeInsets.zero,
+    children: <Widget>[
+      DrawerHeader(
+        decoration: const BoxDecoration(
+          color: Colors.yellow,
+        ),
+        child: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const UserProfile()),
+            );
+          },
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 40,
+                backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                    ? NetworkImage(_profileImageUrl!)
+                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
               ),
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const UserProfile()),
-                  );
-                },
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
-                          ? NetworkImage(_profileImageUrl!)
-                          : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _username ?? 'amk',
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: 10),
+              Text(
+                _username ?? 'amk',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 20,
                 ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.search),
-              title: const Text('Search Users'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SearchUsers()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Edit Preferences'),
-              onTap: () {
-                User? user = _auth.currentUser;
-                if (user != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => EditPreferencesPage(uid: user.uid)),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.directions_car),
-              title: const Text('Filtered Rides'),
-              onTap: () {
-                User? user = _auth.currentUser;
-                if (user != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const FilteredRidesPage()),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.history),
-              title: const Text('My Ride History'),
-              onTap: () {
-                User? user = _auth.currentUser;
-                if (user != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const UserRidesPage()),
-                  );
-                }
-              },
-            ),
-            // Add more drawer options here
-          ],
+            ],
+          ),
         ),
       ),
+      ListTile(
+        leading: const Icon(Icons.power_settings_new),
+        title: const Text('Go Online'),
+        trailing: Switch(
+          value: _goOnline,  // bind the switch to _goOnline
+          onChanged: (value) {
+            _toggleGoOnline(value);  // call the method to toggle the state
+          },
+          activeColor: Colors.green,
+        ),
+      ),
+      ListTile(
+        leading: const Icon(Icons.search),
+        title: const Text('Search Users'),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SearchUsers()),
+          );
+        },
+      ),
+      ListTile(
+        leading: const Icon(Icons.settings),
+        title: const Text('Edit Preferences'),
+        onTap: () {
+          User? user = _auth.currentUser;
+          if (user != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => EditPreferencesPage(uid: user.uid)),
+            );
+          }
+        },
+      ),
+      ListTile(
+        leading: const Icon(Icons.directions_car),
+        title: const Text('Filtered Rides'),
+        onTap: () {
+          User? user = _auth.currentUser;
+          if (user != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const FilteredRidesPage()),
+            );
+          }
+        },
+      ),
+      ListTile(
+        leading: const Icon(Icons.history),
+        title: const Text('My Ride History'),
+        onTap: () {
+          User? user = _auth.currentUser;
+          if (user != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const UserRidesPage()),
+            );
+          }
+        },
+      ),
+      // Add more drawer options here
+    ],
+  ),
+),
       body: Column(
         children: [
           Padding(
