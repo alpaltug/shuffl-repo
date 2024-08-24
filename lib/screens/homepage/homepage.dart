@@ -192,6 +192,7 @@ Future<void> _createRideRequest(DateTime timeOfRide) async {
       await doc.reference.update({
         'participants': FieldValue.arrayUnion([user.uid]),
         'dropoffLocations': FieldValue.arrayUnion([_dropoffController.text]),
+        'readyStatus.${user.uid}': false,
       });
       matched = true;
       break;
@@ -205,6 +206,7 @@ Future<void> _createRideRequest(DateTime timeOfRide) async {
       'pickupLocation': _pickupController.text,
       'dropoffLocations': [_dropoffController.text], // Store dropoff locations as an array
       'participants': [user.uid],
+      'isComplete': false,
       'timestamp': FieldValue.serverTimestamp(),
     });
   }
