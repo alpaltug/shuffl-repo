@@ -19,33 +19,38 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  late Future<List<DocumentSnapshot>> _filteredRidesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredRidesFuture = _fetchFilteredRides(); // Initialize the future here
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Available Rides'),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore
-            .collection('rides')
-            .orderBy('timeOfRide')
-            .snapshots(),
+      body: FutureBuilder<List<DocumentSnapshot>>(
+        future: _filteredRidesFuture,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final rides = snapshot.data!.docs;
-          print('Number of filtered rides: ${rides.length}');
+          final filteredRides = snapshot.data!;
+          print('Number of filtered rides: ${filteredRides.length}');
 
-          if (rides.isEmpty) {
+          if (filteredRides.isEmpty) {
             return const Center(child: Text('No rides available that match your preferences.'));
           }
 
           return ListView.builder(
-            itemCount: rides.length,
+            itemCount: filteredRides.length,
             itemBuilder: (context, index) {
-              var ride = rides[index];
+              var ride = filteredRides[index];
 
               return FutureBuilder<List<String>>(
                 future: _getParticipantUsernames(List<String>.from(ride['participants'])),
@@ -172,7 +177,7 @@ bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String,
   // Age Range Matching
   int userMinAge = userPrefs['ageRange']['min'];
   int userMaxAge = userPrefs['ageRange']['max'];
-  int targetAge = _calculateAge(targetData['birthday']);
+  int targetAge = targetData['age'];
   
   print('Checking age: targetAge=$targetAge, range=$userMinAge-$userMaxAge');
   if (targetAge < userMinAge || targetAge > userMaxAge) {
@@ -237,7 +242,7 @@ bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<Str
   Map<String, dynamic> participantPrefs = participantData['preferences'];
 
   // Age Range Matching
-  int userAge = _calculateAge(participantData['birthday']);
+  int userAge = currentUserData['age'];
   int minAge = participantPrefs['ageRange']['min'];
   int maxAge = participantPrefs['ageRange']['max'];
 
@@ -281,18 +286,7 @@ bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<Str
     print('Gender check skipped: No gender preference set.');
   }
 
-  print('Participant data validation complete.');
   return true;
-}
-
-int _calculateAge(String birthday) {
-  DateTime birthDate = DateTime.parse(birthday);
-  DateTime today = DateTime.now();
-  int age = today.year - birthDate.year;
-  if (today.month < birthDate.month || (today.month == birthDate.month && today.day < birthDate.day)) {
-    age--;
-  }
-  return age;
 }
 
 Future<void> _joinRide(String rideId, List<String> participants) async {

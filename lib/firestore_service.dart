@@ -8,14 +8,14 @@ class FirestoreService {
       'email': email,
       'createdAt': FieldValue.serverTimestamp(),
       'domain': _extractDomainFromEmail(email),
-      'rating': null, 
-      'numRides': 0, 
+      'rating': null,
+      'numRides': 0,
       'preferences': {
         'ageRange': {'min': 18, 'max': 80},
         'schoolToggle': false,
         'sameGenderToggle': false,
-        'minCarCapacity': 2, 
-        'maxCarCapacity': 5, 
+        'minCarCapacity': 2,
+        'maxCarCapacity': 5,
       },
     });
   }
@@ -27,14 +27,14 @@ class FirestoreService {
       String description,
       String? imageUrl,
       String sexAssignedAtBirth,
-      String birthday) async {
+      int age) async {
     await _db.collection('users').doc(uid).update({
       'fullName': fullName,
       'username': username,
       'description': description,
       'imageUrl': imageUrl,
       'sexAssignedAtBirth': sexAssignedAtBirth,
-      'birthday': birthday,
+      'age': age,
     });
   }
 
@@ -95,7 +95,6 @@ class FirestoreService {
         .collection('chats')
         .doc(chatId);
 
-    // Check if the chat already exists
     DocumentSnapshot chatDoc = await chatDocRef.get();
     if (!chatDoc.exists) {
       await chatDocRef.set({
@@ -106,7 +105,6 @@ class FirestoreService {
         }
       });
 
-      // Create chat for the friend as well
       DocumentReference friendChatDocRef = _db
           .collection('users')
           .doc(friendUserId)
@@ -221,6 +219,7 @@ class FirestoreService {
     }
     return uniqueSenders.length;
   }
+
   Future<List<Map<String, dynamic>>> getUsersBySex(String sex) async {
     final result = await _db.collection('users')
         .where('sexAssignedAtBirth', isEqualTo: sex)
@@ -229,13 +228,9 @@ class FirestoreService {
   }
 
   Future<List<Map<String, dynamic>>> getUsersByAgeRange(int minAge, int maxAge) async {
-    DateTime now = DateTime.now();
-    DateTime minDate = now.subtract(Duration(days: maxAge * 365));
-    DateTime maxDate = now.subtract(Duration(days: minAge * 365));
-
     final result = await _db.collection('users')
-        .where('birthday', isLessThanOrEqualTo: maxDate.toIso8601String())
-        .where('birthday', isGreaterThanOrEqualTo: minDate.toIso8601String())
+        .where('age', isGreaterThanOrEqualTo: minAge)
+        .where('age', isLessThanOrEqualTo: maxAge)
         .get();
     return result.docs.map((doc) => doc.data()).toList();
   }
@@ -251,7 +246,6 @@ class FirestoreService {
     final RegExp regExp = RegExp(r'@([a-zA-Z0-9]+)\.edu$');
     final match = regExp.firstMatch(email);
     final domain = match != null ? match.group(1) ?? '' : '';
-    print('Extracted domain from email $email: $domain');
     return domain;
   }
 }

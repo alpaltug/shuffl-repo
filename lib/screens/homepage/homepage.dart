@@ -234,8 +234,14 @@ class _HomePageState extends State<HomePage> with RouteAware {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return false;
 
-    // Check if the pickup locations are within 500 meters
-    LatLng existingPickupLocation = await _getLatLngFromAddress(rideRequest['pickupLocation']);
+    // Retrieve the first pickup location (assuming it's a list of locations)
+    List<dynamic> pickupLocationsList = rideRequest['pickupLocations'];
+    if (pickupLocationsList.isEmpty) return false;
+
+    // Extract the first pickup location (you can modify this if your logic needs more locations)
+    String existingPickupLocationAddress = pickupLocationsList[0];
+
+    LatLng existingPickupLocation = await _getLatLngFromAddress(existingPickupLocationAddress);
     LatLng currentPickupLocation = await _getLatLngFromAddress(_pickupController.text);
 
     if (!_isWithinProximity(existingPickupLocation, currentPickupLocation)) {
@@ -245,7 +251,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     // Continue with the preference matching logic
     DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
     if (!currentUserDoc.exists) return false;
-    
+
     Map<String, dynamic> currentUserPreferences = currentUserDoc['preferences'];
 
     List<String> participants = List<String>.from(rideRequest['participants']);
@@ -265,7 +271,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       }
     }
     return true;
-  }
+}
 
   Future<LatLng> _getLatLngFromAddress(String address) async {
     try {
@@ -645,6 +651,15 @@ class _HomePageState extends State<HomePage> with RouteAware {
                   myLocationButtonEnabled: true,
                   markers: _markers,
                 ),
+                // if (_currentPosition != null)
+                //   Positioned(
+                //     top: 10,
+                //     left: 10,
+                //     child: Container(
+                //       padding: const EdgeInsets.all(8),
+                //       color: Colors.black54,
+                //     ),
+                //   ),
               ],
             ),
           ),

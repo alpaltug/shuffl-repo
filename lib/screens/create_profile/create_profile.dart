@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/edit_preferences/edit_preferences.dart';
-// import 'package:my_flutter_app/screens/homepage/homepage.dart';
-
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
@@ -10,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:profanity_filter/profanity_filter.dart';
-import 'package:intl/intl.dart';
 
 class CreateProfile extends StatefulWidget {
   const CreateProfile({super.key});
@@ -23,7 +20,7 @@ class _CreateProfileState extends State<CreateProfile> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _userNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _birthdayController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
   String? _sexAssignedAtBirth;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
@@ -41,35 +38,6 @@ class _CreateProfileState extends State<CreateProfile> {
         _imageFile = File(pickedFile.path);
       });
     }
-  }
-
-  Future<void> _showImageSourceActionSheet(BuildContext context) async {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Photo Library'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickImage(ImageSource.camera);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _uploadImage() async {
@@ -113,9 +81,17 @@ class _CreateProfileState extends State<CreateProfile> {
       return;
     }
 
-    if (_birthdayController.text.isEmpty) {
+    if (_ageController.text.isEmpty) {
       setState(() {
-        _errorMessage = 'Birthday is required.';
+        _errorMessage = 'Age is required.';
+      });
+      return;
+    }
+
+    int? age = int.tryParse(_ageController.text);
+    if (age == null || age < 18 || age > 80) {
+      setState(() {
+        _errorMessage = 'Please enter a valid age between 18 and 80.';
       });
       return;
     }
@@ -163,32 +139,18 @@ class _CreateProfileState extends State<CreateProfile> {
           _descriptionController.text,
           _imageUrl,
           _sexAssignedAtBirth!,
-          _birthdayController.text,
+          age,
         );
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => EditPreferencesPage(uid: user.uid), 
-  ),
-);
+            builder: (context) => EditPreferencesPage(uid: user.uid),
+          ),
+        );
       }
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to save profile: $e';
-      });
-    }
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) {
-      setState(() {
-        _birthdayController.text = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
   }
@@ -235,7 +197,7 @@ class _CreateProfileState extends State<CreateProfile> {
                     ),
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed: () => _showImageSourceActionSheet(context),
+                      onPressed: () => _pickImage(ImageSource.gallery),
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.white,
                         backgroundColor: Colors.grey[800],
@@ -261,10 +223,10 @@ class _CreateProfileState extends State<CreateProfile> {
                       controller: _descriptionController,
                     ),
                     const SizedBox(height: 20),
-                    GreyDatePickerField(
-                      labelText: 'Birthday',
-                      controller: _birthdayController,
-                      onTap: () => _selectDate(context),
+                    GreyTextField(
+                      labelText: 'Age',
+                      controller: _ageController,
+                      keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 20),
                     DropdownButtonFormField<String>(
@@ -275,19 +237,21 @@ class _CreateProfileState extends State<CreateProfile> {
                                 value: label,
                               ))
                           .toList(),
-                      hint: const Text('Select Sex Assigned at Birth'),
+                      decoration: InputDecoration(
+                        labelText: 'Select Sex Assigned at Birth',
+                        labelStyle: const TextStyle(color: Colors.white),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.1),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
                       onChanged: (value) {
                         setState(() {
                           _sexAssignedAtBirth = value;
                         });
                       },
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.grey[800],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
                       dropdownColor: Colors.grey[800],
                       style: const TextStyle(color: Colors.white),
                     ),

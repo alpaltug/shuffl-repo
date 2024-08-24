@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
+import 'package:my_flutter_app/screens/homepage/homepage.dart';
 
 class CurrentRidePage extends StatefulWidget {
   final String rideId;
@@ -31,6 +32,15 @@ class _CurrentRidePageState extends State<CurrentRidePage> {
             return const Center(child: CircularProgressIndicator());
           }
 
+          // Check if the document exists
+          if (!snapshot.data!.exists) {
+            // Navigate back to the homepage since the ride has been deleted
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            });
+            return const Center(child: Text('This ride no longer exists.'));
+          }
+
           var rideData = snapshot.data!;
           List<String> participants = List<String>.from(rideData['participants']);
           User? currentUser = _auth.currentUser;
@@ -42,7 +52,7 @@ class _CurrentRidePageState extends State<CurrentRidePage> {
             children: [
               ListTile(
                 title: const Text('Pickup Location'),
-                subtitle: Text(rideData['pickupLocations'][0] ?? 'Not calculated yet'), //We'll change this
+                subtitle: Text(rideData['pickupLocations'][0] ?? 'Not calculated yet'), // Adjust if needed
               ),
               const Divider(),
               Expanded(
@@ -121,11 +131,21 @@ class _CurrentRidePageState extends State<CurrentRidePage> {
 
     DocumentReference rideDocRef = _firestore.collection('rides').doc(widget.rideId);
 
-    rideDocRef.update({
+    await rideDocRef.update({
       'participants': FieldValue.arrayRemove([user.uid]),
     });
 
-    // Navigate back to the filtered rides page
-    Navigator.pop(context);
+    DocumentSnapshot rideSnapshot = await rideDocRef.get();
+    if (rideSnapshot.exists) {
+      List<String> participants = List<String>.from(rideSnapshot['participants']);
+      if (participants.isEmpty) {
+        // If no participants remain, delete the ride document
+        await rideDocRef.delete();
+      }
+    }
+    // Navigate back to the homepage
+    Navigator.push(context,MaterialPageRoute(builder: (context) => HomePage(),
+    ),
+    );
   }
 }
