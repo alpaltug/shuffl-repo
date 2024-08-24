@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
-import 'package:my_flutter_app/view_user_profile/view_user_profile.dart';
+import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 
 class CurrentRidePage extends StatefulWidget {
   final String rideId;
@@ -42,7 +42,7 @@ class _CurrentRidePageState extends State<CurrentRidePage> {
             children: [
               ListTile(
                 title: const Text('Pickup Location'),
-                subtitle: Text(rideData['pickupLocation'] ?? 'Not calculated yet'),
+                subtitle: Text(rideData['pickupLocations'][0] ?? 'Not calculated yet'), //We'll change this
               ),
               const Divider(),
               Expanded(

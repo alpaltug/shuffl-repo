@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'package:my_flutter_app/current_ride_page/current_ride_page.dart';
+import 'package:my_flutter_app/screens/current_ride_page/current_ride_page.dart';
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
@@ -60,7 +60,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                   print('Participant usernames for ride $index: $participantUsernames');
 
                   return ListTile(
-                    title: Text('Pickup: ${ride['pickupLocation']}'),
+                    title: Text('Pickup: ${ride['pickupLocations'][0]}'),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -295,7 +295,7 @@ int _calculateAge(String birthday) {
   return age;
 }
 
-  Future<void> _joinRide(String rideId, List<String> participants) async {
+Future<void> _joinRide(String rideId, List<String> participants) async {
   User? user = _auth.currentUser;
   if (user == null) return;
 
@@ -303,12 +303,12 @@ int _calculateAge(String birthday) {
     participants.add(user.uid);
 
     // Update ride with new participant and recalculate pickup location
-    String newPickupLocation = await _calculateMidpointAddress(participants);
+    //String newPickupLocation = await _calculateMidpointAddress(participants);
 
-    await _firestore.collection('rides').doc(rideId).update({
-      'participants': participants,
-      'pickupLocation': newPickupLocation,
-    });
+    // await _firestore.collection('rides').doc(rideId).update({
+    //   'participants': participants,
+    //   'pickupLocation': newPickupLocation,
+    // });
 
     print('User ${user.uid} joined ride $rideId');
     ScaffoldMessenger.of(context).showSnackBar(

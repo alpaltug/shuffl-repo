@@ -44,7 +44,7 @@ class _UserRidesPageState extends State<UserRidesPage> {
               var ride = rides[index];
 
               return ListTile(
-                title: Text('Pickup: ${ride['pickupLocation']}'),
+                title: Text('Pickup: ${ride['pickupLocations'][0]}'),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
