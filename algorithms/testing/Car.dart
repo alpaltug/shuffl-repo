@@ -16,14 +16,24 @@ class Car {
     return current_location;
   }
 
+  bool Empty(){
+    return passengers.isEmpty;
+  }
+
+  void assign(Person p){
+    pickups.add(p.getPickUp());
+  }
+
   void travel(int location){
     for (int i = 0; i < passengers.length; i++){
       passengers[i].Move(location);
     }
+    current_location = location;
   }
   void pickup(Person p){
     passengers.add(p);
     pickups.remove(this.current_location);
+    dropoffs.add(p.getDropOff());
   }
   void dropoff(Person p){
     passengers.remove(p);

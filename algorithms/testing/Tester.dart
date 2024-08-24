@@ -307,6 +307,7 @@ void main() {
   ride_requests.remove(bob);
   //create our map
   generateMap();
+  //sum of squared differences is car selection?
   int time = 0;
   while (time < 1000000 || !ride_requests.isEmpty){//version 1: just scan for closest available car
     if(rand.nextInt(100) > 80){
