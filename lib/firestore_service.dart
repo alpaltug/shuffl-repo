@@ -21,22 +21,25 @@ class FirestoreService {
   }
 
   Future<void> updateUserProfile(
-      String uid,
-      String fullName,
-      String username,
-      String description,
-      String? imageUrl,
-      String sexAssignedAtBirth,
-      int age) async {
-    await _db.collection('users').doc(uid).update({
-      'fullName': fullName,
-      'username': username,
-      'description': description,
-      'imageUrl': imageUrl,
-      'sexAssignedAtBirth': sexAssignedAtBirth,
-      'age': age,
-    });
-  }
+  String uid,
+  String fullName,
+  String username,
+  String description,
+  String? imageUrl,
+  String sexAssignedAtBirth,
+  int age, {
+  bool goOnline = false, 
+}) async {
+  await _db.collection('users').doc(uid).update({
+    'fullName': fullName,
+    'username': username,
+    'description': description,
+    'imageUrl': imageUrl,
+    'sexAssignedAtBirth': sexAssignedAtBirth,
+    'age': age,
+    'goOnline': goOnline, 
+  });
+}
 
   Future<bool> checkIfUserExists(String uid) async {
     DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
