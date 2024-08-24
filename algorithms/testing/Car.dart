@@ -27,8 +27,11 @@ class Car {
   bool Empty(){
     return passengers.isEmpty && pickups.isEmpty;
   }
-
+  int count(){
+    return passengers.length;
+  }
   void assign(Person p){
+    passengers.add(p);
     pickups.add(p.getLocation());
   }
 
@@ -39,7 +42,6 @@ class Car {
     current_location = location;
   }
   void pickup(Person p){
-    passengers.add(p);
     pickups.remove(this.current_location);
     dropoffs.add(p.getDropOff());
   }

@@ -10,8 +10,10 @@ class Person {
   bool gender_preference;
   var acceptable_schools = [];
   int acceptable_walking;
+  int carLow;
+  int carHigh;
 
-  Person(this.current_location, this.dropoff, this.is_male, this.school, this.age, this.min_age, this.max_age, this.gender_preference, this.acceptable_schools, this.acceptable_walking);
+  Person(this.current_location, this.dropoff, this.is_male, this.school, this.age, this.min_age, this.max_age, this.gender_preference, this.acceptable_schools, this.acceptable_walking, this.carLow, this.carHigh);
     //this.current_location; //Initialize
   
   void Move(int location){

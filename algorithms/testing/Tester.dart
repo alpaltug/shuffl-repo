@@ -109,7 +109,9 @@ Person generate_passenger(){
     antiLoop++;
   }
   assert(antiLoop < probDim);//test case valid?
-  Person bob = new Person(pick, drop, (male != 0), school_library[school], age, minAge, maxAge, (sex_preference != 0), schools, walk);
+  int cLow = rand.nextInt(4) + 2;
+  int cHigh = max(5, cLow + rand.nextInt(4));
+  Person bob = new Person(pick, drop, (male != 0), school_library[school], age, minAge, maxAge, (sex_preference != 0), schools, walk, cLow, cHigh);
   return bob;
 }
 
