@@ -6,8 +6,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 
-final google_maps_api_key = 'YOUR_API_KEY_HERE';
-
 class FilteredRidesPage extends StatefulWidget {
   const FilteredRidesPage({super.key});
 

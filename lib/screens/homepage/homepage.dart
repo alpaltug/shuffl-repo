@@ -127,11 +127,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
     _addCurrentLocationMarker();
   });
 
-  if (mapController != null) {
-    mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(currentPosition, 15.0),
-    );
-  }
+  mapController.animateCamera(
+    CameraUpdate.newLatLngZoom(currentPosition, 15.0),
+  );
 }
 
   void _onMapCreated(GoogleMapController controller) {
