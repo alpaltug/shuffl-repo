@@ -136,13 +136,14 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
                 ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              'Ride Time: ${DateFormat('yyyy-MM-dd – kk:mm').format(_rideTime!)}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+          if (_rideTime != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                'Ride Time: ${DateFormat('yyyy-MM-dd – kk:mm').format(_rideTime!)}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
             ),
-          ),
           const SizedBox(height: 10),
           if (_users.isEmpty)
             const Text('No users found.', style: TextStyle(color: Colors.black))

@@ -93,36 +93,39 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
   }
 
   Future<List<DocumentSnapshot>> _fetchFilteredRides() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return [];
+  User? currentUser = _auth.currentUser;
+  if (currentUser == null) return [];
 
-    DateTime now = DateTime.now();
-    QuerySnapshot snapshot = await _firestore
-        .collection('rides')
-        .orderBy('timeOfRide')
-        .get();
+  DateTime now = DateTime.now();
+  QuerySnapshot snapshot = await _firestore
+      .collection('rides')
+      .orderBy('timeOfRide')
+      .get();
 
-    DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-    Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+  DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+  Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
 
-    List<DocumentSnapshot> filteredRides = [];
+  List<DocumentSnapshot> filteredRides = [];
 
-    for (var ride in snapshot.docs) {
+  for (var ride in snapshot.docs) {
+    bool isComplete = ride['isComplete'] ?? false;
+    if (!isComplete) {
       bool isValid = await _validatePreferences(ride, currentUserData);
       if (isValid) {
         filteredRides.add(ride);
       }
     }
-
-    for (var ride in snapshot.docs) {
-      DateTime timeOfRide = ride['timeOfRide'].toDate();
-      if (timeOfRide.isBefore(now.subtract(Duration(hours: 24)))) {
-        await ride.reference.delete();
-      }
-    }
-
-    return filteredRides;
   }
+
+  for (var ride in snapshot.docs) {
+    DateTime timeOfRide = ride['timeOfRide'].toDate();
+    if (timeOfRide.isBefore(now.subtract(Duration(hours: 24)))) {
+      await ride.reference.delete();
+    }
+  }
+
+  return filteredRides;
+}
 
   Future<bool> _validatePreferences(DocumentSnapshot ride, Map<String, dynamic> currentUserData) async {
     List<String> participants = List<String>.from(ride['participants']);

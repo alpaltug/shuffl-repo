@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 
@@ -169,6 +171,56 @@ class GreyDatePickerField extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
+      ),
+    );
+  }
+}
+
+class CountdownTimer extends StatefulWidget {
+  final Duration duration;
+
+  CountdownTimer({required this.duration});
+
+  @override
+  _CountdownTimerState createState() => _CountdownTimerState();
+}
+
+class _CountdownTimerState extends State<CountdownTimer> {
+  late int _remainingSeconds;
+  late Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _remainingSeconds = widget.duration.inSeconds;
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (_remainingSeconds > 0) {
+        setState(() {
+          _remainingSeconds--;
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Ride will start in $_remainingSeconds seconds.',
+      style: TextStyle(
+        color: Colors.black,
+        fontWeight: FontWeight.bold,
       ),
     );
   }
