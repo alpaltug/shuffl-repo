@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
+import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
 
 class UserRidesPage extends StatefulWidget {
   const UserRidesPage({super.key});
@@ -24,39 +26,144 @@ class _UserRidesPageState extends State<UserRidesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Rides'),
+        backgroundColor: Colors.blueAccent,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore.collection('rides').where('participants', arrayContains: user.uid).snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Column(
+        children: [
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('rides')
+                  .where('participants', arrayContains: user.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          final rides = snapshot.data!.docs;
+                final waitingRoomRides = snapshot.data!.docs;
 
-          if (rides.isEmpty) {
-            return const Center(child: Text('You have no ride history.'));
-          }
+                if (waitingRoomRides.isEmpty) {
+                  return const Center(child: Text('You have no rides in the waiting room.'));
+                }
 
-          return ListView.builder(
-            itemCount: rides.length,
-            itemBuilder: (context, index) {
-              var ride = rides[index];
-
-              return ListTile(
-                title: Text('Pickup: ${ride['pickupLocations'][0]}'),
-                subtitle: Column(
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Dropoff: ${ride['dropoffLocations'].join(", ")}'),
-                    Text('Time: ${ride['timeOfRide'].toDate()}'),
-                    Text('Participants: ${List<String>.from(ride['participants']).join(", ")}'),
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Text(
+                        'Waiting Room',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: waitingRoomRides.length,
+                        itemBuilder: (context, index) {
+                          var ride = waitingRoomRides[index];
+
+                          return Card(
+                            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                            color: Colors.grey[200],
+                            child: ListTile(
+                              title: Text(
+                                'Pickup: ${ride['pickupLocations'][0]}',
+                                style: const TextStyle(color: Colors.black),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Dropoff: ${ride['dropoffLocations'].join(", ")}'),
+                                  Text('Time: ${ride['timeOfRide'].toDate()}'),
+                                  Text('Participants: ${List<String>.from(ride['participants']).join(", ")}'),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => WaitingPage(rideId: ride.id)),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ],
-                ),
-              );
-            },
-          );
-        },
+                );
+              },
+            ),
+          ),
+          Divider(color: Colors.black, thickness: 2),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('active_rides')
+                  .where('participants', arrayContains: user.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final activeRides = snapshot.data!.docs;
+
+                if (activeRides.isEmpty) {
+                  return const Center(child: Text('You have no active rides.'));
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Text(
+                        'Rides',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: activeRides.length,
+                        itemBuilder: (context, index) {
+                          var ride = activeRides[index];
+                          DateTime rideTime = (ride['timeOfRide'] as Timestamp).toDate();
+                          bool isPast = rideTime.isBefore(DateTime.now());
+
+                          return Card(
+                            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                            color: isPast ? Colors.red[50] : Colors.blue[50],
+                            child: ListTile(
+                              title: Text(
+                                'Pickup: ${ride['pickupLocation']}',
+                                style: const TextStyle(color: Colors.black),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Dropoff: ${ride['dropoffLocations'].join(", ")}'),
+                                  Text('Time: ${rideTime.toString()}'),
+                                  Text('Participants: ${List<String>.from(ride['participants']).join(", ")}'),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => ActiveRidesPage(rideId: ride.id)),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,46 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
-import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
+import 'package:intl/intl.dart';
 
-class WaitingPage extends StatefulWidget {
+class ActiveRidesPage extends StatefulWidget {
   final String rideId;
-  const WaitingPage({required this.rideId, Key? key}) : super(key: key);
+  const ActiveRidesPage({required this.rideId, Key? key}) : super(key: key);
 
   @override
-  _WaitingPageState createState() => _WaitingPageState();
+  _ActiveRidesPageState createState() => _ActiveRidesPageState();
 }
 
-class _WaitingPageState extends State<WaitingPage> {
+class _ActiveRidesPageState extends State<ActiveRidesPage> {
   late GoogleMapController _mapController;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   Set<Marker> _markers = {};
+  DocumentSnapshot? _rideData;
   List<DocumentSnapshot> _users = [];
-  List<String> _pickupLocations = [];
-  Map<String, bool> _readyStatus = {};
-  int _participantsCount = 0;
+  DateTime? _rideTime;
 
   @override
   void initState() {
     super.initState();
-    _loadRideDetails();
+    _loadActiveRideDetails();
   }
 
-  Future<void> _loadRideDetails() async {
+  Future<void> _loadActiveRideDetails() async {
     DocumentSnapshot rideDoc = await FirebaseFirestore.instance
-        .collection('rides')
+        .collection('active_rides')
         .doc(widget.rideId)
         .get();
 
     if (rideDoc.exists) {
       setState(() {
-        _pickupLocations = List<String>.from(rideDoc['pickupLocations']);
-        _readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
-        _participantsCount = (rideDoc['participants'] as List).length;
+        _rideData = rideDoc;
+        _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
         _loadMarkers();
       });
 
@@ -51,28 +47,36 @@ class _WaitingPageState extends State<WaitingPage> {
             .collection('users')
             .doc(uid)
             .get();
-        userDocs.add(userDoc);
+        if (userDoc.exists) {
+          userDocs.add(userDoc);
+        } else {
+          print('User with UID $uid not found.');
+        }
       }
 
-      setState(() {
-        _users = userDocs;
-      });
+      if (mounted) {
+        setState(() {
+          _users = userDocs;
+        });
+      }
+
+      print('Number of users found: ${_users.length}');
+    } else {
+      print('Ride document does not exist.');
     }
   }
 
   Future<void> _loadMarkers() async {
-    Set<Marker> markers = {};
+    if (_rideData == null) return;
 
-    for (String address in _pickupLocations) {
-      LatLng location = await _getLatLngFromAddress(address);
-      markers.add(Marker(
+    String address = _rideData!['pickupLocation'];
+    LatLng location = await _getLatLngFromAddress(address);
+
+    setState(() {
+      _markers.add(Marker(
         markerId: MarkerId(address),
         position: location,
       ));
-    }
-
-    setState(() {
-      _markers = markers;
     });
   }
 
@@ -85,69 +89,18 @@ class _WaitingPageState extends State<WaitingPage> {
     }
   }
 
-  Future<void> _toggleReadyStatus(String userId) async {
-    if (userId != _auth.currentUser?.uid) return; // Lock other users' buttons
-
-    DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
-
-    bool currentStatus = _readyStatus[userId] ?? false;
-    setState(() {
-      _readyStatus[userId] = !currentStatus;
-    });
-
-    await rideDocRef.update({
-      'readyStatus.$userId': !currentStatus,
-    });
-
-    // Check if all participants are ready
-    if (_readyStatus.values.every((status) => status)) {
-      await _init_ride(rideDocRef);
-    }
-  }
-
-  Future<void> _init_ride(DocumentReference rideDocRef) async {
-    DocumentSnapshot rideDoc = await rideDocRef.get();
-    Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
-
-    // Calculate single pickup location (currently just returns the first)
-    String singlePickupLocation = _calculateSinglePickupLocation(List<String>.from(rideData['pickupLocations']));
-    rideData['pickupLocation'] = singlePickupLocation;
-
-    // Ensure ride time is not in the past
-    DateTime rideTime = rideData['timeOfRide'].toDate();
-    DateTime now = DateTime.now();
-    rideData['timeOfRide'] = Timestamp.fromDate(rideTime.isBefore(now) ? now : rideTime);
-
-    // Remove from rides collection
-    await rideDocRef.delete();
-
-    // Add to active_rides collection and get the new document ID
-    DocumentReference activeRideDocRef = await FirebaseFirestore.instance
-        .collection('active_rides')
-        .add(rideData);
-
-    // Navigate to active ride page using the new document ID
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => ActiveRidesPage(rideId: activeRideDocRef.id)),
-    );
-}
-
-
-  String _calculateSinglePickupLocation(List<String> pickupLocations) {
-    // For now, return the first pickup location
-    return pickupLocations.isNotEmpty ? pickupLocations[0] : 'Unknown location';
-  }
-
   @override
   Widget build(BuildContext context) {
+    Duration? timeRemaining = _rideTime != null ? _rideTime!.difference(DateTime.now()) : null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Waiting Page'),
+        title: const Text('Active Ride'),
+        backgroundColor: Colors.green,
       ),
       body: Column(
         children: [
-          if (_pickupLocations.isNotEmpty)
+          if (_rideData != null)
             Container(
               height: 200,
               child: GoogleMap(
@@ -163,6 +116,34 @@ class _WaitingPageState extends State<WaitingPage> {
                 },
               ),
             ),
+          if (timeRemaining != null && timeRemaining > Duration.zero)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.hourglass_top,
+                    size: 30,
+                    color: Colors.redAccent,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Starts in:',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  const SizedBox(width: 10),
+                  CountdownTimer(duration: timeRemaining),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'Ride Time: ${DateFormat('yyyy-MM-dd – kk:mm').format(_rideTime!)}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+          ),
+          const SizedBox(height: 10),
           if (_users.isEmpty)
             const Text('No users found.', style: TextStyle(color: Colors.black))
           else
@@ -174,9 +155,9 @@ class _WaitingPageState extends State<WaitingPage> {
                   var username = user['username'] ?? '';
                   var fullName = user['fullName'] ?? '';
                   var imageUrl = user.data().toString().contains('imageUrl') ? user['imageUrl'] : null;
-                  bool isReady = _readyStatus[user.id] ?? false;
 
                   return Card(
+                    color: Colors.green[50],
                     margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
@@ -211,19 +192,6 @@ class _WaitingPageState extends State<WaitingPage> {
                               ],
                             ),
                           ),
-                          ElevatedButton(
-                            onPressed: user.id == _auth.currentUser?.uid
-                                ? () => _toggleReadyStatus(user.id)
-                                : null, // Lock button for others
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isReady ? Colors.green : Colors.white,
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18.0),
-                              ),
-                            ),
-                            child: Text(isReady ? 'Unready' : 'Ready'),
-                          ),
                         ],
                       ),
                     ),
@@ -234,5 +202,38 @@ class _WaitingPageState extends State<WaitingPage> {
         ],
       ),
     );
+  }
+}
+
+class CountdownTimer extends StatelessWidget {
+  final Duration duration;
+
+  const CountdownTimer({Key? key, required this.duration}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<Duration>(
+      tween: Tween(begin: duration, end: Duration.zero),
+      duration: duration,
+      onEnd: () {
+        print('Ride starting now!');
+      },
+      builder: (BuildContext context, Duration value, Widget? child) {
+        return Text(
+          _formatTimeRemaining(value),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.redAccent),
+        );
+      },
+    );
+  }
+
+  String _formatTimeRemaining(Duration duration) {
+    if (duration.inHours > 0) {
+      return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m ${duration.inSeconds.remainder(60)}s';
+    } else if (duration.inMinutes > 0) {
+      return '${duration.inMinutes}m ${duration.inSeconds.remainder(60)}s';
+    } else {
+      return '${duration.inSeconds}s';
+    }
   }
 }

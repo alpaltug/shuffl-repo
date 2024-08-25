@@ -19,6 +19,8 @@ import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
+import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
+
 import 'package:http/http.dart' as http;
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
@@ -208,7 +210,6 @@ class _HomePageState extends State<HomePage> with RouteAware {
     String rideId = '';
 
     for (var doc in existingRides.docs) {
-      print(doc.id);
       Future<bool> isMatch = _validateMatch(doc, timeOfRide);
 
       if (await isMatch) {
@@ -217,7 +218,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
           'participants': FieldValue.arrayUnion([user.uid]),
           'pickupLocations': FieldValue.arrayUnion([_pickupController.text]), // Update pickup locations array
           'dropoffLocations': FieldValue.arrayUnion([_dropoffController.text]),
-          'readyStatus.${user.uid}': false,
+          'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
         });
         matched = true;
         rideId = doc.id;
@@ -226,7 +227,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
 
     if (!matched) {
-      // Create a new ride request if no match was found
+        // Create a new ride request if no match was found
       DocumentReference newRide = await _firestore.collection('rides').add({
         'timeOfRide': timeOfRide,
         'pickupLocations': [_pickupController.text], // Store pickup locations as an array
@@ -234,16 +235,21 @@ class _HomePageState extends State<HomePage> with RouteAware {
         'participants': [user.uid],
         'isComplete': false,
         'timestamp': FieldValue.serverTimestamp(),
+        'readyStatus': {user.uid: false}, // Initialize ready status map with current user as false
       });
 
       rideId = newRide.id;
-    }
+    } 
+
 
     // Reset the selected ride time after the request
     _selectedRideTime = null;
 
     return rideId;
   }
+
+
+
 
   Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) async {
     User? currentUser = _auth.currentUser;
