@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
+import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
+import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 
 class ActiveRidesPage extends StatefulWidget {
   final String rideId;
@@ -160,41 +162,45 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
                   return Card(
                     color: Colors.green[50],
                     margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                                ? NetworkImage(imageUrl)
-                                : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  fullName,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                Text(
-                                  '@$username',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        radius: 30,
+                        backgroundImage: imageUrl != null && imageUrl.isNotEmpty
+                            ? NetworkImage(imageUrl)
+                            : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
                       ),
+                      title: Text(
+                        fullName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '@$username',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black,
+                        ),
+                      ),
+                      onTap: () {
+                        if (user.id == _auth.currentUser?.uid) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const UserProfile(),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ViewUserProfile(uid: user.id),
+                            ),
+                          );
+                        }
+                      },
                     ),
                   );
                 },
