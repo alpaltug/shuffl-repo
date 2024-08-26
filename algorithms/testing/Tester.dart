@@ -130,6 +130,8 @@ List<int> dists = [];
 
 var prev = [];
 
+var path = [];
+
 Map lookup = {
   -1:-1
 };
@@ -156,6 +158,7 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
   }
   dists = [];
   prev = [];
+  path = [];
   for (int i = 0; i < dim; i++){
     dists.add(double.maxFinite.toInt());
     prev.add(Null);
@@ -169,12 +172,15 @@ int dist(int a, int b){//Calculate distance between two nodes via Djikstra's
     int extract = checkers.removeFirst();
     //int n = extract[0];
     int u = lookup[extract];
-    /*if (u == b){
+    if (u == b){
       int d = u;
-      while(d != s){
-
+      while(d != a){
+        path.add(d);
+        d = prev[d];
       }
-    }*///not needed
+      path.add(a);
+      path = path.reversed.toList();
+    }//calculating path
     for (int i = 0; i < ourMap[u].length; i++){
       int v = ourMap[u][i][0];//node
       int w = ourMap[u][i][1];//distance
