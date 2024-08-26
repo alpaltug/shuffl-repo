@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
+import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
 
 class ActiveRidesPage extends StatefulWidget {
   final String rideId;
@@ -99,6 +100,19 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
       appBar: AppBar(
         title: const Text('Active Ride'),
         backgroundColor: Colors.green,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupChatScreen(rideId: widget.rideId),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
