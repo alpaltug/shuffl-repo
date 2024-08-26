@@ -738,7 +738,7 @@ Widget build(BuildContext context) {
               minimumSize: Size(double.infinity, 50), // Make the button full width and tall
               backgroundColor: Colors.yellow,
             ),
-            child: const Text('Find Ride', style: TextStyle(color: Colors.black)),
+            child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),
           ),
         ),
         Row(
@@ -749,7 +749,7 @@ Widget build(BuildContext context) {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.yellow,
               ),
-              child: const Text('Select Time of Ride', style: TextStyle(color: Colors.black)),
+              child: const Text('Schedule Ahead', style: TextStyle(color: Colors.black)),
             ),
             Row(
               children: [
