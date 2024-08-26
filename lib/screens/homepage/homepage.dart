@@ -183,13 +183,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   _getOnlineUsersStream().listen((QuerySnapshot userSnapshot) {
-    print('Fetched ${userSnapshot.docs.length} users');
     Set<Marker> markers = {};
     Map<String, int> locationCount = {};
 
     for (var doc in userSnapshot.docs) {
       var userData = doc.data() as Map<String, dynamic>;
-      print('Processing user: ${userData['username']} with data: $userData');
 
       if (userData.containsKey('lastPickupLocation')) {
         GeoPoint location = userData['lastPickupLocation'];
@@ -214,10 +212,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
         Color markerColor = Colors.yellow; // Default for others
         if (doc.id == currentUser.uid) {
           markerColor = Colors.blue; // Blue for the current user
-          print('Marker for current user: ${userData['username']}');
         } else if (userData.containsKey('friends') && userData['friends'].contains(currentUser.uid)) {
           markerColor = Colors.green; // Green for friends
-          print('Marker for friend: ${userData['username']}');
         }
 
         markers.add(
@@ -236,15 +232,12 @@ class _HomePageState extends State<HomePage> with RouteAware {
             ),
           ),
         );
-        print('Marker added for user: ${userData['username']}');
       } else {
-        print('No location found for user: ${userData['username']}');
       }
     }
 
     setState(() {
       _markers = markers;
-      print('Updated markers: $_markers');
     });
   });
 }
@@ -526,264 +519,270 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Shuffl'),
-        backgroundColor: Colors.yellow,
-        actions: [
-          StreamBuilder<int>(
-            stream: _getNotificationCountStream(),
-            builder: (context, snapshot) {
-              int notificationCount = snapshot.data ?? 0;
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                      );
-                    },
-                  ),
-                  if (notificationCount > 0)
-                    Positioned(
-                      right: 11,
-                      top: 11,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(6),
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Shuffl'),
+      backgroundColor: Colors.yellow,
+      actions: [
+        StreamBuilder<int>(
+          stream: _getNotificationCountStream(),
+          builder: (context, snapshot) {
+            int notificationCount = snapshot.data ?? 0;
+            return Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                    );
+                  },
+                ),
+                if (notificationCount > 0)
+                  Positioned(
+                    right: 11,
+                    top: 11,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 14,
+                        minHeight: 14,
+                      ),
+                      child: Text(
+                        '$notificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
                         ),
-                        constraints: const BoxConstraints(
-                          minWidth: 14,
-                          minHeight: 14,
-                        ),
-                        child: Text(
-                          '$notificationCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
+                  ),
+              ],
+            );
+          },
+        ),
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chat),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChatsScreen()),
+                );
+              },
+            ),
+            if (_uniqueMessageSenderCount > 0)
+              Positioned(
+                right: 11,
+                top: 11,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 14,
+                    minHeight: 14,
+                  ),
+                  child: Text(
+                    '$_uniqueMessageSenderCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    ),
+    drawer: Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: <Widget>[
+          DrawerHeader(
+            decoration: const BoxDecoration(
+              color: Colors.yellow,
+            ),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const UserProfile()),
+                );
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                        ? NetworkImage(_profileImageUrl!)
+                        : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _username ?? 'amk',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 20,
+                    ),
+                  ),
                 ],
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.search),
+            title: const Text('Search Users'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchUsers()),
               );
             },
           ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chat),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ChatsScreen()),
-                  );
-                },
-              ),
-              if (_uniqueMessageSenderCount > 0)
-                Positioned(
-                  right: 11,
-                  top: 11,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 14,
-                      minHeight: 14,
-                    ),
-                    child: Text(
-                      '$_uniqueMessageSenderCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text('Edit Preferences'),
+            onTap: () {
+              User? user = _auth.currentUser;
+              if (user != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => EditPreferencesPage(uid: user.uid)),
+                );
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.directions_car),
+            title: const Text('Filtered Rides'),
+            onTap: () {
+              User? user = _auth.currentUser;
+              if (user != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const FilteredRidesPage()),
+                );
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('My Ride History'),
+            onTap: () {
+              User? user = _auth.currentUser;
+              if (user != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const UserRidesPage()),
+                );
+              }
+            },
           ),
         ],
       ),
-      drawer: Drawer(
-  child: ListView(
-    padding: EdgeInsets.zero,
-    children: <Widget>[
-      DrawerHeader(
-        decoration: const BoxDecoration(
-          color: Colors.yellow,
-        ),
-        child: GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const UserProfile()),
-            );
-          },
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
-                    ? NetworkImage(_profileImageUrl!)
-                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+    ),
+    body: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _pickupController,
+            decoration: InputDecoration(
+              hintText: 'Enter pick-up location',
+              prefixIcon: const Icon(Icons.location_on),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(height: 10),
-              Text(
-                _username ?? 'amk',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 20,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      ListTile(
-        leading: const Icon(Icons.power_settings_new),
-        title: const Text('Go Online'),
-        trailing: Switch(
-          value: _goOnline,  // bind the switch to _goOnline
-          onChanged: (value) {
-            _toggleGoOnline(value);  // call the method to toggle the state
-          },
-          activeColor: Colors.green,
-        ),
-      ),
-      ListTile(
-        leading: const Icon(Icons.search),
-        title: const Text('Search Users'),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SearchUsers()),
-          );
-        },
-      ),
-      ListTile(
-        leading: const Icon(Icons.settings),
-        title: const Text('Edit Preferences'),
-        onTap: () {
-          User? user = _auth.currentUser;
-          if (user != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => EditPreferencesPage(uid: user.uid)),
-            );
-          }
-        },
-      ),
-      ListTile(
-        leading: const Icon(Icons.directions_car),
-        title: const Text('Filtered Rides'),
-        onTap: () {
-          User? user = _auth.currentUser;
-          if (user != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const FilteredRidesPage()),
-            );
-          }
-        },
-      ),
-      ListTile(
-        leading: const Icon(Icons.history),
-        title: const Text('My Ride History'),
-        onTap: () {
-          User? user = _auth.currentUser;
-          if (user != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const UserRidesPage()),
-            );
-          }
-        },
-      ),
-      // Add more drawer options here
-    ],
-  ),
-),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _pickupController,
-              decoration: InputDecoration(
-                hintText: 'Enter pick-up location',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              style: const TextStyle(color: Colors.black),
-              readOnly: true,
-              onTap: () => _navigateToLocationSearch(true),
             ),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(true),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _dropoffController,
-              decoration: InputDecoration(
-                hintText: 'Enter destination',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _dropoffController,
+            decoration: InputDecoration(
+              hintText: 'Enter destination',
+              prefixIcon: const Icon(Icons.location_on),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              style: const TextStyle(color: Colors.black),
-              readOnly: true,
-              onTap: () => _navigateToLocationSearch(false),
             ),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(false),
           ),
-          ElevatedButton(
-            onPressed: _showDateTimePicker,
-            child: const Text('Select Time of Ride'),
-          ),
-          ElevatedButton(
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ElevatedButton(
             onPressed: _findRide,
-            child: const Text('Find Ride'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: Size(double.infinity, 50), // Make the button full width and tall
+              backgroundColor: Colors.yellow,
+            ),
+            child: const Text('Find Ride', style: TextStyle(color: Colors.black)),
           ),
-          Expanded(
-            child: Stack(
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            ElevatedButton(
+              onPressed: _showDateTimePicker,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.yellow,
+              ),
+              child: const Text('Select Time of Ride', style: TextStyle(color: Colors.black)),
+            ),
+            Row(
               children: [
-                GoogleMap(
-                  onMapCreated: _onMapCreated,
-                  initialCameraPosition: CameraPosition(
-                    target: _currentPosition ?? _center,
-                    zoom: 15.0,
-                  ),
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  markers: _markers,
+                const Text('Go Online', style: TextStyle(color: Colors.black)),
+                Switch(
+                  value: _goOnline,
+                  onChanged: (value) {
+                    _toggleGoOnline(value);
+                  },
+                  activeColor: Colors.green,
                 ),
-                // if (_currentPosition != null)
-                //   Positioned(
-                //     top: 10,
-                //     left: 10,
-                //     child: Container(
-                //       padding: const EdgeInsets.all(8),
-                //       color: Colors.black54,
-                //     ),
-                //   ),
               ],
             ),
+          ],
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              GoogleMap(
+                onMapCreated: _onMapCreated,
+                initialCameraPosition: CameraPosition(
+                  target: _currentPosition ?? _center,
+                  zoom: 15.0,
+                ),
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true,
+                markers: _markers,
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 }
