@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,6 +20,7 @@ class WaitingPage extends StatefulWidget {
 class _WaitingPageState extends State<WaitingPage> {
   late GoogleMapController _mapController;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final TextEditingController _controller = TextEditingController();
   Set<Marker> _markers = {};
   List<DocumentSnapshot> _users = [];
   List<String> _pickupLocations = [];
@@ -155,22 +157,20 @@ class _WaitingPageState extends State<WaitingPage> {
     DocumentSnapshot rideDoc = await rideDocRef.get();
     Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
 
-    // Calculate single pickup location (currently just returns the first)
-    String singlePickupLocation = _calculateSinglePickupLocation(List<String>.from(rideData['pickupLocations']));
-    rideData['pickupLocation'] = singlePickupLocation;
-
-    // Ensure ride time is not in the past
-    DateTime rideTime = rideData['timeOfRide'].toDate();
-    DateTime now = DateTime.now();
-    rideData['timeOfRide'] = Timestamp.fromDate(rideTime.isBefore(now) ? now : rideTime);
-
-    // Remove from rides collection
-    await rideDocRef.delete();
+    // Transfer chat messages from waiting room to active rides
+    QuerySnapshot messagesSnapshot = await rideDocRef.collection('messages').get();
+    List<Map<String, dynamic>> messages = messagesSnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
 
     // Add to active_rides collection and get the new document ID
-    DocumentReference activeRideDocRef = await FirebaseFirestore.instance
-        .collection('active_rides')
-        .add(rideData);
+    DocumentReference activeRideDocRef = await FirebaseFirestore.instance.collection('active_rides').add(rideData);
+
+    // Transfer chat messages to active rides
+    for (var message in messages) {
+      await activeRideDocRef.collection('messages').add(message);
+    }
+
+    // Delete the ride document from the waiting room (including the chat)
+    await rideDocRef.delete();
 
     // Navigate to active ride page using the new document ID
     Navigator.pushReplacement(
@@ -179,54 +179,63 @@ class _WaitingPageState extends State<WaitingPage> {
     );
   }
 
-  String _calculateSinglePickupLocation(List<String> pickupLocations) {
-    return pickupLocations.isNotEmpty ? pickupLocations[0] : 'Unknown location';
-  }
-
   Future<void> _leaveGroup() async {
-  User? user = _auth.currentUser;
-  if (user == null) return;
+    User? user = _auth.currentUser;
+    if (user == null) return;
 
-  DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
+    DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
 
-  // Remove the user from the participants array
-  await rideDocRef.update({
-    'participants': FieldValue.arrayRemove([user.uid]),
-    'readyStatus.${user.uid}': FieldValue.delete(), // Remove the user's ready status
-  });
+    // Remove the user from the participants array
+    await rideDocRef.update({
+      'participants': FieldValue.arrayRemove([user.uid]),
+      'readyStatus.${user.uid}': FieldValue.delete(), // Remove the user's ready status
+    });
 
-  // Check the number of participants remaining
-  DocumentSnapshot rideDoc = await rideDocRef.get();
-  List<String> participants = List<String>.from(rideDoc['participants']);
+    // Check the number of participants remaining
+    DocumentSnapshot rideDoc = await rideDocRef.get();
+    List<String> participants = List<String>.from(rideDoc['participants']);
 
-  if (participants.isEmpty) {
-    // If no participants are left, delete the ride document
-    await rideDocRef.delete();
-  } else {
-    // Recalculate whether the ride is complete based on remaining participants
-    int maxCapacity = 0;
-    for (String participantId in participants) {
-      DocumentSnapshot participantDoc = await FirebaseFirestore.instance.collection('users').doc(participantId).get();
-      int participantMaxCapacity = participantDoc['preferences']['maxCarCapacity'];
-      maxCapacity = maxCapacity > participantMaxCapacity ? maxCapacity : participantMaxCapacity;
-    }
-
-    if (participants.length >= maxCapacity) {
-      await rideDocRef.update({'isComplete': true});
+    if (participants.isEmpty) {
+      // If no participants are left, delete the ride document
+      await rideDocRef.delete();
     } else {
-      await rideDocRef.update({'isComplete': false});
+      // Recalculate whether the ride is complete based on remaining participants
+      int maxCapacity = 0;
+      for (String participantId in participants) {
+        DocumentSnapshot participantDoc = await FirebaseFirestore.instance.collection('users').doc(participantId).get();
+        int participantMaxCapacity = participantDoc['preferences']['maxCarCapacity'];
+        maxCapacity = maxCapacity > participantMaxCapacity ? maxCapacity : participantMaxCapacity;
+      }
+
+      if (participants.length >= maxCapacity) {
+        await rideDocRef.update({'isComplete': true});
+      } else {
+        await rideDocRef.update({'isComplete': false});
+      }
     }
-  }
 
   // Navigate back to the homepage
   Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
 }
 
-    @override
+     @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Waiting Page'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupChatScreen(rideId: widget.rideId),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

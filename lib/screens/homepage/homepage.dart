@@ -328,50 +328,141 @@ class _HomePageState extends State<HomePage> with RouteAware {
     return rideId;
   }
 
-
-
-
   Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return false;
+  User? currentUser = _auth.currentUser;
+  if (currentUser == null) return false;
 
-    // Retrieve the first pickup location (assuming it's a list of locations)
-    List<dynamic> pickupLocationsList = rideRequest['pickupLocations'];
-    if (pickupLocationsList.isEmpty) return false;
+  // Retrieve the pickup locations
+  List<dynamic> pickupLocationsList = rideRequest['pickupLocations'];
+  if (pickupLocationsList.isEmpty) return false;
 
-    // Extract the first pickup location (you can modify this if your logic needs more locations)
-    String existingPickupLocationAddress = pickupLocationsList[0];
+  LatLng currentPickupLocation = await _getLatLngFromAddress(_pickupController.text);
+  bool pickupProximityMatched = false;
 
-    LatLng existingPickupLocation = await _getLatLngFromAddress(existingPickupLocationAddress);
-    LatLng currentPickupLocation = await _getLatLngFromAddress(_pickupController.text);
+  for (String pickupLocationAddress in pickupLocationsList) {
+    LatLng existingPickupLocation = await _getLatLngFromAddress(pickupLocationAddress);
+    if (_isWithinProximity(existingPickupLocation, currentPickupLocation)) {
+      pickupProximityMatched = true;
+      break;
+    }
+  }
 
-    if (!_isWithinProximity(existingPickupLocation, currentPickupLocation)) {
+  if (!pickupProximityMatched) {
+    return false;
+  }
+
+  // Retrieve the dropoff locations
+  List<dynamic> dropoffLocationsList = rideRequest['dropoffLocations'];
+  if (dropoffLocationsList.isEmpty) return false;
+
+  LatLng currentDropoffLocation = await _getLatLngFromAddress(_dropoffController.text);
+  bool dropoffProximityMatched = false;
+
+  for (String dropoffLocationAddress in dropoffLocationsList) {
+    LatLng existingDropoffLocation = await _getLatLngFromAddress(dropoffLocationAddress);
+    if (_isWithinProximity(existingDropoffLocation, currentDropoffLocation)) {
+      dropoffProximityMatched = true;
+      break;
+    }
+  }
+
+  if (!dropoffProximityMatched) {
+    return false;
+  }
+
+  // Retrieve the current user data
+  DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+  if (!currentUserDoc.exists) return false;
+
+  Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+
+  List<String> participants = List<String>.from(rideRequest['participants']);
+  int currentGroupSize = participants.length;
+
+  for (String participantId in participants) {
+    if (participantId == currentUser.uid) continue;
+
+    DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
+    if (!participantDoc.exists) return false;
+
+    Map<String, dynamic> participantData = participantDoc.data() as Map<String, dynamic>;
+
+    if (!_doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
+        !_doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
       return false;
     }
+  }
 
-    // Continue with the preference matching logic
-    DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-    if (!currentUserDoc.exists) return false;
+  return true;
+}
 
-    Map<String, dynamic> currentUserPreferences = currentUserDoc['preferences'];
+bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
+  Map<String, dynamic> userPrefs = currentUserData['preferences'];
 
-    List<String> participants = List<String>.from(rideRequest['participants']);
-    for (String participantId in participants) {
-      if (participantId == currentUser.uid) continue;
+  int userMinAge = userPrefs['ageRange']['min'];
+  int userMaxAge = userPrefs['ageRange']['max'];
+  int targetAge = targetData['age'];
 
-      DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
-      if (!participantDoc.exists) return false;
+  if (targetAge < userMinAge || targetAge > userMaxAge) {
+    return false;
+  }
 
-      Map<String, dynamic> participantPreferences = participantDoc['preferences'];
+  int userMinCapacity = userPrefs['minCarCapacity'];
+  int userMaxCapacity = userPrefs['maxCarCapacity'];
 
-      if (!_doesUserMatchPreferences(currentUserPreferences, participantPreferences)) {
-        return false;
-      }
-      if (!_doesUserMatchPreferences(participantPreferences, currentUserPreferences)) {
-        return false;
-      }
-    }
-    return true;
+  if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
+    return false;
+  }
+
+  String? userDomain = currentUserData['domain'];
+  String? targetDomain = targetData['domain'];
+
+  if (userPrefs['schoolToggle'] == true && userDomain != targetDomain) {
+    return false;
+  }
+
+  String? userGender = currentUserData['sexAssignedAtBirth'];
+  String? targetGender = targetData['sexAssignedAtBirth'];
+
+  if (userPrefs['sameGenderToggle'] == true && userGender != targetGender) {
+    return false;
+  }
+
+  return true;
+}
+
+bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<String, dynamic> currentUserData, int currentGroupSize) {
+  Map<String, dynamic> participantPrefs = participantData['preferences'];
+
+  int userAge = currentUserData['age'];
+  int minAge = participantPrefs['ageRange']['min'];
+  int maxAge = participantPrefs['ageRange']['max'];
+
+  if (userAge < minAge || userAge > maxAge) {
+    return false;
+  }
+
+  int participantMinCapacity = participantPrefs['minCarCapacity'];
+  int participantMaxCapacity = participantPrefs['maxCarCapacity'];
+
+  if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
+    return false;
+  }
+
+  String? participantDomain = participantData['domain'];
+  String? userDomain = currentUserData['domain'];
+
+  if (participantPrefs['schoolToggle'] == true && participantDomain != userDomain) {
+    return false;
+  }
+
+  String? participantGender = participantData['sexAssignedAtBirth'];
+  String? userGender = currentUserData['sexAssignedAtBirth'];
+
+  if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
+    return false;
+  }
+  return true;
 }
 
   Future<LatLng> _getLatLngFromAddress(String address) async {
@@ -413,35 +504,6 @@ class _HomePageState extends State<HomePage> with RouteAware {
     return distance;
   }
 
-  bool _doesUserMatchPreferences(Map<String, dynamic> userPrefs, Map<String, dynamic> targetPrefs) {
-    int userMinAge = userPrefs['ageRange']['min'];
-    int userMaxAge = userPrefs['ageRange']['max'];
-    int targetMinAge = targetPrefs['ageRange']['min'];
-    int targetMaxAge = targetPrefs['ageRange']['max'];
-
-    if (userMinAge > targetMaxAge || userMaxAge < targetMinAge) {
-      return false;
-    }
-
-    int userMinCapacity = userPrefs['minCarCapacity'];
-    int userMaxCapacity = userPrefs['maxCarCapacity'];
-    int targetMinCapacity = targetPrefs['minCarCapacity'];
-    int targetMaxCapacity = targetPrefs['maxCarCapacity'];
-
-    if (userMinCapacity > targetMaxCapacity || userMaxCapacity < targetMinCapacity) {
-      return false;
-    }
-
-    if (userPrefs['schoolToggle'] && userPrefs['domain'] != targetPrefs['domain']) {
-      return false;
-    }
-
-    if (userPrefs['sameGenderToggle'] && userPrefs['sexAssignedAtBirth'] != targetPrefs['sexAssignedAtBirth']) {
-      return false;
-    }
-
-    return true;
-  }
 
   void _findRide() async {
     if (_pickupController.text.isNotEmpty && _dropoffController.text.isNotEmpty) {

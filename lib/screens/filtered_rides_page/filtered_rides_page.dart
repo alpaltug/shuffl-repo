@@ -131,59 +131,45 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
   List<String> participants = List<String>.from(ride['participants']);
   int currentGroupSize = participants.length;
 
-  print('Validating preferences for ride with participants: $participants');
-
   for (String participantId in participants) {
-    print('Checking preferences for participant: $participantId');
     DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
     Map<String, dynamic> participantData = participantDoc.data() as Map<String, dynamic>;
 
     if (!_doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
         !_doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
-      print('Validation failed for participant: $participantId');
       return false;
     }
   }
-  print('All preferences validated successfully');
   return true;
 }
 
  bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
   Map<String, dynamic> userPrefs = currentUserData['preferences'];
-  print('User preferences: $userPrefs');
-  print('Target user data: $targetData');
 
   int userMinAge = userPrefs['ageRange']['min'];
   int userMaxAge = userPrefs['ageRange']['max'];
   int targetAge = targetData['age'];
 
   if (targetAge < userMinAge || targetAge > userMaxAge) {
-    print('Age validation failed: targetAge $targetAge, userMinAge $userMinAge, userMaxAge $userMaxAge');
+
     return false;
   }
-  print('Age validation passed');
 
   // Validate car capacity
   int userMinCapacity = userPrefs['minCarCapacity'];
   int userMaxCapacity = userPrefs['maxCarCapacity'];
 
-  print('Validating car capacity: currentGroupSize $currentGroupSize, userMinCapacity $userMinCapacity, userMaxCapacity $userMaxCapacity');
-
   if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
-    print('Capacity validation failed: currentGroupSize $currentGroupSize, userMinCapacity $userMinCapacity, userMaxCapacity $userMaxCapacity');
     return false;
   }
-  print('Capacity validation passed');
 
   // Other validations (school domain, gender)
   String? userDomain = currentUserData['domain'];
   String? targetDomain = targetData['domain'];
 
   if (userPrefs['schoolToggle'] == true && userDomain != targetDomain) {
-    print('School domain validation failed: userDomain $userDomain, targetDomain $targetDomain');
     return false;
   }
-  print('School domain validation passed');
 
   String? userGender = currentUserData['sexAssignedAtBirth'];
   String? targetGender = targetData['sexAssignedAtBirth'];
@@ -192,57 +178,39 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     print('Gender validation failed: userGender $userGender, targetGender $targetGender');
     return false;
   }
-  print('Gender validation passed');
-
-  print('All user preferences matched successfully with target data');
   return true;
 }
 
  bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<String, dynamic> currentUserData, int currentGroupSize) {
   Map<String, dynamic> participantPrefs = participantData['preferences'];
-  print('Participant preferences: $participantPrefs');
-  print('Current user data: $currentUserData');
 
   int userAge = currentUserData['age'];
   int minAge = participantPrefs['ageRange']['min'];
   int maxAge = participantPrefs['ageRange']['max'];
 
   if (userAge < minAge || userAge > maxAge) {
-    print('Age validation failed: userAge $userAge, minAge $minAge, maxAge $maxAge');
     return false;
   }
-  print('Age validation passed');
-
   int participantMinCapacity = participantPrefs['minCarCapacity'];
   int participantMaxCapacity = participantPrefs['maxCarCapacity'];
 
-  print('Validating participant car capacity: currentGroupSize $currentGroupSize, participantMinCapacity $participantMinCapacity, participantMaxCapacity $participantMaxCapacity');
-
   if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
-    print('Capacity validation failed: currentGroupSize $currentGroupSize, participantMinCapacity $participantMinCapacity, participantMaxCapacity $participantMaxCapacity');
     return false;
   }
-  print('Capacity validation passed');
 
   String? participantDomain = participantData['domain'];
   String? userDomain = currentUserData['domain'];
 
   if (participantPrefs['schoolToggle'] == true && participantDomain != userDomain) {
-    print('School domain validation failed: participantDomain $participantDomain, userDomain $userDomain');
     return false;
   }
-  print('School domain validation passed');
 
   String? participantGender = participantData['sexAssignedAtBirth'];
   String? userGender = currentUserData['sexAssignedAtBirth'];
 
   if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
-    print('Gender validation failed: participantGender $participantGender, userGender $userGender');
     return false;
   }
-  print('Gender validation passed');
-
-  print('All participant preferences matched successfully with current user data');
   return true;
 }
 
