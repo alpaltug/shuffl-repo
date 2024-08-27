@@ -34,7 +34,6 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     DocumentSnapshot rideDoc = await FirebaseFirestore.instance
         .collection('active_rides')
         .doc(widget.rideId)
-        .orderBy('timeOfRide')
         .get();
 
     if (rideDoc.exists) {
