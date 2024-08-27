@@ -328,74 +328,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
     return rideId;
   }
 
-Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) async {
-  User? currentUser = _auth.currentUser;
-  if (currentUser == null) return false;
-
-  // Retrieve the pickup locations
-  List<dynamic> pickupLocationsList = rideRequest['pickupLocations'];
-  if (pickupLocationsList.isEmpty) return false;
-
-  LatLng currentPickupLocation = await _getLatLngFromAddress(_pickupController.text);
-  bool pickupProximityMatched = false;
-
-  for (String pickupLocationAddress in pickupLocationsList) {
-    LatLng existingPickupLocation = await _getLatLngFromAddress(pickupLocationAddress);
-    if (_isWithinProximity(existingPickupLocation, currentPickupLocation)) {
-      pickupProximityMatched = true;
-      break;
-    }
-  }
-
-  if (!pickupProximityMatched) {
-    return false;
-  }
-
-  // Retrieve the dropoff locations
-  List<dynamic> dropoffLocationsList = rideRequest['dropoffLocations'];
-  if (dropoffLocationsList.isEmpty) return false;
-
-  LatLng currentDropoffLocation = await _getLatLngFromAddress(_dropoffController.text);
-
-  // Await the result of _isValidRoute to get the boolean value
-  bool isRoute = await _isValidRoute(currentDropoffLocation, dropoffLocationsList);
-
-  if (!isRoute) {
-    return false;
-  }
-
-  // Retrieve the current user data
-  DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-  if (!currentUserDoc.exists) return false;
-
-  Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
-
-  List<String> participants = List<String>.from(rideRequest['participants']);
-  int currentGroupSize = participants.length;
-
-  for (String participantId in participants) {
-    if (participantId == currentUser.uid) continue;
-
-    DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
-    if (!participantDoc.exists) return false;
-
-    Map<String, dynamic> participantData = participantDoc.data() as Map<String, dynamic>;
-
-    if (!_doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
-        !_doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-Future<bool> _isValidRoute(LatLng newDropoff, List<dynamic> existingDropoffs) async {
-  // Convert the list of existing drop-offs into LatLng objects
-  List<LatLng> dropoffLocations = [];
-  for (String address in existingDropoffs) {
-    dropoffLocations.add(await _getLatLngFromAddress(address));
-  }
+Future<bool> _isValidRoute(LatLng pickup, LatLng newDropoff, List<LatLng> existingDropoffs) async {
+  // Convert the list of existing drop-offs into LatLng objects (if necessary)
+  List<LatLng> dropoffLocations = existingDropoffs;
 
   // We can start with simple checks, e.g., is the new dropoff between the first and last dropoff?
   // For simplicity, we can assume that if the new dropoff is within the bounding box of the existing dropoffs,
@@ -429,8 +364,94 @@ Future<bool> _isValidRoute(LatLng newDropoff, List<dynamic> existingDropoffs) as
     return true;
   }
 
+  double pickupLat = pickup.latitude;
+  double pickupLong = pickup.longitude;
+
+  double dropoffLat = newDropoff.latitude;
+  double dropoffLong = newDropoff.longitude;
+
+  // Determine if the dropoff is north or south of the pickup
+  bool isDropoffNorth = dropoffLat > pickupLat;
+
+  for (LatLng loc in dropoffLocations) {
+    double lat = loc.latitude;
+    double long = loc.longitude;
+
+    // Check if the current location is on the same side as the dropoff
+    bool isLocNorth = lat > pickupLat;
+
+    if (isLocNorth == isDropoffNorth) {
+      print("Location $lat, $long is on the same side as the dropoff.");
+    } else {
+      print("Location $lat, $long is on the opposite side from the dropoff.");
+      return false;
+    }
+  }
+
   // If the new dropoff is significantly off the current route, it's not a match
   return false;
+}
+
+Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) async {
+  User? currentUser = _auth.currentUser;
+  if (currentUser == null) return false;
+
+  // Retrieve the pickup locations and ensure they are LatLng objects
+  List<LatLng> pickupLocationsList = [];
+  for (var location in rideRequest['pickupLocations']) {
+    pickupLocationsList.add(await _getLatLngFromAddress(location));
+  }
+
+  if (pickupLocationsList.isEmpty) return false;
+
+  LatLng currentPickupLocation = await _getLatLngFromAddress(_pickupController.text);
+  bool pickupProximityMatched = pickupLocationsList.any((location) =>
+      _isWithinProximity(location, currentPickupLocation));
+
+  if (!pickupProximityMatched) {
+    return false;
+  }
+
+  // Retrieve the dropoff locations and ensure they are LatLng objects
+  List<LatLng> dropoffLocationsList = [];
+  for (var location in rideRequest['dropoffLocations']) {
+    dropoffLocationsList.add(await _getLatLngFromAddress(location));
+  }
+
+  if (dropoffLocationsList.isEmpty) return false;
+
+  LatLng currentDropoffLocation = await _getLatLngFromAddress(_dropoffController.text);
+
+  bool isRouteValid = await _isValidRoute(currentPickupLocation, currentDropoffLocation, dropoffLocationsList);
+
+  if (!isRouteValid) {
+    return false;
+  }
+
+  // Retrieve the current user data
+  DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+  if (!currentUserDoc.exists) return false;
+
+  Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+
+  List<String> participants = List<String>.from(rideRequest['participants']);
+  int currentGroupSize = participants.length;
+
+  for (String participantId in participants) {
+    if (participantId == currentUser.uid) continue;
+
+    DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
+    if (!participantDoc.exists) return false;
+
+    Map<String, dynamic> participantData = participantDoc.data() as Map<String, dynamic>;
+
+    if (!_doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
+        !_doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
