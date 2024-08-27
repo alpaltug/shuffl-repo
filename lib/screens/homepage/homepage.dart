@@ -331,6 +331,15 @@ class _HomePageState extends State<HomePage> with RouteAware {
 Future<bool> _isValidRoute(LatLng pickup, LatLng newDropoff, List<LatLng> existingDropoffs) async {
   // Convert the list of existing drop-offs into LatLng objects (if necessary)
   List<LatLng> dropoffLocations = existingDropoffs;
+  const double maxDistance = 160.934; // 100 miles in kilometers
+
+  // We can start with simple checks, e.g., is the new dropoff within an acceptable distance of existing dropoffs?
+  // for (LatLng existingDropoff in dropoffLocations) {
+  //   double distance = _calculateDistance(existingDropoff, newDropoff);
+  //   if (distance > maxDistance) {
+  //     return false; // New dropoff is too far from an existing dropoff
+  //   }
+  // }
 
   // We can start with simple checks, e.g., is the new dropoff between the first and last dropoff?
   // For simplicity, we can assume that if the new dropoff is within the bounding box of the existing dropoffs,
