@@ -4,7 +4,7 @@ import 'package:my_flutter_app/screens/login/login.dart';
 import 'package:firebase_core/firebase_core.dart';
 // import 'package:my_flutter_app/screens/test_preference_queries/test_preference_queries.dart';
 import 'firebase_options.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+// import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -16,6 +16,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // Commented out Firebase Messaging related code
+  /*
   FirebaseMessaging messaging = FirebaseMessaging.instance;
 
   NotificationSettings settings = await messaging.requestPermission(
@@ -51,6 +53,7 @@ void main() async {
       print('Message also contained a notification: ${message.notification}');
     }
   });
+  */
 
   runApp(const MyApp());
 }

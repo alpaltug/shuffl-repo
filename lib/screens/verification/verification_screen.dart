@@ -42,43 +42,45 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const LogoAppBar(title: 'Email Verification'),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'A verification email has been sent to your email address.',
-                style: TextStyle(fontSize: 18, color: Colors.black),
-                textAlign: TextAlign.center,
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Email Verification'),
+    ),
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'A verification email has been sent to your email address.',
+              style: TextStyle(fontSize: 18, color: Colors.black),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Please check your email and verify your account before logging in.',
+              style: TextStyle(fontSize: 16, color: Colors.black),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            if (!isEmailVerified && isChecking)
+              const CircularProgressIndicator(),
+            if (!isEmailVerified && !isChecking)
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    isChecking = true;
+                  });
+                  checkEmailVerified();
+                },
+                child: const Text('Check Verification Status'),
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'Please check your email and verify your account before logging in.',
-                style: TextStyle(fontSize: 16, color: Colors.black),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              if (!isEmailVerified && isChecking)
-                const CircularProgressIndicator(),
-              if (!isEmailVerified && !isChecking)
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      isChecking = true;
-                    });
-                    checkEmailVerified();
-                  },
-                  child: const Text('Check Verification Status'),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

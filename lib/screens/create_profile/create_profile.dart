@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/edit_preferences/edit_preferences.dart';
+import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
@@ -8,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:profanity_filter/profanity_filter.dart';
+import 'package:flutter/gestures.dart';
 
 class CreateProfile extends StatefulWidget {
   const CreateProfile({super.key});
@@ -156,124 +158,175 @@ class _CreateProfileState extends State<CreateProfile> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const LogoAppBar(title: 'Shuffl'),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(defaultPadding),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Create Profile',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Adjust the content below to update your profile.',
-                      style: TextStyle(color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundImage: _imageFile != null
-                          ? FileImage(_imageFile!)
-                          : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                    ),
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: () => _pickImage(ImageSource.gallery),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Colors.grey[800],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text('Change Photo'),
-                    ),
-                    const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'Full Name',
-                      controller: _fullNameController,
-                    ),
-                    const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'Username',
-                      controller: _userNameController,
-                    ),
-                    const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'Short Description',
-                      controller: _descriptionController,
-                    ),
-                    const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'Age',
-                      controller: _ageController,
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 20),
-                    DropdownButtonFormField<String>(
-                      value: _sexAssignedAtBirth,
-                      items: ['Male', 'Female']
-                          .map((label) => DropdownMenuItem(
-                                child: Text(label),
-                                value: label,
-                              ))
-                          .toList(),
-                      decoration: InputDecoration(
-                        labelText: 'Select Sex Assigned at Birth',
-                        labelStyle: const TextStyle(color: Colors.white),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _sexAssignedAtBirth = value;
-                        });
-                      },
-                      dropdownColor: Colors.grey[800],
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 20),
-                    if (_errorMessage != null)
-                      Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    const SizedBox(height: 20),
-                    GreenActionButton(
-                      text: 'Save & Continue',
-                      onPressed: _saveProfile,
-                    ),
-                  ],
-                ),
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.yellow,
+    body: Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16.0, 50.0, 16.0, 16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12.0), // Reduced padding
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(15), // Slightly smaller border radius
               ),
-            ],
-          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Create Profile',
+                    style: TextStyle(
+                      fontSize: 22, // Slightly smaller font size
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8), // Reduced spacing
+                  const Text(
+                    'Adjust the content below to update your profile.',
+                    style: TextStyle(color: Colors.white, fontSize: 14), // Smaller font size
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15), // Reduced spacing
+                  CircleAvatar(
+                    radius: 45, // Smaller avatar
+                    backgroundImage: _imageFile != null
+                        ? FileImage(_imageFile!)
+                        : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                  ),
+                  const SizedBox(height: 8), // Reduced spacing
+                  TextButton(
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.grey[800],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Change Photo'),
+                  ),
+                  const SizedBox(height: 15), // Reduced spacing
+                  GreyTextField(
+                    labelText: 'Full Name',
+                    controller: _fullNameController,
+                  ),
+                  const SizedBox(height: 15), // Reduced spacing
+                  GreyTextField(
+                    labelText: 'Username',
+                    controller: _userNameController,
+                  ),
+                  const SizedBox(height: 15), // Reduced spacing
+                  GreyTextField(
+                    labelText: 'Short Description',
+                    controller: _descriptionController,
+                  ),
+                  const SizedBox(height: 15), // Reduced spacing
+                  GreyTextField(
+                    labelText: 'Age',
+                    controller: _ageController,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 15), // Reduced spacing
+                  DropdownButtonFormField<String>(
+                    value: _sexAssignedAtBirth,
+                    items: ['Male', 'Female']
+                        .map((label) => DropdownMenuItem(
+                              child: Text(label),
+                              value: label,
+                            ))
+                        .toList(),
+                    decoration: InputDecoration(
+                      labelText: 'Select Sex Assigned at Birth',
+                      labelStyle: const TextStyle(color: Colors.white),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.1),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _sexAssignedAtBirth = value;
+                      });
+                    },
+                    dropdownColor: Colors.grey[800],
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 15), // Reduced spacing
+                  if (_errorMessage != null)
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  const SizedBox(height: 15), // Reduced spacing
+                  GreenActionButton(
+                    text: 'Save & Continue',
+                    onPressed: _saveProfile,
+                  ),
+                  const SizedBox(height: 10), // Adjust the spacing as needed
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      text: 'By continuing you are agreeing to Shuffl\'s ',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      children: <TextSpan>[
+                        TextSpan(
+                          text: 'terms and conditions',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PDFViewerPage(
+                                    pdfAssetPath: 'assets/Shuffl mobility Terms of Use.pdf',
+                                    title: 'Terms and Conditions',
+                                  ),
+                                ),
+                              );
+                            },
+                        ),
+                        const TextSpan(
+                          text: ' and ',
+                        ),
+                        TextSpan(
+                          text: 'privacy policy',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PDFViewerPage(
+                                    pdfAssetPath: 'assets/Shuffl Privacy Policy Aug 2024.pdf',
+                                    title: 'Privacy Policy',
+                                  ),
+                                ),
+                              );
+                            },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
