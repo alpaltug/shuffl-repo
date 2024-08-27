@@ -328,7 +328,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     return rideId;
   }
 
-  Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) async {
+Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) async {
   User? currentUser = _auth.currentUser;
   if (currentUser == null) return false;
 
@@ -356,17 +356,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
   if (dropoffLocationsList.isEmpty) return false;
 
   LatLng currentDropoffLocation = await _getLatLngFromAddress(_dropoffController.text);
-  bool dropoffProximityMatched = false;
 
-  for (String dropoffLocationAddress in dropoffLocationsList) {
-    LatLng existingDropoffLocation = await _getLatLngFromAddress(dropoffLocationAddress);
-    if (_isWithinProximity(existingDropoffLocation, currentDropoffLocation)) {
-      dropoffProximityMatched = true;
-      break;
-    }
-  }
+  // Await the result of _isValidRoute to get the boolean value
+  bool isRoute = await _isValidRoute(currentDropoffLocation, dropoffLocationsList);
 
-  if (!dropoffProximityMatched) {
+  if (!isRoute) {
     return false;
   }
 
@@ -394,6 +388,49 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   return true;
+}
+
+Future<bool> _isValidRoute(LatLng newDropoff, List<dynamic> existingDropoffs) async {
+  // Convert the list of existing drop-offs into LatLng objects
+  List<LatLng> dropoffLocations = [];
+  for (String address in existingDropoffs) {
+    dropoffLocations.add(await _getLatLngFromAddress(address));
+  }
+
+  // We can start with simple checks, e.g., is the new dropoff between the first and last dropoff?
+  // For simplicity, we can assume that if the new dropoff is within the bounding box of the existing dropoffs,
+  // it's a valid addition. A more sophisticated approach could involve actual route planning.
+
+  double minLat = dropoffLocations.map((loc) => loc.latitude).reduce((a, b) => a < b ? a : b);
+  double maxLat = dropoffLocations.map((loc) => loc.latitude).reduce((a, b) => a > b ? a : b);
+  double minLon = dropoffLocations.map((loc) => loc.longitude).reduce((a, b) => a < b ? a : b);
+  double maxLon = dropoffLocations.map((loc) => loc.longitude).reduce((a, b) => a > b ? a : b);
+
+  // Check if the new dropoff is within the bounding box
+  if (newDropoff.latitude >= minLat && newDropoff.latitude <= maxLat &&
+      newDropoff.longitude >= minLon && newDropoff.longitude <= maxLon) {
+    return true;
+  }
+
+  // Further checks: If the new dropoff extends the route logically
+  // For example, does it follow the direction of the existing route?
+
+  LatLng start = dropoffLocations.first;
+  LatLng end = dropoffLocations.last;
+
+  double routeDirectionLat = end.latitude - start.latitude;
+  double routeDirectionLon = end.longitude - start.longitude;
+
+  double newDirectionLat = newDropoff.latitude - end.latitude;
+  double newDirectionLon = newDropoff.longitude - end.longitude;
+
+  // Basic check if the new direction is somewhat aligned with the route direction
+  if (routeDirectionLat * newDirectionLat >= 0 && routeDirectionLon * newDirectionLon >= 0) {
+    return true;
+  }
+
+  // If the new dropoff is significantly off the current route, it's not a match
+  return false;
 }
 
 bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
