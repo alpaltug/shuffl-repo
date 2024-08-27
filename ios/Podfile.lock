@@ -962,6 +962,8 @@ PODS:
     - Firebase/Firestore (= 10.28.0)
     - firebase_core
     - Flutter
+  - device_info_plus (0.0.1):
+    - Flutter
   - Firebase/Analytics (10.28.0):
     - Firebase/Core
   - Firebase/Auth (10.28.0):
@@ -1244,9 +1246,14 @@ PODS:
   - nanopb/encode (2.30910.0)
   - PromisesObjC (2.4.0)
   - RecaptchaInterop (100.0.0)
+  - syncfusion_flutter_pdfviewer (0.0.1):
+    - Flutter
+  - url_launcher_ios (0.0.1):
+    - Flutter
 
 DEPENDENCIES:
   - cloud_firestore (from `.symlinks/plugins/cloud_firestore/ios`)
+  - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - Firebase/Analytics
   - Firebase/Auth (~> 10.28.0)
   - Firebase/Firestore (~> 10.28.0)
@@ -1261,6 +1268,8 @@ DEPENDENCIES:
   - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/darwin`)
   - GoogleSignIn (~> 7.1.0)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
+  - syncfusion_flutter_pdfviewer (from `.symlinks/plugins/syncfusion_flutter_pdfviewer/ios`)
+  - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
 SPEC REPOS:
   trunk:
@@ -1298,6 +1307,8 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   cloud_firestore:
     :path: ".symlinks/plugins/cloud_firestore/ios"
+  device_info_plus:
+    :path: ".symlinks/plugins/device_info_plus/ios"
   firebase_auth:
     :path: ".symlinks/plugins/firebase_auth/ios"
   firebase_core:
@@ -1318,12 +1329,17 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/google_sign_in_ios/darwin"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
+  syncfusion_flutter_pdfviewer:
+    :path: ".symlinks/plugins/syncfusion_flutter_pdfviewer/ios"
+  url_launcher_ios:
+    :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
   abseil: d121da9ef7e2ff4cab7666e76c5a3e0915ae08c3
   AppAuth: 501c04eda8a8d11f179dbe8637b7a91bb7e5d2fa
   BoringSSL-GRPC: 1e2348957acdbcad360b80a264a90799984b2ba6
   cloud_firestore: 9b13aee630ba3bc9e853ab72be3e7630e2e9c075
+  device_info_plus: 97af1d7e84681a90d0693e63169a5d50e0839a0d
   Firebase: 5121c624121af81cbc81df3bda414b3c28c4f3c3
   firebase_auth: 7970a5b78ab99bb9a912c2ed6e92f1e5483ad9f5
   firebase_core: a9d0180d5285527884d07a41eb4a9ec9ed12cdb6
@@ -1361,6 +1377,8 @@ SPEC CHECKSUMS:
   nanopb: 438bc412db1928dac798aa6fd75726007be04262
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   RecaptchaInterop: 7d1a4a01a6b2cb1610a47ef3f85f0c411434cb21
+  syncfusion_flutter_pdfviewer: bb9998884b864cfedf72628df3503bdf57e397c0
+  url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
 
 PODFILE CHECKSUM: c8d6319d1e10305ac4936db0eea0648a18b75537
 

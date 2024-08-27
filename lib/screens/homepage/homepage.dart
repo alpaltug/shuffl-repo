@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:my_flutter_app/main.dart';
 
 
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -20,6 +21,7 @@ import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
+import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
 
 import 'package:http/http.dart' as http;
 
@@ -763,7 +765,7 @@ Widget build(BuildContext context) {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    _username ?? 'amk',
+                    _username ?? 'Unknown User',
                     style: const TextStyle(
                       color: Colors.black,
                       fontSize: 20,
@@ -822,6 +824,37 @@ Widget build(BuildContext context) {
               }
             },
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip),
+            title: const Text('Privacy Policy'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PDFViewerPage(
+                    pdfAssetPath: 'assets/Shuffl Privacy Policy Aug 2024.pdf',
+                    title: 'Privacy Policy',
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.description),
+            title: const Text('Terms of Use'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PDFViewerPage(
+                    pdfAssetPath: 'assets/Shuffl mobility Terms of Use.pdf',
+                    title: 'Terms of Use',
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     ),
@@ -864,7 +897,7 @@ Widget build(BuildContext context) {
           child: ElevatedButton(
             onPressed: _findRide,
             style: ElevatedButton.styleFrom(
-              minimumSize: Size(double.infinity, 50), // Make the button full width and tall
+              minimumSize: const Size(double.infinity, 50), // Make the button full width and tall
               backgroundColor: Colors.yellow,
             ),
             child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),

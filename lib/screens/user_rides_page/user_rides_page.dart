@@ -136,7 +136,7 @@ class _UserRidesPageState extends State<UserRidesPage> {
                             color: isPast ? Colors.red[50] : Colors.blue[50],
                             child: ListTile(
                               title: Text(
-                                'Pickup: ${ride['pickupLocation']}',
+                                'Pickup: ${ride['pickupLocations']}',
                                 style: const TextStyle(color: Colors.black),
                               ),
                               subtitle: Column(

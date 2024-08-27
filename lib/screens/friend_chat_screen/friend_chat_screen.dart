@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
+import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
+import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 
 class ChatScreen extends StatefulWidget {
   final String friendUid;
@@ -70,10 +72,20 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Colors.yellow, // Set background color to yellow
         title: Row(
           children: [
-            CircleAvatar(
-              backgroundImage: friendImageUrl != null && friendImageUrl!.isNotEmpty
-                  ? NetworkImage(friendImageUrl!)
-                  : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ViewUserProfile(uid: widget.friendUid),
+                  ),
+                );
+              },
+              child: CircleAvatar(
+                backgroundImage: friendImageUrl != null && friendImageUrl!.isNotEmpty
+                    ? NetworkImage(friendImageUrl!)
+                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+              ),
             ),
             const SizedBox(width: 10),
             Text(friendUsername ?? 'Shuffl User', style: const TextStyle(color: Colors.black)), // Set text color to black
@@ -104,6 +116,40 @@ class _ChatScreenState extends State<ChatScreen> {
                     var isMe = message['senderId'] == _auth.currentUser!.uid;
 
                     return ListTile(
+                      trailing: isMe
+                          ? GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const UserProfile(),
+                                  ),
+                                );
+                              },
+                              child: CircleAvatar(
+                                backgroundImage: _auth.currentUser!.photoURL != null && _auth.currentUser!.photoURL!.isNotEmpty
+                                    ? NetworkImage(_auth.currentUser!.photoURL!)
+                                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                              ),
+                            )
+                          : null,
+                      leading: !isMe
+                          ? GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ViewUserProfile(uid: widget.friendUid),
+                                  ),
+                                );
+                              },
+                              child: CircleAvatar(
+                                backgroundImage: friendImageUrl != null && friendImageUrl!.isNotEmpty
+                                    ? NetworkImage(friendImageUrl!)
+                                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                              ),
+                            )
+                          : null,
                       title: Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                         child: Container(
