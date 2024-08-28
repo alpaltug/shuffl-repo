@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
-import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geocoding/geocoding.dart';
@@ -26,6 +25,8 @@ class _WaitingPageState extends State<WaitingPage> {
   List<String> _pickupLocations = [];
   Map<String, bool> _readyStatus = {};
   int _participantsCount = 0;
+  LatLng loc = LatLng(0, 0);
+  final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
 
   @override
   void initState() {
@@ -40,28 +41,79 @@ class _WaitingPageState extends State<WaitingPage> {
         .get();
 
     if (rideDoc.exists) {
-      setState(() {
+        setState(() {
         _pickupLocations = List<String>.from(rideDoc['pickupLocations']);
         _readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
         _participantsCount = (rideDoc['participants'] as List).length;
-        _loadMarkers();
-      });
+        });
 
-      List<String> userIds = List<String>.from(rideDoc['participants']);
-      List<DocumentSnapshot> userDocs = [];
-      for (String uid in userIds) {
+        List<String> userIds = List<String>.from(rideDoc['participants']);
+        List<DocumentSnapshot> userDocs = [];
+        for (String uid in userIds) {
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
             .get();
         userDocs.add(userDoc);
-      }
+        }
 
-      setState(() {
+        loc = await _getLatLngFromAddress(_pickupLocations[0]);
+
+        setState(() {
         _users = userDocs;
-      });
+        _loadMarkers();
+        });
 
-      _checkMaxCapacity(rideDoc.reference);
+        _checkMaxCapacity(rideDoc.reference);
+    } else {
+        // Handle the case where the document does not exist
+        print('Ride document does not exist.');
+        // You can also show a message to the user or navigate back to a previous page
+    }
+}
+
+Future<void> _toggleReadyStatus(String userId) async {
+  if (userId != _auth.currentUser?.uid) return;
+
+  DocumentReference rideDocRef =
+      FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
+
+  DocumentSnapshot rideDoc = await rideDocRef.get();
+  
+  if (!rideDoc.exists) {
+    print('Ride document does not exist.');
+    return;
+  }
+
+  bool currentStatus = _readyStatus[userId] ?? false;
+  setState(() {
+    _readyStatus[userId] = !currentStatus;
+  });
+
+  await rideDocRef.update({
+    'readyStatus.$userId': !currentStatus,
+  });
+
+  List<dynamic> participants = rideDoc['participants'];
+
+  // Check if all participants are ready and there's more than one participant
+  if (_readyStatus.values.every((status) => status) &&
+      participants.length > 1) {
+    await _initRide(rideDocRef);
+  }
+}
+
+
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+    if (loc != null) {
+      _mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(loc, 15.0),
+      );
+    } else {
+      _mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
+      );
     }
   }
 
@@ -90,29 +142,6 @@ class _WaitingPageState extends State<WaitingPage> {
     }
   }
 
-  Future<void> _toggleReadyStatus(String userId) async {
-    if (userId != _auth.currentUser?.uid) return;
-
-    DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
-
-    bool currentStatus = _readyStatus[userId] ?? false;
-    setState(() {
-      _readyStatus[userId] = !currentStatus;
-    });
-
-    await rideDocRef.update({
-      'readyStatus.$userId': !currentStatus,
-    });
-
-    DocumentSnapshot rideDoc = await rideDocRef.get();
-    List<dynamic> participants = rideDoc['participants'];
-
-    // Check if all participants are ready and there's more than one participant
-    if (_readyStatus.values.every((status) => status) && participants.length > 1) {
-      await _initRide(rideDocRef);
-    }
-  }
-
   Future<void> _checkMaxCapacity(DocumentReference rideDocRef) async {
     bool isComplete = false;
 
@@ -136,7 +165,8 @@ class _WaitingPageState extends State<WaitingPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("Max Capacity Reached", style: TextStyle(color: Colors.black)),
+          title: Text("Max Capacity Reached",
+              style: TextStyle(color: Colors.black)),
           content: Text(
               "$username's maxCapacity preference is met. The ride is ready to start once everyone is ready.",
               style: TextStyle(color: Colors.black)),
@@ -158,11 +188,16 @@ class _WaitingPageState extends State<WaitingPage> {
     Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
 
     // Transfer chat messages from waiting room to active rides
-    QuerySnapshot messagesSnapshot = await rideDocRef.collection('messages').get();
-    List<Map<String, dynamic>> messages = messagesSnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+    QuerySnapshot messagesSnapshot =
+        await rideDocRef.collection('messages').get();
+    List<Map<String, dynamic>> messages = messagesSnapshot.docs
+        .map((doc) => doc.data() as Map<String, dynamic>)
+        .toList();
 
     // Add to active_rides collection and get the new document ID
-    DocumentReference activeRideDocRef = await FirebaseFirestore.instance.collection('active_rides').add(rideData);
+    DocumentReference activeRideDocRef = await FirebaseFirestore.instance
+        .collection('active_rides')
+        .add(rideData);
 
     // Transfer chat messages to active rides
     for (var message in messages) {
@@ -175,7 +210,8 @@ class _WaitingPageState extends State<WaitingPage> {
     // Navigate to active ride page using the new document ID
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => ActiveRidesPage(rideId: activeRideDocRef.id)),
+      MaterialPageRoute(
+          builder: (context) => ActiveRidesPage(rideId: activeRideDocRef.id)),
     );
   }
 
@@ -183,7 +219,8 @@ class _WaitingPageState extends State<WaitingPage> {
     User? user = _auth.currentUser;
     if (user == null) return;
 
-    DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
+    DocumentReference rideDocRef =
+        FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
 
     // Remove the user from the participants array
     await rideDocRef.update({
@@ -202,9 +239,15 @@ class _WaitingPageState extends State<WaitingPage> {
       // Recalculate whether the ride is complete based on remaining participants
       int maxCapacity = 0;
       for (String participantId in participants) {
-        DocumentSnapshot participantDoc = await FirebaseFirestore.instance.collection('users').doc(participantId).get();
-        int participantMaxCapacity = participantDoc['preferences']['maxCarCapacity'];
-        maxCapacity = maxCapacity > participantMaxCapacity ? maxCapacity : participantMaxCapacity;
+        DocumentSnapshot participantDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(participantId)
+            .get();
+        int participantMaxCapacity = participantDoc['preferences']
+            ['maxCarCapacity'];
+        maxCapacity = maxCapacity > participantMaxCapacity
+            ? maxCapacity
+            : participantMaxCapacity;
       }
 
       if (participants.length >= maxCapacity) {
@@ -214,11 +257,12 @@ class _WaitingPageState extends State<WaitingPage> {
       }
     }
 
-  // Navigate back to the homepage
-  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
-}
+    // Navigate back to the homepage
+    Navigator.pushReplacement(
+        context, MaterialPageRoute(builder: (context) => HomePage()));
+  }
 
-     @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -243,16 +287,12 @@ class _WaitingPageState extends State<WaitingPage> {
             Container(
               height: 200,
               child: GoogleMap(
+                onMapCreated: _onMapCreated,
                 initialCameraPosition: CameraPosition(
-                  target: _markers.isNotEmpty
-                      ? _markers.first.position
-                      : LatLng(0, 0),
+                  target: loc ?? _center,
                   zoom: 14,
                 ),
                 markers: _markers,
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                },
               ),
             ),
           if (_users.isEmpty)
@@ -265,17 +305,21 @@ class _WaitingPageState extends State<WaitingPage> {
                   var user = _users[index];
                   var username = user['username'] ?? '';
                   var fullName = user['fullName'] ?? '';
-                  var imageUrl = user.data().toString().contains('imageUrl') ? user['imageUrl'] : null;
+                  var imageUrl = user.data().toString().contains('imageUrl')
+                      ? user['imageUrl']
+                      : null;
                   bool isReady = _readyStatus[user.id] ?? false;
 
                   return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                    margin: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 15),
                     child: ListTile(
                       leading: CircleAvatar(
                         radius: 30,
                         backgroundImage: imageUrl != null && imageUrl.isNotEmpty
                             ? NetworkImage(imageUrl)
-                            : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                            : const AssetImage('assets/icons/ShuffleLogo.jpeg')
+                                as ImageProvider,
                       ),
                       title: Text(
                         fullName,
@@ -297,7 +341,8 @@ class _WaitingPageState extends State<WaitingPage> {
                             ? () => _toggleReadyStatus(user.id)
                             : null, // Disable button for others
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isReady ? Colors.green : Colors.white,
+                          backgroundColor:
+                              isReady ? Colors.green : Colors.white,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18.0),
@@ -315,9 +360,10 @@ class _WaitingPageState extends State<WaitingPage> {
             child: ElevatedButton(
               onPressed: _leaveGroup,
               style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white, 
+                foregroundColor: Colors.white,
                 backgroundColor: Colors.red,
-                padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 20.0),
+                padding: const EdgeInsets.symmetric(
+                    vertical: 12.0, horizontal: 20.0),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20.0),
                 ),
