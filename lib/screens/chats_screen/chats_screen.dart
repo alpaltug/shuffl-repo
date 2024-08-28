@@ -19,7 +19,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chats'),
-        backgroundColor: Colors.yellow,
+        backgroundColor: Colors.white,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore

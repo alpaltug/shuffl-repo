@@ -43,13 +43,14 @@ class _HomePageState extends State<HomePage> with RouteAware {
   final FirestoreService _firestoreService = FirestoreService();
   String? _profileImageUrl;
   String? _username;
+  String? _fullName;
   LatLng? _currentPosition;
   DateTime? _selectedRideTime;
   int _uniqueMessageSenderCount = 0;
   bool _goOnline = false;
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
 
-  Set<Marker> _markers = {}; // Store markers
+  Set<Marker> _markers = {}; 
 
   @override
   void initState() {
@@ -79,16 +80,22 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   void _loadUserProfile() async {
-    User? user = _auth.currentUser;
-    if (user != null) {
-      DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
-      setState(() {
-        _profileImageUrl = userProfile['imageUrl'];
-        _username = userProfile['username'];
-        _goOnline = userProfile['goOnline'] ?? false;
-      });
-    }
+  User? user = _auth.currentUser;
+  if (user != null) {
+    DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
+
+    // Debug print statements to check what is being fetched
+    print('User Profile: ${userProfile.data()}');
+    print('Full Name: ${userProfile['fullName']}');
+
+    setState(() {
+      _profileImageUrl = userProfile['imageUrl'];
+      _username = userProfile['username'];
+      _fullName = userProfile['fullName'] ?? 'Shuffl User'; // Fallback in case fullName is null
+      _goOnline = userProfile['goOnline'] ?? false;
+    });
   }
+}
 
   Future<void> _toggleGoOnline(bool value) async {  
     User? user = _auth.currentUser;
@@ -654,7 +661,7 @@ bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<Str
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
-      title: const Text('Shuffl'),
+       title: Text(_fullName != null ? 'Hi, $_fullName!' : 'Hi, Shuffl User!'),
       backgroundColor: Colors.yellow,
       actions: [
         StreamBuilder<int>(

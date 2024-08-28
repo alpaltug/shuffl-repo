@@ -57,88 +57,110 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Edit Preferences'),
-        backgroundColor: Colors.yellow,
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Edit Preferences', style: TextStyle(color: Colors.black)),
+      backgroundColor: Colors.white,
+      iconTheme: IconThemeData(color: Colors.black),
+    ),
+    body: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Age Range: ${_currentMinAge.toInt()} - ${_currentMaxAge.toInt()}',
+            style: TextStyle(color: Colors.black),
+          ),
+          RangeSlider(
+            values: RangeValues(_currentMinAge, _currentMaxAge),
+            min: 18,
+            max: 80,
+            divisions: 62,
+            labels: RangeLabels(
+              _currentMinAge.toInt().toString(),
+              _currentMaxAge.toInt().toString(),
+            ),
+            activeColor: Colors.black, // Set active color to black
+            inactiveColor: Colors.black.withOpacity(0.3), // Adjust inactive color
+            onChanged: (RangeValues values) {
+              setState(() {
+                _currentMinAge = values.start;
+                _currentMaxAge = values.end;
+              });
+            },
+          ),
+          SwitchListTile(
+            title: const Text('Same Gender', style: TextStyle(color: Colors.black)),
+            value: _sameGenderToggle,
+            onChanged: (bool value) {
+              setState(() {
+                _sameGenderToggle = value;
+              });
+            },
+            activeColor: Colors.grey, // Keep this toggle different
+            inactiveThumbColor: Colors.grey.withOpacity(0.6),
+            activeTrackColor: Colors.black.withOpacity(0.3),
+          ),
+          SwitchListTile(
+            title: const Text('Same School', style: TextStyle(color: Colors.black)),
+            value: _sameSchoolToggle,
+            onChanged: (bool value) {
+              setState(() {
+                _sameSchoolToggle = value;
+              });
+            },
+            activeColor: Colors.black, // Set the toggle color to black
+            inactiveThumbColor: Colors.black.withOpacity(0.6),
+            activeTrackColor: Colors.black.withOpacity(0.3),
+          ),
+          Text(
+            'Minimum Total People in Car: $_minCarCapacity',
+            style: TextStyle(color: Colors.black),
+          ),
+          Slider(
+            value: _minCarCapacity.toDouble(),
+            min: 2,
+            max: 5,
+            divisions: 3,
+            label: _minCarCapacity.toString(),
+            activeColor: Colors.black, // Set the slider color to black
+            inactiveColor: Colors.black.withOpacity(0.3),
+            onChanged: (double value) {
+              setState(() {
+                _minCarCapacity = value.toInt();
+              });
+            },
+          ),
+          Text(
+            'Maximum Total People in Car: $_maxCarCapacity',
+            style: TextStyle(color: Colors.black),
+          ),
+          Slider(
+            value: _maxCarCapacity.toDouble(),
+            min: 2,
+            max: 5,
+            divisions: 3,
+            label: _maxCarCapacity.toString(),
+            activeColor: Colors.black, // Set the slider color to black
+            inactiveColor: Colors.black.withOpacity(0.3),
+            onChanged: (double value) {
+              setState(() {
+                _maxCarCapacity = value.toInt();
+              });
+            },
+          ),
+          const Spacer(), // Push the button to the bottom
+          Center(
+            child: GreenActionButton(
+              text: 'Save Preferences',
+              onPressed: _updatePreferences,
+            ),
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Age Range: ${_currentMinAge.toInt()} - ${_currentMaxAge.toInt()}', style: TextStyle(color: Colors.black)),
-            RangeSlider(
-              values: RangeValues(_currentMinAge, _currentMaxAge),
-              min: 18,
-              max: 80,
-              divisions: 62,
-              labels: RangeLabels(
-                _currentMinAge.toInt().toString(),
-                _currentMaxAge.toInt().toString(),
-              ),
-              onChanged: (RangeValues values) {
-                setState(() {
-                  _currentMinAge = values.start;
-                  _currentMaxAge = values.end;
-                });
-              },
-            ),
-            SwitchListTile(
-              title: Text('Same Gender'),
-              value: _sameGenderToggle,
-              onChanged: (bool value) {
-                setState(() {
-                  _sameGenderToggle = value;
-                });
-              },
-            ),
-            SwitchListTile(
-              title: Text('Same School'),
-              value: _sameSchoolToggle,
-              onChanged: (bool value) {
-                setState(() {
-                  _sameSchoolToggle = value;
-                });
-              },
-            ),
-            Text('Minimum Total People in Car: $_minCarCapacity', style: TextStyle(color: Colors.black)),
-            Slider(
-              value: _minCarCapacity.toDouble(),
-              min: 2,
-              max: 5,
-              divisions: 3,
-              label: _minCarCapacity.toString(),
-              onChanged: (double value) {
-                setState(() {
-                  _minCarCapacity = value.toInt();
-                });
-              },
-            ),
-            Text('Maximum Total People in Car: $_maxCarCapacity', style: TextStyle(color: Colors.black)),
-            Slider(
-              value: _maxCarCapacity.toDouble(),
-              min: 2,
-              max: 5,
-              divisions: 3,
-              label: _maxCarCapacity.toString(),
-              onChanged: (double value) {
-                setState(() {
-                  _maxCarCapacity = value.toInt();
-                });
-              },
-            ),
-            SizedBox(height: 20),
-            Center(
-              child: GreenActionButton(
-                text: 'Save Preferences',
-                onPressed: _updatePreferences,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    ),
+  );
+}
 }

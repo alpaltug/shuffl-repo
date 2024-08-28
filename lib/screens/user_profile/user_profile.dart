@@ -45,7 +45,7 @@ class _UserProfileState extends State<UserProfile> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Shuffl'),
+        title: const Text('Edit Profile'),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -171,46 +171,6 @@ class _UserProfileState extends State<UserProfile> {
                                   Icon(Icons.arrow_forward_ios, color: Colors.white),
                                 ],
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.support, color: Colors.white),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Support',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                                Spacer(),
-                                Icon(Icons.arrow_forward_ios, color: Colors.white),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.description, color: Colors.white),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Terms of Service',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                                Spacer(),
-                                Icon(Icons.arrow_forward_ios, color: Colors.white),
-                              ],
                             ),
                           ),
                         ],

@@ -42,63 +42,66 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const LogoAppBar(title: 'Notifications'),
-      body: currentUser == null
-          ? const Center(child: Text('No user logged in'))
-          : StreamBuilder<QuerySnapshot>(
-              stream: _firestore.collection('users').doc(currentUser!.uid).collection('notifications').snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Notifications'),
+      backgroundColor: Colors.white,
+    ),
+    body: currentUser == null
+        ? const Center(child: Text('No user logged in'))
+        : StreamBuilder<QuerySnapshot>(
+            stream: _firestore.collection('users').doc(currentUser!.uid).collection('notifications').snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                var notifications = snapshot.data!.docs;
+              var notifications = snapshot.data!.docs;
 
-                if (notifications.isEmpty) {
-                  // make text black
-                  return const Center(child: Text('No notifications', style: TextStyle(color: Colors.black)));
-                }
-                return ListView.builder(
-                  itemCount: notifications.length,
-                  itemBuilder: (context, index) {
-                    var notification = notifications[index];
-                    var fromUid = notification['fromUid'];
-                    var notificationId = notification.id;
+              if (notifications.isEmpty) {
+                // make text black
+                return const Center(child: Text('No notifications', style: TextStyle(color: Colors.black)));
+              }
+              return ListView.builder(
+                itemCount: notifications.length,
+                itemBuilder: (context, index) {
+                  var notification = notifications[index];
+                  var fromUid = notification['fromUid'];
+                  var notificationId = notification.id;
 
-                    return FutureBuilder<String>(
-                      future: _getUsername(fromUid),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const ListTile(
-                            title: Text('Loading...'),
-                          );
-                        }
-
-                        var username = snapshot.data!;
-                        return ListTile(
-                          title: Text('Friend request from @$username'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton(
-                                onPressed: () => _acceptRequest(notificationId, fromUid),
-                                child: const Text('Accept'),
-                              ),
-                              TextButton(
-                                onPressed: () => _declineRequest(notificationId),
-                                child: const Text('Decline'),
-                              ),
-                            ],
-                          ),
+                  return FutureBuilder<String>(
+                    future: _getUsername(fromUid),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const ListTile(
+                          title: Text('Loading...'),
                         );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-    );
-  }
+                      }
+
+                      var username = snapshot.data!;
+                      return ListTile(
+                        title: Text('Friend request from @$username'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: () => _acceptRequest(notificationId, fromUid),
+                              child: const Text('Accept'),
+                            ),
+                            TextButton(
+                              onPressed: () => _declineRequest(notificationId),
+                              child: const Text('Decline'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+  );
+}
 }
