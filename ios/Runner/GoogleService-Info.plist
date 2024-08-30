@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.shufflemobility.myFlutterApp</string>
+	<string>com.shufflmobility.myFlutterApp</string>
 	<key>PROJECT_ID</key>
 	<string>shuffl-c2c6b</string>
 	<key>STORAGE_BUCKET</key>
