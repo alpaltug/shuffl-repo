@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/main.dart';
 
 
@@ -677,7 +678,7 @@ Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
        title: Text(_fullName != null ? 'Hi, $_fullName!' : 'Hi, Shuffl User!'),
-      backgroundColor: Colors.yellow,
+      backgroundColor: kBackgroundColor,
       actions: [
         StreamBuilder<int>(
           stream: _getNotificationCountStream(),
@@ -767,7 +768,7 @@ Widget build(BuildContext context) {
         children: <Widget>[
           DrawerHeader(
             decoration: const BoxDecoration(
-              color: Colors.yellow,
+              color: kBackgroundColor,
             ),
             child: GestureDetector(
               onTap: () {

@@ -78,92 +78,92 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
     return _profanityFilter.hasProfanity(input);
   }
 
-void _saveProfile() async {
-  if (_nameController.text.isEmpty) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Full Name is required.')),
-      );
-    }
-    return;
-  }
-
-  if (_usernameController.text.isEmpty) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Username is required.')),
-      );
-    }
-    return;
-  }
-
-  if (_descriptionController.text.isEmpty) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Description is required.')),
-      );
-    }
-    return;
-  }
-
-  if (_containsProfanity(_nameController.text) ||
-      _containsProfanity(_usernameController.text) ||
-      _containsProfanity(_descriptionController.text)) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please remove profanity from your profile details.')),
-      );
-    }
-    return;
-  }
-
-  User? user = _auth.currentUser;
-  if (user != null && _usernameController.text != _username) {
-    bool usernameExists = await _firestoreService.checkIfUsernameExists(_usernameController.text);
-    if (usernameExists) {
+  void _saveProfile() async {
+    if (_nameController.text.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('The username already exists. Please choose a different username.')),
+          const SnackBar(content: Text('Full Name is required.')),
         );
       }
       return;
     }
-  }
 
-  String? imageUrl;
-  if (_imageFile != null) {
-    String uid = _auth.currentUser!.uid;
-    Reference storageRef = _storage.ref().child('profile_pics/$uid');
-    UploadTask uploadTask = storageRef.putFile(File(_imageFile!.path));
-    TaskSnapshot taskSnapshot = await uploadTask;
-    imageUrl = await taskSnapshot.ref.getDownloadURL();
-  }
-
-  try {
-    if (user != null) {
-      await _firestore.collection('users').doc(user.uid).update({
-        'fullName': _nameController.text,
-        'username': _usernameController.text,
-        'description': _descriptionController.text,
-        'imageUrl': imageUrl != null && imageUrl.isNotEmpty ? imageUrl : _imageUrl,
-      });
+    if (_usernameController.text.isEmpty) {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const UserProfile(),
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Username is required.')),
+        );
+      }
+      return;
+    }
+
+    if (_descriptionController.text.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Description is required.')),
+        );
+      }
+      return;
+    }
+
+    if (_containsProfanity(_nameController.text) ||
+        _containsProfanity(_usernameController.text) ||
+        _containsProfanity(_descriptionController.text)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please remove profanity from your profile details.')),
+        );
+      }
+      return;
+    }
+
+    User? user = _auth.currentUser;
+    if (user != null && _usernameController.text != _username) {
+      bool usernameExists = await _firestoreService.checkIfUsernameExists(_usernameController.text);
+      if (usernameExists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('The username already exists. Please choose a different username.')),
+          );
+        }
+        return;
+      }
+    }
+
+    String? imageUrl;
+    if (_imageFile != null) {
+      String uid = _auth.currentUser!.uid;
+      Reference storageRef = _storage.ref().child('profile_pics/$uid');
+      UploadTask uploadTask = storageRef.putFile(File(_imageFile!.path));
+      TaskSnapshot taskSnapshot = await uploadTask;
+      imageUrl = await taskSnapshot.ref.getDownloadURL();
+    }
+
+    try {
+      if (user != null) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'fullName': _nameController.text,
+          'username': _usernameController.text,
+          'description': _descriptionController.text,
+          'imageUrl': imageUrl != null && imageUrl.isNotEmpty ? imageUrl : _imageUrl,
+        });
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UserProfile(),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save profile: $e')),
         );
       }
     }
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save profile: $e')),
-      );
-    }
   }
-}
 
   void _showImageSourceActionSheet() {
     showModalBottomSheet(
@@ -198,7 +198,17 @@ void _saveProfile() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogoAppBar(title: 'Shuffl'),
+      appBar: AppBar(
+        title: const Text(
+          'Edit Profile',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: kBackgroundColor, // Use the consistent background color
+        automaticallyImplyLeading: true, // Enable back button
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),

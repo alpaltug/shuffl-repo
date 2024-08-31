@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/widgets.dart';
+import 'package:my_flutter_app/constants.dart'; // Import for constants
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -42,66 +43,89 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: const Text('Notifications'),
-      backgroundColor: Colors.white,
-    ),
-    body: currentUser == null
-        ? const Center(child: Text('No user logged in'))
-        : StreamBuilder<QuerySnapshot>(
-            stream: _firestore.collection('users').doc(currentUser!.uid).collection('notifications').snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const LogolessAppBar(
+        title: 'Notifications',
+        automaticallyImplyLeading: true, // Include necessary buttons
+      ),
+      backgroundColor: kBackgroundColor, // Set the background color to match the app's theme
+      body: currentUser == null
+          ? const Center(
+              child: Text(
+                'No user logged in',
+                style: TextStyle(color: Colors.black), // Set text color to black
+              ),
+            )
+          : StreamBuilder<QuerySnapshot>(
+              stream: _firestore.collection('users').doc(currentUser!.uid).collection('notifications').snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              var notifications = snapshot.data!.docs;
+                var notifications = snapshot.data!.docs;
 
-              if (notifications.isEmpty) {
-                // make text black
-                return const Center(child: Text('No notifications', style: TextStyle(color: Colors.black)));
-              }
-              return ListView.builder(
-                itemCount: notifications.length,
-                itemBuilder: (context, index) {
-                  var notification = notifications[index];
-                  var fromUid = notification['fromUid'];
-                  var notificationId = notification.id;
-
-                  return FutureBuilder<String>(
-                    future: _getUsername(fromUid),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const ListTile(
-                          title: Text('Loading...'),
-                        );
-                      }
-
-                      var username = snapshot.data!;
-                      return ListTile(
-                        title: Text('Friend request from @$username'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextButton(
-                              onPressed: () => _acceptRequest(notificationId, fromUid),
-                              child: const Text('Accept'),
-                            ),
-                            TextButton(
-                              onPressed: () => _declineRequest(notificationId),
-                              child: const Text('Decline'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                if (notifications.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No notifications',
+                      style: TextStyle(color: Colors.black), // Set text color to black
+                    ),
                   );
-                },
-              );
-            },
-          ),
-  );
-}
+                }
+
+                return ListView.builder(
+                  itemCount: notifications.length,
+                  itemBuilder: (context, index) {
+                    var notification = notifications[index];
+                    var fromUid = notification['fromUid'];
+                    var notificationId = notification.id;
+
+                    return FutureBuilder<String>(
+                      future: _getUsername(fromUid),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const ListTile(
+                            title: Text(
+                              'Loading...',
+                              style: TextStyle(color: Colors.black), // Set text color to black
+                            ),
+                          );
+                        }
+
+                        var username = snapshot.data!;
+                        return ListTile(
+                          title: Text(
+                            'Friend request from @$username',
+                            style: const TextStyle(color: Colors.black), // Set text color to black
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextButton(
+                                onPressed: () => _acceptRequest(notificationId, fromUid),
+                                child: const Text(
+                                  'Accept',
+                                  style: TextStyle(color: Colors.black), // Set button text color to black
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => _declineRequest(notificationId),
+                                child: const Text(
+                                  'Decline',
+                                  style: TextStyle(color: Colors.black), // Set button text color to black
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+    );
+  }
 }

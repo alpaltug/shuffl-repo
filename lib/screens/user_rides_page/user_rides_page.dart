@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
+import 'package:my_flutter_app/widgets.dart';
+import 'package:my_flutter_app/constants.dart'; // Ensure this import for constants
 
 class UserRidesPage extends StatefulWidget {
   const UserRidesPage({super.key});
@@ -41,10 +43,11 @@ class _UserRidesPageState extends State<UserRidesPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Rides'),
-        backgroundColor: Colors.white,
+      appBar: const LogolessAppBar(
+        title: 'My Rides',
+        automaticallyImplyLeading: true, // Keep necessary buttons like back or search
       ),
+      backgroundColor: kBackgroundColor, // Use the consistent background color
       body: Column(
         children: [
           Expanded(
@@ -61,17 +64,26 @@ class _UserRidesPageState extends State<UserRidesPage> {
                 final waitingRoomRides = snapshot.data!.docs;
 
                 if (waitingRoomRides.isEmpty) {
-                  return const Center(child: Text('You have no rides in the waiting room.'));
+                  return const Center(
+                    child: Text(
+                      'You have no rides in the waiting room.',
+                      style: TextStyle(color: Colors.black), // Text color set to black
+                    ),
+                  );
                 }
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(10.0),
-                      child: const Text(
+                    const Padding(
+                      padding: EdgeInsets.all(10.0),
+                      child: Text(
                         'Waiting Room',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black, // Text color set to black
+                        ),
                       ),
                     ),
                     Expanded(
@@ -85,7 +97,7 @@ class _UserRidesPageState extends State<UserRidesPage> {
                             builder: (context, usernamesSnapshot) {
                               if (!usernamesSnapshot.hasData) {
                                 return const ListTile(
-                                  title: Text('Loading...'),
+                                  title: Text('Loading...', style: TextStyle(color: Colors.black)), // Text color set to black
                                 );
                               }
 
@@ -94,15 +106,24 @@ class _UserRidesPageState extends State<UserRidesPage> {
                                 color: Colors.grey[200],
                                 child: ListTile(
                                   title: Text(
-                                    'Pickup: ${ride['pickupLocations'][_userId] ?? 'Unknown'}', // Get the current user's pickup location
-                                    style: const TextStyle(color: Colors.black),
+                                    'Pickup: ${ride['pickupLocations'][_userId] ?? 'Unknown'}',
+                                    style: const TextStyle(color: Colors.black), // Text color set to black
                                   ),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Dropoff: ${ride['dropoffLocations'][_userId] ?? 'Unknown'}'), // Get the current user's dropoff location
-                                      Text('Time: ${ride['timeOfRide'].toDate()}'),
-                                      Text('Participants: ${usernamesSnapshot.data!.join(", ")}'),
+                                      Text(
+                                        'Dropoff: ${ride['dropoffLocations'][_userId] ?? 'Unknown'}',
+                                        style: const TextStyle(color: Colors.black), // Text color set to black
+                                      ),
+                                      Text(
+                                        'Time: ${ride['timeOfRide'].toDate()}',
+                                        style: const TextStyle(color: Colors.black), // Text color set to black
+                                      ),
+                                      Text(
+                                        'Participants: ${usernamesSnapshot.data!.join(", ")}',
+                                        style: const TextStyle(color: Colors.black), // Text color set to black
+                                      ),
                                     ],
                                   ),
                                   onTap: () {
@@ -123,7 +144,7 @@ class _UserRidesPageState extends State<UserRidesPage> {
               },
             ),
           ),
-          Divider(color: Colors.black, thickness: 2),
+          const Divider(color: Colors.black, thickness: 2),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestore
@@ -138,17 +159,26 @@ class _UserRidesPageState extends State<UserRidesPage> {
                 final activeRides = snapshot.data!.docs;
 
                 if (activeRides.isEmpty) {
-                  return const Center(child: Text('You have no active rides.'));
+                  return const Center(
+                    child: Text(
+                      'You have no active rides.',
+                      style: TextStyle(color: Colors.black), // Text color set to black
+                    ),
+                  );
                 }
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(10.0),
-                      child: const Text(
+                    const Padding(
+                      padding: EdgeInsets.all(10.0),
+                      child: Text(
                         'Rides',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black, // Text color set to black
+                        ),
                       ),
                     ),
                     Expanded(
@@ -164,7 +194,7 @@ class _UserRidesPageState extends State<UserRidesPage> {
                             builder: (context, usernamesSnapshot) {
                               if (!usernamesSnapshot.hasData) {
                                 return const ListTile(
-                                  title: Text('Loading...'),
+                                  title: Text('Loading...', style: TextStyle(color: Colors.black)), // Text color set to black
                                 );
                               }
 
@@ -173,15 +203,24 @@ class _UserRidesPageState extends State<UserRidesPage> {
                                 color: isPast ? Colors.red[50] : Colors.blue[50],
                                 child: ListTile(
                                   title: Text(
-                                    'Pickup: ${ride['pickupLocations'][_userId] ?? 'Unknown'}', // Get the current user's pickup location
-                                    style: const TextStyle(color: Colors.black),
+                                    'Pickup: ${ride['pickupLocations'][_userId] ?? 'Unknown'}',
+                                    style: const TextStyle(color: Colors.black), // Text color set to black
                                   ),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Dropoff: ${ride['dropoffLocations'][_userId] ?? 'Unknown'}'), // Get the current user's dropoff location
-                                      Text('Time: ${rideTime.toString()}'),
-                                      Text('Participants: ${usernamesSnapshot.data!.join(", ")}'),
+                                      Text(
+                                        'Dropoff: ${ride['dropoffLocations'][_userId] ?? 'Unknown'}',
+                                        style: const TextStyle(color: Colors.black), // Text color set to black
+                                      ),
+                                      Text(
+                                        'Time: ${rideTime.toString()}',
+                                        style: const TextStyle(color: Colors.black), // Text color set to black
+                                      ),
+                                      Text(
+                                        'Participants: ${usernamesSnapshot.data!.join(", ")}',
+                                        style: const TextStyle(color: Colors.black), // Text color set to black
+                                      ),
                                     ],
                                   ),
                                   onTap: () {

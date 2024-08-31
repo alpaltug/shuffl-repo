@@ -45,7 +45,15 @@ class _UserProfileState extends State<UserProfile> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Profile'),
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white, 
+          ),
+        ),
+        backgroundColor: kBackgroundColor, // Set the AppBar color to the same as the rest of the app
+        iconTheme: const IconThemeData(color: Colors.black), // Set AppBar icons to white
         actions: [
           IconButton(
             icon: const Icon(Icons.search),

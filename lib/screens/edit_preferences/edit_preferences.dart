@@ -61,7 +61,7 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
     return Scaffold(
       appBar: const LogolessAppBar(
         title: 'Edit Preferences',
-        automaticallyImplyLeading: false, // Remove the back button
+        automaticallyImplyLeading: true, // Remove the back button
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
