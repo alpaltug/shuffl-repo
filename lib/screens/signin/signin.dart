@@ -172,13 +172,14 @@ class _SignInState extends State<SignIn> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogoAppBar(title: 'Shuffl'),
+      appBar: const LogolessAppBar(title: 'Shuffl', automaticallyImplyLeading: false),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const SizedBox(height: defaultPadding),
               Container(
                 padding: const EdgeInsets.all(defaultPadding),
                 decoration: BoxDecoration(

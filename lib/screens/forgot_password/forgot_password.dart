@@ -75,7 +75,10 @@ class _ForgotPasswordState extends State<ForgotPassword> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogoAppBar(title: "Shuffl"),
+      appBar: const LogolessAppBar(
+        title: "Shuffl",
+        automaticallyImplyLeading: true, // To show the back button
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
@@ -96,8 +99,10 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                         IconButton(
                           icon: const Icon(Icons.arrow_back, color: Colors.white),
                           onPressed: () {
-                            Navigator.push(context, 
-                            MaterialPageRoute(builder: (context) => const SignIn()));
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SignIn()),
+                            );
                           },
                         ),
                         const Text(
@@ -128,11 +133,11 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                       ),
                     const SizedBox(height: 20),
                     _isProcessing
-                      ? const CircularProgressIndicator()
-                      : GreenActionButton(
-                          text: 'Send Reset Link',
-                          onPressed: _sendResetLink,
-                        ),
+                        ? const CircularProgressIndicator()
+                        : GreenActionButton(
+                            text: 'Send Reset Link',
+                            onPressed: _sendResetLink,
+                          ),
                   ],
                 ),
               ),
