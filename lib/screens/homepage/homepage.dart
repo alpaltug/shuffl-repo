@@ -545,17 +545,29 @@ bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<Str
 }
 
   Future<LatLng> _getLatLngFromAddress(String address) async {
-    try {
-      List<Location> locations = await locationFromAddress(address);
-      if (locations.isNotEmpty) {
-        return LatLng(locations.first.latitude, locations.first.longitude);
+  final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$google_maps_api_key');
+
+  try {
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+        final location = data['results'][0]['geometry']['location'];
+        return LatLng(location['lat'], location['lng']);
       } else {
-        throw Exception('No locations found for the given address.');
+        throw Exception('No locations found for the given address: $address');
       }
-    } catch (e) {
-      throw Exception('Failed to get location from address: $e');
+    } else {
+      throw Exception(
+          'Failed to get location from address: ${response.reasonPhrase}');
     }
+  } catch (e) {
+    print('Failed to get location from address: $address, error: $e');
+    throw Exception('Failed to get location from address: $e');
   }
+}
 
   bool _isWithinProximity(LatLng location1, LatLng location2) {
     const double maxDistance = 500; // 500 meters (we can change later)
