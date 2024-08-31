@@ -72,7 +72,11 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   Future<void> _loadMarkers() async {
     if (_rideData == null) return;
 
-    String address = _rideData!['pickupLocation'];
+    User? user = _auth.currentUser;
+    if (user == null) return;
+
+    // Retrieve the pickup location for the current user
+    String address = _rideData!['pickupLocations'][user.uid];
     LatLng location = await _getLatLngFromAddress(address);
 
     setState(() {

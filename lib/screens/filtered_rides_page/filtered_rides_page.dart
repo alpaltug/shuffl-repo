@@ -67,13 +67,13 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                     color: Colors.grey[200],
                     child: ListTile(
                       title: Text(
-                        'Pickup: ${ride['pickupLocations'][0]}',
+                        'Pickup: ${ride['pickupLocations'].values.join(", ")}', // Update to handle map
                         style: const TextStyle(color: Colors.black),
                       ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Dropoff: ${ride['dropoffLocations'].join(", ")}'),
+                          Text('Dropoff: ${ride['dropoffLocations'].values.join(", ")}'), // Update to handle map
                           Text('Time: ${ride['timeOfRide'].toDate()}'),
                           Text('Participants: ${participantUsernames.join(", ")}'),
                         ],
@@ -93,126 +93,125 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
   }
 
   Future<List<DocumentSnapshot>> _fetchFilteredRides() async {
-  User? currentUser = _auth.currentUser;
-  if (currentUser == null) return [];
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return [];
 
-  DateTime now = DateTime.now();
-  QuerySnapshot snapshot = await _firestore
-      .collection('rides')
-      .orderBy('timeOfRide')
-      .get();
+    DateTime now = DateTime.now();
+    QuerySnapshot snapshot = await _firestore
+        .collection('rides')
+        .orderBy('timeOfRide')
+        .get();
 
-  DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-  Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+    DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
 
-  List<DocumentSnapshot> filteredRides = [];
+    List<DocumentSnapshot> filteredRides = [];
 
-  for (var ride in snapshot.docs) {
-    bool isComplete = ride['isComplete'] ?? false;
-    if (!isComplete) {
-      bool isValid = await _validatePreferences(ride, currentUserData);
-      if (isValid) {
-        filteredRides.add(ride);
+    for (var ride in snapshot.docs) {
+      bool isComplete = ride['isComplete'] ?? false;
+      if (!isComplete) {
+        bool isValid = await _validatePreferences(ride, currentUserData);
+        if (isValid) {
+          filteredRides.add(ride);
+        }
       }
     }
-  }
 
-  for (var ride in snapshot.docs) {
-    DateTime timeOfRide = ride['timeOfRide'].toDate();
-    if (timeOfRide.isBefore(now.subtract(Duration(hours: 24)))) {
-      await ride.reference.delete();
+    for (var ride in snapshot.docs) {
+      DateTime timeOfRide = ride['timeOfRide'].toDate();
+      if (timeOfRide.isBefore(now.subtract(Duration(hours: 24)))) {
+        await ride.reference.delete();
+      }
     }
-  }
 
-  return filteredRides;
-}
+    return filteredRides;
+  }
 
   Future<bool> _validatePreferences(DocumentSnapshot ride, Map<String, dynamic> currentUserData) async {
-  List<String> participants = List<String>.from(ride['participants']);
-  int currentGroupSize = participants.length;
+    List<String> participants = List<String>.from(ride['participants']);
+    int currentGroupSize = participants.length;
 
-  for (String participantId in participants) {
-    DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
-    Map<String, dynamic> participantData = participantDoc.data() as Map<String, dynamic>;
+    for (String participantId in participants) {
+      DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
+      Map<String, dynamic> participantData = participantDoc.data() as Map<String, dynamic>;
 
-    if (!_doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
-        !_doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
+      if (!_doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
+          !_doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
+    Map<String, dynamic> userPrefs = currentUserData['preferences'];
+
+    int userMinAge = userPrefs['ageRange']['min'];
+    int userMaxAge = userPrefs['ageRange']['max'];
+    int targetAge = targetData['age'];
+
+    if (targetAge < userMinAge || targetAge > userMaxAge) {
       return false;
     }
-  }
-  return true;
-}
 
- bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
-  Map<String, dynamic> userPrefs = currentUserData['preferences'];
+    // Validate car capacity
+    int userMinCapacity = userPrefs['minCarCapacity'];
+    int userMaxCapacity = userPrefs['maxCarCapacity'];
 
-  int userMinAge = userPrefs['ageRange']['min'];
-  int userMaxAge = userPrefs['ageRange']['max'];
-  int targetAge = targetData['age'];
+    if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
+      return false;
+    }
 
-  if (targetAge < userMinAge || targetAge > userMaxAge) {
+    // Other validations (school domain, gender)
+    String? userDomain = currentUserData['domain'];
+    String? targetDomain = targetData['domain'];
 
-    return false;
-  }
+    if (userPrefs['schoolToggle'] == true && userDomain != targetDomain) {
+      return false;
+    }
 
-  // Validate car capacity
-  int userMinCapacity = userPrefs['minCarCapacity'];
-  int userMaxCapacity = userPrefs['maxCarCapacity'];
+    String? userGender = currentUserData['sexAssignedAtBirth'];
+    String? targetGender = targetData['sexAssignedAtBirth'];
 
-  if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
-    return false;
-  }
-
-  // Other validations (school domain, gender)
-  String? userDomain = currentUserData['domain'];
-  String? targetDomain = targetData['domain'];
-
-  if (userPrefs['schoolToggle'] == true && userDomain != targetDomain) {
-    return false;
+    if (userPrefs['sameGenderToggle'] == true && userGender != targetGender) {
+      print('Gender validation failed: userGender $userGender, targetGender $targetGender');
+      return false;
+    }
+    return true;
   }
 
-  String? userGender = currentUserData['sexAssignedAtBirth'];
-  String? targetGender = targetData['sexAssignedAtBirth'];
+  bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<String, dynamic> currentUserData, int currentGroupSize) {
+    Map<String, dynamic> participantPrefs = participantData['preferences'];
 
-  if (userPrefs['sameGenderToggle'] == true && userGender != targetGender) {
-    print('Gender validation failed: userGender $userGender, targetGender $targetGender');
-    return false;
+    int userAge = currentUserData['age'];
+    int minAge = participantPrefs['ageRange']['min'];
+    int maxAge = participantPrefs['ageRange']['max'];
+
+    if (userAge < minAge || userAge > maxAge) {
+      return false;
+    }
+    int participantMinCapacity = participantPrefs['minCarCapacity'];
+    int participantMaxCapacity = participantPrefs['maxCarCapacity'];
+
+    if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
+      return false;
+    }
+
+    String? participantDomain = participantData['domain'];
+    String? userDomain = currentUserData['domain'];
+
+    if (participantPrefs['schoolToggle'] == true && participantDomain != userDomain) {
+      return false;
+    }
+
+    String? participantGender = participantData['sexAssignedAtBirth'];
+    String? userGender = currentUserData['sexAssignedAtBirth'];
+
+    if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
+      return false;
+    }
+    return true;
   }
-  return true;
-}
-
- bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<String, dynamic> currentUserData, int currentGroupSize) {
-  Map<String, dynamic> participantPrefs = participantData['preferences'];
-
-  int userAge = currentUserData['age'];
-  int minAge = participantPrefs['ageRange']['min'];
-  int maxAge = participantPrefs['ageRange']['max'];
-
-  if (userAge < minAge || userAge > maxAge) {
-    return false;
-  }
-  int participantMinCapacity = participantPrefs['minCarCapacity'];
-  int participantMaxCapacity = participantPrefs['maxCarCapacity'];
-
-  if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
-    return false;
-  }
-
-  String? participantDomain = participantData['domain'];
-  String? userDomain = currentUserData['domain'];
-
-  if (participantPrefs['schoolToggle'] == true && participantDomain != userDomain) {
-    return false;
-  }
-
-  String? participantGender = participantData['sexAssignedAtBirth'];
-  String? userGender = currentUserData['sexAssignedAtBirth'];
-
-  if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
-    return false;
-  }
-  return true;
-}
 
   Future<void> _joinRide(String rideId, List<String> participants) async {
     User? user = _auth.currentUser;
@@ -251,7 +250,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
   void _showRideDetailsModal(BuildContext context, DocumentSnapshot ride, List<String> participantUsernames) {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
       ),
       builder: (context) {
@@ -260,34 +259,34 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              const Text(
                 'Ride Details',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'Time: ${ride['timeOfRide'].toDate()}',
-                style: TextStyle(color: Colors.black),
+                style: const TextStyle(color: Colors.black),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
-                'Pickup: ${ride['pickupLocations'].join(", ")}',
-                style: TextStyle(color: Colors.black),
+                'Pickup: ${ride['pickupLocations'].values.join(", ")}', // Update to handle map
+                style: const TextStyle(color: Colors.black),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
-                'Dropoff: ${ride['dropoffLocations'].join(", ")}',
-                style: TextStyle(color: Colors.black),
+                'Dropoff: ${ride['dropoffLocations'].values.join(", ")}', // Update to handle map
+                style: const TextStyle(color: Colors.black),
               ),
-              SizedBox(height: 8),
-              Divider(),
-              Text(
+              const SizedBox(height: 8),
+              const Divider(),
+              const Text(
                 'Participants:',
                 style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
               ),
-              SizedBox(height: 8),
-              ...participantUsernames.map((username) => Text(username, style: TextStyle(color: Colors.black))).toList(),
-              SizedBox(height: 16),
+              const SizedBox(height: 8),
+              ...participantUsernames.map((username) => Text(username, style: const TextStyle(color: Colors.black))).toList(),
+              const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => _joinRide(ride.id, List<String>.from(ride['participants'])),
                 child: const Text('Join Ride'),
@@ -299,4 +298,3 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     );
   }
 }
-

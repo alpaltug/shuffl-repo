@@ -305,8 +305,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
         // Add user to existing ride and update destinations
         await doc.reference.update({
           'participants': FieldValue.arrayUnion([user.uid]),
-          'pickupLocations': FieldValue.arrayUnion([_pickupController.text]), // Update pickup locations array
-          'dropoffLocations': FieldValue.arrayUnion([_dropoffController.text]),
+          'pickupLocations.${user.uid}': _pickupController.text, // Update pickup locations map
+          'dropoffLocations.${user.uid}': _dropoffController.text, // Update dropoff locations map
           'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
         });
         matched = true;
@@ -319,8 +319,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
         // Create a new ride request if no match was found
       DocumentReference newRide = await _firestore.collection('rides').add({
         'timeOfRide': timeOfRide,
-        'pickupLocations': [_pickupController.text], // Store pickup locations as an array
-        'dropoffLocations': [_dropoffController.text], // Store dropoff locations as an array
+        'pickupLocations': {user.uid: _pickupController.text}, // Store pickup locations as a map
+        'dropoffLocations': {user.uid: _dropoffController.text}, // Store dropoff locations as a map
         'participants': [user.uid],
         'isComplete': false,
         'timestamp': FieldValue.serverTimestamp(),
@@ -416,7 +416,9 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
 
   // Retrieve the pickup locations and ensure they are LatLng objects
   List<LatLng> pickupLocationsList = [];
-  for (var location in rideRequest['pickupLocations']) {
+  Map<String, String> pickupLocationsMap = Map<String, String>.from(rideRequest['pickupLocations']);
+
+  for (var location in pickupLocationsMap.values) {
     pickupLocationsList.add(await _getLatLngFromAddress(location));
   }
 
@@ -432,7 +434,8 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
 
   // Retrieve the dropoff locations and ensure they are LatLng objects
   List<LatLng> dropoffLocationsList = [];
-  for (var location in rideRequest['dropoffLocations']) {
+  Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideRequest['dropoffLocations']);
+  for (var location in dropoffLocationsMap.values) {
     dropoffLocationsList.add(await _getLatLngFromAddress(location));
   }
 

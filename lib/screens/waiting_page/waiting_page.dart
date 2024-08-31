@@ -22,7 +22,7 @@ class _WaitingPageState extends State<WaitingPage> {
   final TextEditingController _controller = TextEditingController();
   Set<Marker> _markers = {};
   List<DocumentSnapshot> _users = [];
-  List<String> _pickupLocations = [];
+  List<LatLng> _pickupLocations = [];
   Map<String, bool> _readyStatus = {};
   int _participantsCount = 0;
   LatLng loc = LatLng(0, 0);
@@ -42,10 +42,14 @@ class _WaitingPageState extends State<WaitingPage> {
 
     if (rideDoc.exists) {
         setState(() {
-        _pickupLocations = List<String>.from(rideDoc['pickupLocations']);
-        _readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
-        _participantsCount = (rideDoc['participants'] as List).length;
-        });
+          _pickupLocations = [];
+          Map<String, String> pickupLocationsMap = Map<String, String>.from(rideRequest['pickupLocations']);
+
+          for (var location in pickupLocationsMap.values) {
+            pickupLocationsList.add(await _getLatLngFromAddress(location));
+          }
+          _readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
+          _participantsCount = (rideDoc['participants'] as List).length;});
 
         List<String> userIds = List<String>.from(rideDoc['participants']);
         List<DocumentSnapshot> userDocs = [];
@@ -57,7 +61,7 @@ class _WaitingPageState extends State<WaitingPage> {
         userDocs.add(userDoc);
         }
 
-        loc = await _getLatLngFromAddress(_pickupLocations[0]);
+        loc = _pickupLocations[0];
 
         setState(() {
         _users = userDocs;
@@ -120,8 +124,7 @@ Future<void> _toggleReadyStatus(String userId) async {
   Future<void> _loadMarkers() async {
     Set<Marker> markers = {};
 
-    for (String address in _pickupLocations) {
-      LatLng location = await _getLatLngFromAddress(address);
+    for (LatLng location in _pickupLocations) {
       markers.add(Marker(
         markerId: MarkerId(address),
         position: location,
