@@ -47,7 +47,7 @@ class LogoAppBar extends StatelessWidget implements PreferredSizeWidget {
 class GreenActionButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
-  final Color color; // Added color parameter
+  final Color color;
 
   const GreenActionButton({
     super.key,
@@ -69,7 +69,13 @@ class GreenActionButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        child: Text(text),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.black, // Set text color to black
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
