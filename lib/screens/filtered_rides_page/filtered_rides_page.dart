@@ -1,10 +1,19 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
+import 'dart:convert';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
+
+
+
+
+final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
+
 
 class FilteredRidesPage extends StatefulWidget {
   const FilteredRidesPage({super.key});
@@ -16,13 +25,27 @@ class FilteredRidesPage extends StatefulWidget {
 class _FilteredRidesPageState extends State<FilteredRidesPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  LatLng? _currentPosition;
+
+
+  String? _pickupFilter;
+  String? _dropoffFilter;
 
   late Future<List<DocumentSnapshot>> _filteredRidesFuture;
+
+  final TextEditingController _pickupController = TextEditingController();
+  final TextEditingController _dropoffController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _filteredRidesFuture = _fetchFilteredRides();
+    _getCurrentPosition();
+  }
+
+  void _getCurrentPosition() async {
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    _currentPosition = LatLng(position.latitude, position.longitude);
   }
 
   @override
@@ -31,63 +54,119 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       appBar: AppBar(
         title: const Text('Available Rides'),
       ),
-      body: FutureBuilder<List<DocumentSnapshot>>(
-        future: _filteredRidesFuture,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Column(
+        children: [
+          _buildFilterSection(),
+          Expanded(
+            child: FutureBuilder<List<DocumentSnapshot>>(
+              future: _filteredRidesFuture,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          final filteredRides = snapshot.data!;
-          print('Number of filtered rides: ${filteredRides.length}');
+                final filteredRides = snapshot.data!;
+                print('Number of filtered rides: ${filteredRides.length}');
 
-          if (filteredRides.isEmpty) {
-            return const Center(child: Text('No rides available that match your preferences.'));
-          }
-
-          return ListView.builder(
-            itemCount: filteredRides.length,
-            itemBuilder: (context, index) {
-              var ride = filteredRides[index];
-
-              return FutureBuilder<List<String>>(
-                future: _getParticipantUsernames(List<String>.from(ride['participants'])),
-                builder: (context, participantsSnapshot) {
-                  if (!participantsSnapshot.hasData) {
-                    return const ListTile(
-                      title: Text('Loading...'),
-                    );
-                  }
-
-                  final participantUsernames = participantsSnapshot.data!;
-                  print('Participant usernames for ride $index: $participantUsernames');
-
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    color: Colors.grey[200],
-                    child: ListTile(
-                      title: Text(
-                        'Pickup: ${ride['pickupLocations'].values.join(", ")}', // Update to handle map
-                        style: const TextStyle(color: Colors.black),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Dropoff: ${ride['dropoffLocations'].values.join(", ")}'), // Update to handle map
-                          Text('Time: ${ride['timeOfRide'].toDate()}'),
-                          Text('Participants: ${participantUsernames.join(", ")}'),
-                        ],
-                      ),
-                      onTap: () {
-                        _showRideDetailsModal(context, ride, participantUsernames);
-                      },
+                if (filteredRides.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No rides available that match your preferences.',
+                      style: TextStyle(color: Colors.black), // Set the text color to black
                     ),
                   );
-                },
-              );
+                }
+
+                return ListView.builder(
+                  itemCount: filteredRides.length,
+                  itemBuilder: (context, index) {
+                    var ride = filteredRides[index];
+
+                    return FutureBuilder<List<String>>(
+                      future: _getParticipantUsernames(List<String>.from(ride['participants'])),
+                      builder: (context, participantsSnapshot) {
+                        if (!participantsSnapshot.hasData) {
+                          return const ListTile(
+                            title: Text('Loading...'),
+                          );
+                        }
+
+                        final participantUsernames = participantsSnapshot.data!;
+                        print('Participant usernames for ride $index: $participantUsernames');
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                          color: Colors.grey[200],
+                          child: ListTile(
+                            title: Text(
+                              'Pickup: ${ride['pickupLocations'].values.join(", ")}',
+                              style: const TextStyle(color: Colors.black),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Dropoff: ${ride['dropoffLocations'].values.join(", ")}'),
+                                Text('Time: ${ride['timeOfRide'].toDate()}'),
+                                Text('Participants: ${participantUsernames.join(", ")}'),
+                              ],
+                            ),
+                            onTap: () {
+                              _showRideDetailsModal(context, ride, participantUsernames);
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterSection() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          TextField(
+            controller: _pickupController,
+            decoration: InputDecoration(
+              labelText: 'Pickup Location',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.location_on),
+            ),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(true),
+          ),
+          const SizedBox(height: 8.0),
+          TextField(
+            controller: _dropoffController,
+            decoration: InputDecoration(
+              labelText: 'Dropoff Location',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.location_on),
+            ),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(false),
+          ),
+          const SizedBox(height: 8.0),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _pickupFilter = _pickupController.text;
+                _dropoffFilter = _dropoffController.text;
+                _filteredRidesFuture = _fetchFilteredRides();
+              });
             },
-          );
-        },
+            child: const Text('Apply Filters'),
+          ),
+        ],
       ),
     );
   }
@@ -97,21 +176,23 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     if (currentUser == null) return [];
 
     DateTime now = DateTime.now();
-    QuerySnapshot snapshot = await _firestore
-        .collection('rides')
-        .orderBy('timeOfRide')
-        .get();
-
-    DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-    Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+    QuerySnapshot snapshot = await _firestore.collection('rides').orderBy('timeOfRide').get();
 
     List<DocumentSnapshot> filteredRides = [];
 
     for (var ride in snapshot.docs) {
       bool isComplete = ride['isComplete'] ?? false;
-      if (!isComplete) {
-        bool isValid = await _validatePreferences(ride, currentUserData);
-        if (isValid) {
+      List<String> participants = List<String>.from(ride['participants']);
+
+      if (!isComplete && !participants.contains(currentUser.uid)) {
+        if (_pickupFilter != null || _dropoffFilter != null) {
+          bool pickupMatch = await _matchesLocation(_pickupFilter, ride['pickupLocations']);
+          bool dropoffMatch = await _matchesLocation(_dropoffFilter, ride['dropoffLocations']);
+
+          if ((_pickupFilter == null || pickupMatch) && (_dropoffFilter == null || dropoffMatch)) {
+            filteredRides.add(ride);
+          }
+        } else {
           filteredRides.add(ride);
         }
       }
@@ -119,7 +200,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
 
     for (var ride in snapshot.docs) {
       DateTime timeOfRide = ride['timeOfRide'].toDate();
-      if (timeOfRide.isBefore(now.subtract(Duration(hours: 24)))) {
+      if (timeOfRide.isBefore(now.subtract(const Duration(hours: 24)))) {
         await ride.reference.delete();
       }
     }
@@ -127,122 +208,60 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     return filteredRides;
   }
 
-  Future<bool> _validatePreferences(DocumentSnapshot ride, Map<String, dynamic> currentUserData) async {
-    List<String> participants = List<String>.from(ride['participants']);
-    int currentGroupSize = participants.length;
-
-    for (String participantId in participants) {
-      DocumentSnapshot participantDoc = await _firestore.collection('users').doc(participantId).get();
-      Map<String, dynamic> participantData = participantDoc.data() as Map<String, dynamic>;
-
-      if (!_doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
-          !_doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
-    Map<String, dynamic> userPrefs = currentUserData['preferences'];
-
-    int userMinAge = userPrefs['ageRange']['min'];
-    int userMaxAge = userPrefs['ageRange']['max'];
-    int targetAge = targetData['age'];
-
-    if (targetAge < userMinAge || targetAge > userMaxAge) {
-      return false;
+  Future<bool> _matchesLocation(String? filter, Map<String, dynamic> locations) async {
+    if (filter == null || filter.isEmpty) {
+      return true;
     }
 
-    // Validate car capacity
-    int userMinCapacity = userPrefs['minCarCapacity'];
-    int userMaxCapacity = userPrefs['maxCarCapacity'];
+    LatLng filterLatLng = await _getLatLngFromAddress(filter);
 
-    if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
-      return false;
-    }
-
-    // Other validations (school domain, gender)
-    String? userDomain = currentUserData['domain'];
-    String? targetDomain = targetData['domain'];
-
-    if (userPrefs['schoolToggle'] == true && userDomain != targetDomain) {
-      return false;
-    }
-
-    String? userGender = currentUserData['sexAssignedAtBirth'];
-    String? targetGender = targetData['sexAssignedAtBirth'];
-
-    if (userPrefs['sameGenderToggle'] == true && userGender != targetGender) {
-      print('Gender validation failed: userGender $userGender, targetGender $targetGender');
-      return false;
-    }
-    return true;
-  }
-
-  bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<String, dynamic> currentUserData, int currentGroupSize) {
-    Map<String, dynamic> participantPrefs = participantData['preferences'];
-
-    int userAge = currentUserData['age'];
-    int minAge = participantPrefs['ageRange']['min'];
-    int maxAge = participantPrefs['ageRange']['max'];
-
-    if (userAge < minAge || userAge > maxAge) {
-      return false;
-    }
-    int participantMinCapacity = participantPrefs['minCarCapacity'];
-    int participantMaxCapacity = participantPrefs['maxCarCapacity'];
-
-    if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
-      return false;
-    }
-
-    String? participantDomain = participantData['domain'];
-    String? userDomain = currentUserData['domain'];
-
-    if (participantPrefs['schoolToggle'] == true && participantDomain != userDomain) {
-      return false;
-    }
-
-    String? participantGender = participantData['sexAssignedAtBirth'];
-    String? userGender = currentUserData['sexAssignedAtBirth'];
-
-    if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
-      return false;
-    }
-    return true;
-  }
-
-  Future<void> _joinRide(String rideId, List<String> participants) async {
-    User? user = _auth.currentUser;
-    if (user == null) return;
-
-    if (!participants.contains(user.uid)) {
-      participants.add(user.uid);
-
-      await _firestore.collection('rides').doc(rideId).update({
-        'participants': participants,
-        'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You have joined the ride!')),
+    for (var location in locations.values) {
+      LatLng locationLatLng = await _getLatLngFromAddress(location);
+      double distanceInMeters = Geolocator.distanceBetween(
+        filterLatLng.latitude,
+        filterLatLng.longitude,
+        locationLatLng.latitude,
+        locationLatLng.longitude,
       );
-    }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => WaitingPage(rideId: rideId)),
-    );
+      if (distanceInMeters <= 50) {
+        return true;
+      }
+    }
+    return false;
   }
 
-  Future<List<String>> _getParticipantUsernames(List<String> participantIds) async {
-    List<String> usernames = [];
-    for (String uid in participantIds) {
-      DocumentSnapshot userDoc = await _firestore.collection('users').doc(uid).get();
-      if (userDoc.exists) {
-        usernames.add(userDoc['username']);
+  Future<LatLng> _getLatLngFromAddress(String address) async {
+    final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$google_maps_api_key');
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          final location = data['results'][0]['geometry']['location'];
+          return LatLng(location['lat'], location['lng']);
+        } else {
+          throw Exception('No locations found for the given address: $address');
+        }
+      } else {
+        throw Exception(
+            'Failed to get location from address: ${response.reasonPhrase}');
       }
+    } catch (e) {
+      print('Failed to get location from address: $address, error: $e');
+      throw Exception('Failed to get location from address: $e');
+    }
+  }
+
+  Future<List<String>> _getParticipantUsernames(List<String> uids) async {
+    List<String> usernames = [];
+    for (String uid in uids) {
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(uid).get();
+      String username = userDoc['username'] ?? 'Unknown';
+      usernames.add(username);
     }
     return usernames;
   }
@@ -295,6 +314,48 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _joinRide(String rideId, List<String> participants) async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
+
+    if (!participants.contains(user.uid)) {
+      participants.add(user.uid);
+
+      await _firestore.collection('rides').doc(rideId).update({
+        'participants': participants,
+        'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You have joined the ride!')),
+      );
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => WaitingPage(rideId: rideId)),
+    );
+  }
+
+  void _navigateToLocationSearch(bool isPickup) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LocationSearchScreen(
+          isPickup: isPickup,
+          currentPosition: _currentPosition,
+          onSelectAddress: (address) {
+            if (isPickup) {
+              _pickupController.text = address;
+            } else {
+              _dropoffController.text = address;
+            }
+          },
+        ),
+      ),
     );
   }
 }
