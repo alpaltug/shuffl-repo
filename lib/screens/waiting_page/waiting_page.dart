@@ -5,6 +5,7 @@ import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
 
@@ -306,62 +307,80 @@ Future<void> _toggleReadyStatus(String userId) async {
             const Text('No users found.', style: TextStyle(color: Colors.black))
           else
             Expanded(
-              child: ListView.builder(
-                itemCount: _users.length,
-                itemBuilder: (context, index) {
-                  var user = _users[index];
-                  var username = user['username'] ?? '';
-                  var fullName = user['fullName'] ?? '';
-                  var imageUrl = user.data().toString().contains('imageUrl')
-                      ? user['imageUrl']
-                      : null;
-                  bool isReady = _readyStatus[user.id] ?? false;
+  child: ListView.builder(
+    itemCount: _users.length,
+    itemBuilder: (context, index) {
+      var user = _users[index];
+      var username = user['username'] ?? '';
+      var fullName = user['fullName'] ?? '';
+      var imageUrl = user.data().toString().contains('imageUrl')
+          ? user['imageUrl']
+          : null;
+      bool isReady = _readyStatus[user.id] ?? false;
 
-                  return Card(
-                    margin: const EdgeInsets.symmetric(
-                        vertical: 10, horizontal: 15),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        radius: 30,
-                        backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                            ? NetworkImage(imageUrl)
-                            : const AssetImage('assets/icons/ShuffleLogo.jpeg')
-                                as ImageProvider,
-                      ),
-                      title: Text(
-                        fullName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '@$username',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.black,
-                        ),
-                      ),
-                      trailing: ElevatedButton(
-                        onPressed: user.id == _auth.currentUser?.uid
-                            ? () => _toggleReadyStatus(user.id)
-                            : null, // Disable button for others
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              isReady ? Colors.green : Colors.white,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18.0),
-                          ),
-                        ),
-                        child: Text(isReady ? 'Unready' : 'Ready'),
-                      ),
-                    ),
-                  );
-                },
+      return Card(
+        margin: const EdgeInsets.symmetric(
+            vertical: 10, horizontal: 15),
+        child: ListTile(
+          onTap: () {
+            if (user.id == _auth.currentUser?.uid) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UserProfile(),
+                ),
+              );
+            } else {
+              // Navigate to the selected user's profile
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ViewUserProfile(uid: user.id),
+                ),
+              );
+            }
+          },
+          leading: CircleAvatar(
+            radius: 30,
+            backgroundImage: imageUrl != null && imageUrl.isNotEmpty
+                ? NetworkImage(imageUrl)
+                : const AssetImage('assets/icons/ShuffleLogo.jpeg')
+                    as ImageProvider,
+          ),
+          title: Text(
+            fullName,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          subtitle: Text(
+            '@$username',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.black,
+            ),
+          ),
+          trailing: ElevatedButton(
+            onPressed: user.id == _auth.currentUser?.uid
+                ? () => _toggleReadyStatus(user.id)
+                : null, // Disable button for others
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  isReady ? Colors.green : Colors.white,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18.0),
               ),
             ),
+            child: Text(isReady ? 'Unready' : 'Ready'),
+          ),
+        ),
+      );
+    },
+  ),
+),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton(
