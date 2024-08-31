@@ -101,7 +101,7 @@ class _SignInState extends State<SignIn> {
             _errorMessage = 'This user has been disabled. Please contact support.';
             break;
           default:
-            _errorMessage = 'Failed to sign in: ${e.message}';
+            _errorMessage = 'The email or password is incorrect. Try again.';
             break;
         }
       });
@@ -150,11 +150,11 @@ class _SignInState extends State<SignIn> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = 'Failed to sign in with Google: ${e.message}';
+        _errorMessage = 'Failed to sign in with Google: Try Again.';
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to sign in with Google: $e';
+        _errorMessage = 'Failed to sign in with Google: Try Again.';
       });
     }
   }
