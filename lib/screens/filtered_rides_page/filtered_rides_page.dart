@@ -72,7 +72,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                   return const Center(
                     child: Text(
                       'No rides available that match your preferences.',
-                      style: TextStyle(color: Colors.black), // Set the text color to black
+                      style: TextStyle(color: Colors.black), 
                     ),
                   );
                 }
