@@ -41,12 +41,12 @@ class _WaitingPageState extends State<WaitingPage> {
         .get();
 
     if (rideDoc.exists) {
-        setState(() {
+        setState(() async {
           _pickupLocations = [];
-          Map<String, String> pickupLocationsMap = Map<String, String>.from(rideRequest['pickupLocations']);
+          Map<String, String> pickupLocationsMap = Map<String, String>.from(rideDoc['pickupLocations']);
 
           for (var location in pickupLocationsMap.values) {
-            pickupLocationsList.add(await _getLatLngFromAddress(location));
+            _pickupLocations.add(await _getLatLngFromAddress(location));
           }
           _readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
           _participantsCount = (rideDoc['participants'] as List).length;});
@@ -126,7 +126,7 @@ Future<void> _toggleReadyStatus(String userId) async {
 
     for (LatLng location in _pickupLocations) {
       markers.add(Marker(
-        markerId: MarkerId(address),
+        markerId: MarkerId("user"), // change to username in the future
         position: location,
       ));
     }
