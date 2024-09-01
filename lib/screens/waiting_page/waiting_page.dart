@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -273,137 +274,144 @@ Future<void> _toggleReadyStatus(String userId) async {
 
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Waiting Page'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => GroupChatScreen(rideId: widget.rideId),
-                ),
-              );
-            },
-          ),
-        ],
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: kBackgroundColor, 
+    appBar: AppBar(
+      title: const Text(
+        'Waiting Page',
+        style: TextStyle(
+          color: Colors.white, 
+          fontWeight: FontWeight.bold, 
+        ),
       ),
-      body: Column(
-        children: [
-          if (_pickupLocations.isNotEmpty)
-            Container(
-              height: 200,
-              child: GoogleMap(
-                onMapCreated: _onMapCreated,
-                initialCameraPosition: CameraPosition(
-                  target: loc ?? _center,
-                  zoom: 14,
-                ),
-                markers: _markers,
+      backgroundColor: kBackgroundColor, 
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.chat),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroupChatScreen(rideId: widget.rideId),
               ),
-            ),
-          if (_users.isEmpty)
-            const Text('No users found.', style: TextStyle(color: Colors.black))
-          else
-            Expanded(
-  child: ListView.builder(
-    itemCount: _users.length,
-    itemBuilder: (context, index) {
-      var user = _users[index];
-      var username = user['username'] ?? '';
-      var fullName = user['fullName'] ?? '';
-      var imageUrl = user.data().toString().contains('imageUrl')
-          ? user['imageUrl']
-          : null;
-      bool isReady = _readyStatus[user.id] ?? false;
-
-      return Card(
-        margin: const EdgeInsets.symmetric(
-            vertical: 10, horizontal: 15),
-        child: ListTile(
-          onTap: () {
-            if (user.id == _auth.currentUser?.uid) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => UserProfile(),
-                ),
-              );
-            } else {
-              // Navigate to the selected user's profile
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ViewUserProfile(uid: user.id),
-                ),
-              );
-            }
+            );
           },
-          leading: CircleAvatar(
-            radius: 30,
-            backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                ? NetworkImage(imageUrl)
-                : const AssetImage('assets/icons/ShuffleLogo.jpeg')
-                    as ImageProvider,
-          ),
-          title: Text(
-            fullName,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+        ),
+      ],
+    ),
+    body: Column(
+      children: [
+        if (_pickupLocations.isNotEmpty)
+          Container(
+            height: 200,
+            child: GoogleMap(
+              onMapCreated: _onMapCreated,
+              initialCameraPosition: CameraPosition(
+                target: loc ?? _center,
+                zoom: 14,
+              ),
+              markers: _markers,
             ),
           ),
-          subtitle: Text(
-            '@$username',
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.black,
+        if (_users.isEmpty)
+          const Text('No users found.', style: TextStyle(color: Colors.black))
+        else
+          Expanded(
+            child: ListView.builder(
+              itemCount: _users.length,
+              itemBuilder: (context, index) {
+                var user = _users[index];
+                var username = user['username'] ?? '';
+                var fullName = user['fullName'] ?? '';
+                var imageUrl = user.data().toString().contains('imageUrl')
+                    ? user['imageUrl']
+                    : null;
+                bool isReady = _readyStatus[user.id] ?? false;
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(
+                      vertical: 10, horizontal: 15),
+                  child: ListTile(
+                    onTap: () {
+                      if (user.id == _auth.currentUser?.uid) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserProfile(),
+                          ),
+                        );
+                      } else {
+                        // Navigate to the selected user's profile
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ViewUserProfile(uid: user.id),
+                          ),
+                        );
+                      }
+                    },
+                    leading: CircleAvatar(
+                      radius: 30,
+                      backgroundImage: imageUrl != null && imageUrl.isNotEmpty
+                          ? NetworkImage(imageUrl)
+                          : const AssetImage('assets/icons/ShuffleLogo.jpeg')
+                              as ImageProvider,
+                    ),
+                    title: Text(
+                      fullName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '@$username',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.black,
+                      ),
+                    ),
+                    trailing: ElevatedButton(
+                      onPressed: user.id == _auth.currentUser?.uid
+                          ? () => _toggleReadyStatus(user.id)
+                          : null, // Disable button for others
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isReady ? Colors.green : Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18.0),
+                        ),
+                      ),
+                      child: Text(isReady ? 'Unready' : 'Ready'),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-          trailing: ElevatedButton(
-            onPressed: user.id == _auth.currentUser?.uid
-                ? () => _toggleReadyStatus(user.id)
-                : null, // Disable button for others
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ElevatedButton(
+            onPressed: _leaveGroup,
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  isReady ? Colors.green : Colors.white,
-              foregroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(
+                  vertical: 12.0, horizontal: 20.0),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18.0),
+                borderRadius: BorderRadius.circular(20.0),
               ),
             ),
-            child: Text(isReady ? 'Unready' : 'Ready'),
+            child: const Text(
+              'Leave Group',
+              style: TextStyle(fontSize: 18),
+            ),
           ),
         ),
-      );
-    },
-  ),
-),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              onPressed: _leaveGroup,
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.red,
-                padding: const EdgeInsets.symmetric(
-                    vertical: 12.0, horizontal: 20.0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20.0),
-                ),
-              ),
-              child: const Text(
-                'Leave Group',
-                style: TextStyle(fontSize: 18),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
 }

@@ -22,6 +22,8 @@ class _UserProfileState extends State<UserProfile> {
   String? _displayName;
   String? _username;
   String? _imageUrl;
+  double _averageRating = 0.0;
+  int _numRides = 0;
 
   @override
   void initState() {
@@ -37,6 +39,8 @@ class _UserProfileState extends State<UserProfile> {
         _displayName = userProfile['fullName'];
         _username = userProfile['username'];
         _imageUrl = userProfile['imageUrl'];
+        _averageRating = userProfile['rating'] ?? 0.0;
+        _numRides = userProfile['numRides'] ?? 0;
       });
     }
   }
@@ -49,7 +53,7 @@ class _UserProfileState extends State<UserProfile> {
           'Profile',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white, 
+            color: Colors.white,
           ),
         ),
         backgroundColor: kBackgroundColor, // Set the AppBar color to the same as the rest of the app
@@ -102,6 +106,21 @@ class _UserProfileState extends State<UserProfile> {
                         fontSize: 16,
                         color: Colors.green,
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.star, color: Colors.yellow),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${_averageRating.toStringAsFixed(2)} | $_numRides rides',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
                     Container(

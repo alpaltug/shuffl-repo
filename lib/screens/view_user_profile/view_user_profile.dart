@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
@@ -23,6 +24,8 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
   String? _username;
   String? _description;
   String? _imageUrl;
+  double _averageRating = 0.0;
+  int _numRides = 0;
   bool isFriendRequestSent = false;
   bool isAlreadyFriend = false;
 
@@ -42,6 +45,8 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
           _username = userProfile!['username'] ?? '';
           _description = userProfile!['description'] ?? '';
           _imageUrl = userProfile!.data().toString().contains('imageUrl') ? userProfile!['imageUrl'] : null;
+          _averageRating = userProfile!['rating'] ?? 0.0;
+          _numRides = userProfile!['numRides'] ?? 0;
           isLoading = false;
         });
       }
@@ -57,7 +62,6 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
     User? currentUser = _auth.currentUser;
 
     if (currentUser != null) {
-      // Check if the current user and the viewed user are already friends
       DocumentSnapshot currentUserSnapshot = await _firestore.collection('users').doc(currentUser.uid).get();
       List friends = currentUserSnapshot.data().toString().contains('friends')
           ? List.from(currentUserSnapshot['friends'])
@@ -69,7 +73,6 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
         return;
       }
 
-      // Check if a friend request has already been sent
       QuerySnapshot sentRequests = await _firestore
           .collection('users')
           .doc(widget.uid)
@@ -156,81 +159,118 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
     );
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogoAppBar(
-        title: 'User Profile',
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: null, // Add navigation to search users page if needed
+      appBar: AppBar(
+        title: const Text(
+          'User Profile',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
-        ],
+        ),
+        backgroundColor: kBackgroundColor,
+        iconTheme: const IconThemeData(color: Colors.black),
+        automaticallyImplyLeading: true,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundImage: _imageUrl != null && _imageUrl!.isNotEmpty
-                        ? NetworkImage(_imageUrl!)
-                        : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _displayName ?? '',
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '@$_username',
-                    style: const TextStyle(
-                        fontSize: 20, color: Colors.black),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _description ?? '',
-                    style: const TextStyle(
-                        fontSize: 16, color: Colors.black),
-                    textAlign: TextAlign.center,
-                  ),
-                  const Spacer(),
-                  if (isAlreadyFriend)
-                    Column(
-                      children: [
-                        GreenActionButton(
-                          text: 'Message',
-                          color: Colors.blue,
-                          onPressed: _navigateToChat,
-                        ),
-                        const SizedBox(height: 10),
-                        GreenActionButton(
-                          text: 'Unfriend',
-                          color: Colors.red,
-                          onPressed: _showUnfriendConfirmationDialog,
-                        ),
-                      ],
-                    )
-                  else
-                    GreenActionButton(
-                      text: isFriendRequestSent ? 'Request Sent' : 'Add Friend',
-                      onPressed: () {
-                        if (!isFriendRequestSent) {
-                          _addFriend();
-                        }
-                      },
+          : Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(defaultPadding),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundImage: _imageUrl != null && _imageUrl!.isNotEmpty
+                                ? NetworkImage(_imageUrl!)
+                                : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _displayName ?? '',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.star, color: Colors.yellow),
+                              const SizedBox(width: 5),
+                              Text(
+                                '${_averageRating.toStringAsFixed(2)} | $_numRides rides',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            '@$_username',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              color: Colors.green,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _description ?? '',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 20),
+                          if (isAlreadyFriend)
+                            Column(
+                              children: [
+                                GreenActionButton(
+                                  text: 'Message',
+                                  color: kBackgroundColor,
+                                  onPressed: _navigateToChat,
+                                ),
+                                const SizedBox(height: 10),
+                                GreenActionButton(
+                                  text: 'Unfriend',
+                                  color: Colors.grey,
+                                  onPressed: _showUnfriendConfirmationDialog,
+                                ),
+                              ],
+                            )
+                          else
+                            GreenActionButton(
+                              text: isFriendRequestSent ? 'Request Sent' : 'Add Friend',
+                              onPressed: () {
+                                if (!isFriendRequestSent) {
+                                  _addFriend();
+                                }
+                              },
+                            ),
+                        ],
+                      ),
                     ),
-                ],
+                  ],
+                ),
               ),
             ),
     );

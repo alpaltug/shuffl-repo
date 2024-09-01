@@ -1043,6 +1043,15 @@ Widget build(BuildContext context) {
               prefixIcon: const Icon(Icons.location_on),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
+
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.black), 
+      ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.black), 
               ),
             ),
             style: const TextStyle(color: Colors.black),
@@ -1060,6 +1069,14 @@ Widget build(BuildContext context) {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.black), // Black border when focused
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.black), // Black border when enabled
+                ),
             ),
             style: const TextStyle(color: Colors.black),
             readOnly: true,

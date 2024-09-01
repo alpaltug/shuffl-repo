@@ -251,4 +251,23 @@ class FirestoreService {
     final domain = match != null ? match.group(1) ?? '' : '';
     return domain;
   }
+
+ Future<void> updateUserRating(String userId, double newRating) async {
+  DocumentReference userRef = _db.collection('users').doc(userId);
+  DocumentSnapshot userSnapshot = await userRef.get();
+
+  if (userSnapshot.exists) {
+    Map<String, dynamic> userData = userSnapshot.data() as Map<String, dynamic>;
+    double currentRating = userData['rating'] ?? 0.0;
+    int numRides = userData['numRides'] ?? 0;
+
+    double updatedRating = (currentRating * numRides + newRating) / (numRides + 1);
+    int updatedNumRides = numRides + 1;
+
+    await userRef.update({
+      'rating': updatedRating,
+      'numRides': updatedNumRides,
+    });
+  }
+  }
 }

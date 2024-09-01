@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
+import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/screens/rating_page/rating_page.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
@@ -31,17 +33,37 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   }
 
   Future<void> _loadActiveRideDetails() async {
+  try {
     DocumentSnapshot rideDoc = await FirebaseFirestore.instance
         .collection('active_rides')
         .doc(widget.rideId)
         .get();
 
     if (rideDoc.exists) {
-      setState(() {
-        _rideData = rideDoc;
-        _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
-        _loadMarkers();
-      });
+      bool isFinished = await _isRideFinished();
+
+      // Check if the widget is still mounted before navigating
+      if (mounted && isFinished) {
+        List<String> participants = List<String>.from(rideDoc['participants']);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RatingPage(
+              rideId: widget.rideId,
+              participants: participants,
+            ),
+          ),
+        );
+        return; // Exit the function to avoid further execution
+      }
+
+      if (mounted) {
+        setState(() {
+          _rideData = rideDoc;
+          _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
+          _loadMarkers();
+        });
+      }
 
       List<String> userIds = List<String>.from(rideDoc['participants']);
       List<DocumentSnapshot> userDocs = [];
@@ -57,6 +79,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
         }
       }
 
+      // Check if the widget is still mounted before updating the state
       if (mounted) {
         setState(() {
           _users = userDocs;
@@ -67,7 +90,13 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     } else {
       print('Ride document does not exist.');
     }
+  } catch (e) {
+    if (mounted) {
+      // Handle the error safely
+      print('Error loading ride details: $e');
+    }
   }
+}
 
   Future<void> _loadMarkers() async {
     if (_rideData == null) return;
@@ -87,6 +116,13 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     });
   }
 
+    Future<bool> _isRideFinished() async {
+       // Placeholder function to check if the ride is finished - to be updated with prediction/maps API later..
+       // Currently, it returns true after a 1-minute delay
+       await Future.delayed(Duration(minutes: 1));
+       return true;
+     }
+
   Future<LatLng> _getLatLngFromAddress(String address) async {
     List<Location> locations = await locationFromAddress(address);
     if (locations.isNotEmpty) {
@@ -97,27 +133,34 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    Duration? timeRemaining = _rideTime != null ? _rideTime!.difference(DateTime.now()) : null;
+Widget build(BuildContext context) {
+  Duration? timeRemaining = _rideTime != null ? _rideTime!.difference(DateTime.now()) : null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Active Ride'),
-        backgroundColor: Colors.green,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => GroupChatScreen(rideId: widget.rideId),
-                ),
-              );
-            },
-          ),
-        ],
+  return Scaffold(
+    backgroundColor: kBackgroundColor, 
+    appBar: AppBar(
+      title: const Text(
+        'Active Ride',
+        style: TextStyle(
+          color: Colors.white, 
+          fontWeight: FontWeight.bold, 
+        ),
       ),
+      backgroundColor: kBackgroundColor, 
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.chat),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroupChatScreen(rideId: widget.rideId),
+              ),
+            );
+          },
+        ),
+      ],
+    ),
       body: Column(
         children: [
           if (_rideData != null)

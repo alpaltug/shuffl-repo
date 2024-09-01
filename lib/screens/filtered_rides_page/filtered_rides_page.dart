@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
@@ -9,10 +10,6 @@ import 'package:my_flutter_app/screens/location_search_screen/location_search_sc
 import 'dart:convert';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/widgets/ride_card.dart'; 
-
-
-
-
 
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
@@ -51,68 +48,6 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     _currentPosition = LatLng(position.latitude, position.longitude);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Available Rides'),
-      ),
-      body: Column(
-        children: [
-          _buildFilterSection(),
-          Expanded(
-            child: FutureBuilder<List<DocumentSnapshot>>(
-              future: _filteredRidesFuture,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final filteredRides = snapshot.data!;
-                print('Number of filtered rides: ${filteredRides.length}');
-
-                if (filteredRides.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No rides available that match your preferences.',
-                      style: TextStyle(color: Colors.black), 
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: filteredRides.length,
-                  itemBuilder: (context, index) {
-                    var ride = filteredRides[index];
-
-                    return FutureBuilder<List<String>>(
-                      future: _getParticipantUsernames(List<String>.from(ride['participants'])),
-                      builder: (context, participantsSnapshot) {
-                        if (!participantsSnapshot.hasData) {
-                          return const ListTile(
-                            title: Text('Loading...'),
-                          );
-                        }
-
-                        final participantUsernames = participantsSnapshot.data!;
-                        print('Participant usernames for ride $index: $participantUsernames');
-
-                        return RideCard(
-                          ride: ride.data() as Map<String, dynamic>,
-                          participantUsernames: participantUsernames,
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFilterSection() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -122,7 +57,19 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
             controller: _pickupController,
             decoration: InputDecoration(
               labelText: 'Pickup Location',
-              border: const OutlineInputBorder(),
+              labelStyle: const TextStyle(color: Colors.black),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.black), // Default border color
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.black), // Black border when focused
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.black), // Black border when enabled
+              ),
               prefixIcon: const Icon(Icons.location_on),
             ),
             style: const TextStyle(color: Colors.black),
@@ -134,7 +81,19 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
             controller: _dropoffController,
             decoration: InputDecoration(
               labelText: 'Dropoff Location',
-              border: const OutlineInputBorder(),
+              labelStyle: const TextStyle(color: Colors.black),
+              border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.black), // Default border color
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.black), // Black border when focused
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.black), // Black border when enabled
+            ),
               prefixIcon: const Icon(Icons.location_on),
             ),
             style: const TextStyle(color: Colors.black),
@@ -150,8 +109,11 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                 _filteredRidesFuture = _fetchFilteredRides();
               });
             },
-            child: const Text('Apply Filters'),
+             child: const Text(
+            'Apply Filters',
+            style: TextStyle(color: Colors.black),
           ),
+          )
         ],
       ),
     );
@@ -344,4 +306,73 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       ),
     );
   }
+   @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: kBackgroundColor, 
+    appBar: AppBar(
+      title: const Text(
+        'Available Rides',
+        style: TextStyle(
+          fontWeight: FontWeight.bold, 
+          color: Colors.white,
+        ),
+      ),
+      backgroundColor: kBackgroundColor, 
+    ),
+    body: Column(
+      children: [
+        _buildFilterSection(),
+        Expanded(
+          child: FutureBuilder<List<DocumentSnapshot>>(
+            future: _filteredRidesFuture,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final filteredRides = snapshot.data!;
+              print('Number of filtered rides: ${filteredRides.length}');
+
+              if (filteredRides.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No rides available that match your preferences.',
+                    style: TextStyle(color: Colors.black),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: filteredRides.length,
+                itemBuilder: (context, index) {
+                  var ride = filteredRides[index];
+
+                  return FutureBuilder<List<String>>(
+                    future: _getParticipantUsernames(List<String>.from(ride['participants'])),
+                    builder: (context, participantsSnapshot) {
+                      if (!participantsSnapshot.hasData) {
+                        return const ListTile(
+                          title: Text('Loading...'),
+                        );
+                      }
+
+                      final participantUsernames = participantsSnapshot.data!;
+                      print('Participant usernames for ride $index: $participantUsernames');
+
+                      return RideCard(
+                        ride: ride.data() as Map<String, dynamic>,
+                        participantUsernames: participantUsernames,
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
 }
