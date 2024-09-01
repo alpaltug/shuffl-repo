@@ -234,6 +234,8 @@ Future<void> _toggleReadyStatus(String userId) async {
     await rideDocRef.update({
       'participants': FieldValue.arrayRemove([user.uid]),
       'readyStatus.${user.uid}': FieldValue.delete(), // Remove the user's ready status
+      'pickupLocations.${user.uid}': FieldValue.delete(), // Remove the user's pickup location
+      'dropoffLocations.${user.uid}': FieldValue.delete(), // Remove the user's dropoff location
     });
 
     // Check the number of participants remaining
@@ -251,8 +253,7 @@ Future<void> _toggleReadyStatus(String userId) async {
             .collection('users')
             .doc(participantId)
             .get();
-        int participantMaxCapacity = participantDoc['preferences']
-            ['maxCarCapacity'];
+        int participantMaxCapacity = participantDoc['preferences']['maxCarCapacity'];
         maxCapacity = maxCapacity > participantMaxCapacity
             ? maxCapacity
             : participantMaxCapacity;
@@ -269,6 +270,7 @@ Future<void> _toggleReadyStatus(String userId) async {
     Navigator.pushReplacement(
         context, MaterialPageRoute(builder: (context) => HomePage()));
   }
+
 
   @override
   Widget build(BuildContext context) {
