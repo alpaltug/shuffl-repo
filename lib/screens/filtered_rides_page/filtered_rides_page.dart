@@ -177,53 +177,78 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
                   var fullName = user['fullName'] ?? '';
                   var imageUrl = user.data().toString().contains('imageUrl') ? user['imageUrl'] : null;
 
-                  return Card(
-                    color: Colors.green[50],
-                    margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        radius: 30,
-                        backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                            ? NetworkImage(imageUrl)
-                            : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                      ),
-                      title: Text(
-                        fullName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '@$username',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.black,
-                        ),
-                      ),
-                      onTap: () {
-                        if (user.id == _auth.currentUser?.uid) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const UserProfile(),
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                          color: Colors.grey[200],
+                          child: ListTile(
+                            title: Text(
+                              'Pickup: ${ride['pickupLocations'].values.join(", ")}',
+                              style: const TextStyle(color: Colors.black),
                             ),
-                          );
-                        } else {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ViewUserProfile(uid: user.id),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Dropoff: ${ride['dropoffLocations'].values.join(", ")}'),
+                                Text('Time: ${ride['timeOfRide'].toDate()}'),
+                                Text('Participants: ${participantUsernames.join(", ")}'),
+                              ],
                             ),
-                          );
-                        }
+                            onTap: () {
+                              _showRideDetailsModal(context, ride, participantUsernames);
+                            },
+                          ),
+                        );
                       },
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                );
+              },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterSection() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          TextField(
+            controller: _pickupController,
+            decoration: InputDecoration(
+              labelText: 'Pickup Location',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.location_on),
+            ),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(true),
+          ),
+          const SizedBox(height: 8.0),
+          TextField(
+            controller: _dropoffController,
+            decoration: InputDecoration(
+              labelText: 'Dropoff Location',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.location_on),
+            ),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(false),
+          ),
+          const SizedBox(height: 8.0),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _pickupFilter = _pickupController.text;
+                _dropoffFilter = _dropoffController.text;
+                _filteredRidesFuture = _fetchFilteredRides();
+              });
+            },
+            child: const Text('Apply Filters'),
+          ),
         ],
       ),
     );

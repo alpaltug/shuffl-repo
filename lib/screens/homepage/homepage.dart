@@ -152,6 +152,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     if (user != null) {
       await _firestore.collection('users').doc(user.uid).update({
         'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
+        'lastPickupTime': FieldValue.serverTimestamp(),
       });
     }
   }
@@ -199,7 +200,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     for (var doc in userSnapshot.docs) {
       var userData = doc.data() as Map<String, dynamic>;
 
-      if (userData.containsKey('lastPickupLocation')) {
+      if (userData.containsKey('lastPickupLocation') && userData.containsKey('lastPickupTime') && userData['lastPickupTime'].toDate().isAfter(DateTime.now().subtract(Duration(minutes: 15)))) {
         GeoPoint location = userData['lastPickupLocation'];
         String locationKey = '${location.latitude},${location.longitude}';
 
