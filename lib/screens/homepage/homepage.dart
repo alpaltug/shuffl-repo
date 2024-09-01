@@ -23,6 +23,9 @@ import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
 
+import 'package:my_flutter_app/widgets/schedule_ride.dart'; 
+
+
 import 'package:http/http.dart' as http;
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
@@ -633,29 +636,29 @@ bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<Str
 }
 
   Future<LatLng> _getLatLngFromAddress(String address) async {
-  final url = Uri.parse(
-      'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$google_maps_api_key');
+    final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$google_maps_api_key');
 
-  try {
-    final response = await http.get(url);
+    try {
+      final response = await http.get(url);
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['status'] == 'OK' && data['results'].isNotEmpty) {
-        final location = data['results'][0]['geometry']['location'];
-        return LatLng(location['lat'], location['lng']);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          final location = data['results'][0]['geometry']['location'];
+          return LatLng(location['lat'], location['lng']);
+        } else {
+          throw Exception('No locations found for the given address: $address');
+        }
       } else {
-        throw Exception('No locations found for the given address: $address');
+        throw Exception(
+            'Failed to get location from address: ${response.reasonPhrase}');
       }
-    } else {
-      throw Exception(
-          'Failed to get location from address: ${response.reasonPhrase}');
+    } catch (e) {
+      print('Failed to get location from address: $address, error: $e');
+      throw Exception('Failed to get location from address: $e');
     }
-  } catch (e) {
-    print('Failed to get location from address: $address, error: $e');
-    throw Exception('Failed to get location from address: $e');
   }
-}
 
   bool _isWithinProximity(LatLng location1, LatLng location2) {
     const double maxDistance = 500; // 500 meters (we can change later)
@@ -764,6 +767,20 @@ void _navigateToLocationSearch(bool isPickup, {Function(String)? onSelectAddress
 
     return distance;
   }
+
+  void _scheduleRideWrapper(DateTime timeOfRide, String pickupLocation, String dropoffLocation) {
+    _findRideAtScheduledTime(
+      timeOfRide: timeOfRide,
+      pickupLocation: pickupLocation,
+      dropoffLocation: dropoffLocation,
+    );
+  }
+
+  void _locationSearchWrapper(bool isPickup, Function(String) onSelectAddressCallback) {
+    _navigateToLocationSearch(isPickup, onSelectAddressCallback: onSelectAddressCallback);
+  }
+
+
 
 
   void _findRide() async {
@@ -1081,7 +1098,15 @@ Widget build(BuildContext context) {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             ElevatedButton(
-              onPressed: _showDateTimeAndLocationPicker,
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  builder: (context) => ScheduleRideWidget(
+                    onScheduleRide: _scheduleRideWrapper,
+                    onLocationSearch: _locationSearchWrapper,
+                  ),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.yellow,
               ),

@@ -5,18 +5,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'dart:convert';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/widgets/ride_card.dart'; 
-
-
-
-
-
+import 'package:my_flutter_app/widgets/ride_details_popup.dart';
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
-
 
 class FilteredRidesPage extends StatefulWidget {
   const FilteredRidesPage({super.key});
@@ -29,7 +23,6 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   LatLng? _currentPosition;
-
 
   String? _pickupFilter;
   String? _dropoffFilter;
@@ -75,7 +68,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                   return const Center(
                     child: Text(
                       'No rides available that match your preferences.',
-                      style: TextStyle(color: Colors.black), 
+                      style: TextStyle(color: Colors.black),
                     ),
                   );
                 }
@@ -85,8 +78,8 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                   itemBuilder: (context, index) {
                     var ride = filteredRides[index];
 
-                    return FutureBuilder<List<String>>(
-                      future: _getParticipantUsernames(List<String>.from(ride['participants'])),
+                    return FutureBuilder<List<Map<String, String>>>(
+                      future: _getParticipantDetails(List<String>.from(ride['participants'])),
                       builder: (context, participantsSnapshot) {
                         if (!participantsSnapshot.hasData) {
                           return const ListTile(
@@ -94,12 +87,15 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                           );
                         }
 
-                        final participantUsernames = participantsSnapshot.data!;
-                        print('Participant usernames for ride $index: $participantUsernames');
+                        final participants = participantsSnapshot.data!;
+                        print('Participant details for ride $index: $participants');
 
-                        return RideCard(
-                          ride: ride.data() as Map<String, dynamic>,
-                          participantUsernames: participantUsernames,
+                        return GestureDetector(
+                          onTap: () => _showRideDetailsPopup(context, ride, participants),
+                          child: RideCard(
+                            ride: ride.data() as Map<String, dynamic>,
+                            participantUsernames: participants.map((p) => p['username']!).toList(),
+                          ),
                         );
                       },
                     );
@@ -109,6 +105,81 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<List<Map<String, String>>> _getParticipantDetails(List<String> uids) async {
+    List<Map<String, String>> participantDetails = [];
+    for (String uid in uids) {
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(uid).get();
+      String username = userDoc['username'] ?? 'Unknown';
+      String fullName = userDoc['fullName'] ?? 'Unknown';
+      String imageUrl = userDoc['imageUrl'] ?? '';
+      participantDetails.add({
+        'uid': uid,
+        'username': username,
+        'fullName': fullName,
+        'imageUrl': imageUrl,
+      });
+    }
+    return participantDetails;
+  }
+
+  void _showRideDetailsPopup(BuildContext context, DocumentSnapshot ride, List<Map<String, String>> participants) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (context) {
+        return RideDetailsPopup(
+          ride: ride,
+          participants: participants,
+          onJoinRide: () => _joinRide(ride.id, List<String>.from(ride['participants'])),
+        );
+      },
+    );
+  }
+
+  Future<void> _joinRide(String rideId, List<String> participants) async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
+
+    if (!participants.contains(user.uid)) {
+      participants.add(user.uid);
+
+      await _firestore.collection('rides').doc(rideId).update({
+        'participants': participants,
+        'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You have joined the ride!')),
+      );
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => WaitingPage(rideId: rideId)),
+    );
+  }
+
+  void _navigateToLocationSearch(bool isPickup) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LocationSearchScreen(
+          isPickup: isPickup,
+          currentPosition: _currentPosition,
+          onSelectAddress: (address) {
+            if (isPickup) {
+              _pickupController.text = address;
+            } else {
+              _dropoffController.text = address;
+            }
+          },
+        ),
       ),
     );
   }
@@ -240,108 +311,5 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       print('Failed to get location from address: $address, error: $e');
       throw Exception('Failed to get location from address: $e');
     }
-  }
-
-  Future<List<String>> _getParticipantUsernames(List<String> uids) async {
-    List<String> usernames = [];
-    for (String uid in uids) {
-      DocumentSnapshot userDoc = await _firestore.collection('users').doc(uid).get();
-      String username = userDoc['username'] ?? 'Unknown';
-      usernames.add(username);
-    }
-    return usernames;
-  }
-
-  void _showRideDetailsModal(BuildContext context, DocumentSnapshot ride, List<String> participantUsernames) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Ride Details',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Time: ${ride['timeOfRide'].toDate()}',
-                style: const TextStyle(color: Colors.black),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pickup: ${ride['pickupLocations'].values.join(", ")}', // Update to handle map
-                style: const TextStyle(color: Colors.black),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Dropoff: ${ride['dropoffLocations'].values.join(", ")}', // Update to handle map
-                style: const TextStyle(color: Colors.black),
-              ),
-              const SizedBox(height: 8),
-              const Divider(),
-              const Text(
-                'Participants:',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              const SizedBox(height: 8),
-              ...participantUsernames.map((username) => Text(username, style: const TextStyle(color: Colors.black))).toList(),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => _joinRide(ride.id, List<String>.from(ride['participants'])),
-                child: const Text('Join Ride'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _joinRide(String rideId, List<String> participants) async {
-    User? user = _auth.currentUser;
-    if (user == null) return;
-
-    if (!participants.contains(user.uid)) {
-      participants.add(user.uid);
-
-      await _firestore.collection('rides').doc(rideId).update({
-        'participants': participants,
-        'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You have joined the ride!')),
-      );
-    }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => WaitingPage(rideId: rideId)),
-    );
-  }
-
-  void _navigateToLocationSearch(bool isPickup) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LocationSearchScreen(
-          isPickup: isPickup,
-          currentPosition: _currentPosition,
-          onSelectAddress: (address) {
-            if (isPickup) {
-              _pickupController.text = address;
-            } else {
-              _dropoffController.text = address;
-            }
-          },
-        ),
-      ),
-    );
   }
 }

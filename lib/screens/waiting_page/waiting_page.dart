@@ -8,6 +8,12 @@ import 'package:geocoding/geocoding.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+
+final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
+
 
 class WaitingPage extends StatefulWidget {
   final String rideId;
@@ -142,11 +148,27 @@ Future<void> _toggleReadyStatus(String userId) async {
   }
 
   Future<LatLng> _getLatLngFromAddress(String address) async {
-    List<Location> locations = await locationFromAddress(address);
-    if (locations.isNotEmpty) {
-      return LatLng(locations.first.latitude, locations.first.longitude);
-    } else {
-      throw Exception('No locations found for the given address.');
+    final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$google_maps_api_key');
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          final location = data['results'][0]['geometry']['location'];
+          return LatLng(location['lat'], location['lng']);
+        } else {
+          throw Exception('No locations found for the given address: $address');
+        }
+      } else {
+        throw Exception(
+            'Failed to get location from address: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('Failed to get location from address: $address, error: $e');
+      throw Exception('Failed to get location from address: $e');
     }
   }
 
