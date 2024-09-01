@@ -186,40 +186,16 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
   }
 
   Widget _buildFilterSection() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        children: [
-          TextField(
-            controller: _pickupController,
-            decoration: InputDecoration(
-              labelText: 'Pickup Location',
-              labelStyle: const TextStyle(color: Colors.black),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Default border color
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Black border when focused
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Black border when enabled
-              ),
-              prefixIcon: const Icon(Icons.location_on),
-            ),
-            style: const TextStyle(color: Colors.black),
-            readOnly: true,
-            onTap: () => _navigateToLocationSearch(true),
-          ),
-          const SizedBox(height: 8.0),
-          TextField(
-            controller: _dropoffController,
-            decoration: InputDecoration(
-              labelText: 'Dropoff Location',
-              labelStyle: const TextStyle(color: Colors.black),
-              border: OutlineInputBorder(
+  return Padding(
+    padding: const EdgeInsets.all(8.0),
+    child: Column(
+      children: [
+        TextField(
+          controller: _pickupController,
+          decoration: InputDecoration(
+            labelText: 'Pickup Location',
+            labelStyle: const TextStyle(color: Colors.black),
+            border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: Colors.black), // Default border color
             ),
@@ -231,30 +207,78 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: Colors.black), // Black border when enabled
             ),
-              prefixIcon: const Icon(Icons.location_on),
+            prefixIcon: const Icon(Icons.location_on),
+          ),
+          style: const TextStyle(color: Colors.black),
+          readOnly: true,
+          onTap: () => _navigateToLocationSearch(true),
+        ),
+        const SizedBox(height: 8.0),
+        TextField(
+          controller: _dropoffController,
+          decoration: InputDecoration(
+            labelText: 'Dropoff Location',
+            labelStyle: const TextStyle(color: Colors.black),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.black), // Default border color
             ),
-            style: const TextStyle(color: Colors.black),
-            readOnly: true,
-            onTap: () => _navigateToLocationSearch(false),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.black), // Black border when focused
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.black), // Black border when enabled
+            ),
+            prefixIcon: const Icon(Icons.location_on),
           ),
-          const SizedBox(height: 8.0),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _pickupFilter = _pickupController.text;
-                _dropoffFilter = _dropoffController.text;
-                _filteredRidesFuture = _fetchFilteredRides();
-              });
-            },
-             child: const Text(
-            'Apply Filters',
-            style: TextStyle(color: Colors.black),
-          ),
-          )
-        ],
-      ),
-    );
-  }
+          style: const TextStyle(color: Colors.black),
+          readOnly: true,
+          onTap: () => _navigateToLocationSearch(false),
+        ),
+        const SizedBox(height: 8.0),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _pickupFilter = _pickupController.text;
+                  _dropoffFilter = _dropoffController.text;
+                  _filteredRidesFuture = _fetchFilteredRides();
+                });
+              },
+              child: const Text(
+                'Apply Filters',
+                style: TextStyle(color: Colors.black),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _pickupController.clear();
+                  _dropoffController.clear();
+                  _pickupFilter = null;
+                  _dropoffFilter = null;
+                  _filteredRidesFuture = _fetchFilteredRides();
+                });
+              },
+              child: const Text(
+                'Remove Filters',
+                style: TextStyle(color: Colors.black),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent, // Red color for the remove filters button
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
 
   Future<List<DocumentSnapshot>> _fetchFilteredRides() async {
     User? currentUser = _auth.currentUser;
