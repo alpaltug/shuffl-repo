@@ -46,6 +46,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   String? _fullName;
   LatLng? _currentPosition;
   DateTime? _selectedRideTime;
+  String? _selectedPickupLocation;
   int _uniqueMessageSenderCount = 0;
   bool _goOnline = false;
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
@@ -278,6 +279,88 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
   }
 
+  Future<void> _scheduleRide() async {
+    DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (selectedDate != null) {
+      TimeOfDay? selectedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
+
+      if (selectedTime != null) {
+        DateTime selectedDateTime = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day,
+          selectedTime.hour,
+          selectedTime.minute,
+        );
+
+        // Initialize variables for pickup and dropoff locations
+        String? pickupLocation;
+        String? dropoffLocation;
+
+        // Prompt the user to select pickup location
+        _navigateToLocationSearch(true, onSelectAddressCallback: (pickupAddress) {
+          pickupLocation = pickupAddress;
+
+          // After pickup is selected, prompt the user to select dropoff location
+          _navigateToLocationSearch(false, onSelectAddressCallback: (dropoffAddress) {
+            dropoffLocation = dropoffAddress;
+
+            // Proceed with ride finding logic only after both locations are selected
+            if (pickupLocation != null && dropoffLocation != null) {
+              _findRideAtScheduledTime(
+                timeOfRide: selectedDateTime,
+                pickupLocation: pickupLocation!,
+                dropoffLocation: dropoffLocation!,
+              );
+            } else {
+              // Handle case where user cancels location selection
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please select both pickup and dropoff locations.')),
+              );
+            }
+          });
+        });
+      }
+    }
+  }
+
+
+Future<void> _findRideAtScheduledTime({
+  required DateTime timeOfRide,
+  required String pickupLocation,
+  required String dropoffLocation,
+}) async {
+  String rideId = await _createRideRequest(
+    timeOfRide,
+    pickupLocation: pickupLocation,
+    dropoffLocation: dropoffLocation,
+  );
+
+  // Push the user to the waiting page for the newly joined or created ride request
+  if (rideId.isNotEmpty) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WaitingPage(rideId: rideId),
+      ),
+    );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to create or join a ride.')),
+    );
+  }
+}
+
+
   String _generatePickupLocationId(LatLng location) {
     // R latitude and longitude to 3 decimal places (~111 meters precision)
     String lat = location.latitude.toStringAsFixed(3);
@@ -285,9 +368,13 @@ class _HomePageState extends State<HomePage> with RouteAware {
     return '$lat,$lng';
   }
 
-  Future<String> _createRideRequest(DateTime timeOfRide) async {
+  Future<String> _createRideRequest(DateTime timeOfRide, {String? pickupLocation, String? dropoffLocation}) async {
     User? user = _auth.currentUser;
     if (user == null) return '';
+
+    // Determine the pickup and dropoff locations to use
+    String finalPickupLocation = pickupLocation ?? _pickupController.text;
+    String finalDropoffLocation = dropoffLocation ?? _dropoffController.text;
 
     // Query ride requests with the same time of ride within a certain range (e.g., +/- 15 minutes)
     QuerySnapshot existingRides = await _firestore
@@ -306,8 +393,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
         // Add user to existing ride and update destinations
         await doc.reference.update({
           'participants': FieldValue.arrayUnion([user.uid]),
-          'pickupLocations.${user.uid}': _pickupController.text, // Update pickup locations map
-          'dropoffLocations.${user.uid}': _dropoffController.text, // Update dropoff locations map
+          'pickupLocations.${user.uid}': finalPickupLocation, // Update pickup locations map
+          'dropoffLocations.${user.uid}': finalDropoffLocation, // Update dropoff locations map
           'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
         });
         matched = true;
@@ -317,11 +404,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
 
     if (!matched) {
-        // Create a new ride request if no match was found
+      // Create a new ride request if no match was found
       DocumentReference newRide = await _firestore.collection('rides').add({
         'timeOfRide': timeOfRide,
-        'pickupLocations': {user.uid: _pickupController.text}, // Store pickup locations as a map
-        'dropoffLocations': {user.uid: _dropoffController.text}, // Store dropoff locations as a map
+        'pickupLocations': {user.uid: finalPickupLocation}, // Store pickup locations as a map
+        'dropoffLocations': {user.uid: finalDropoffLocation}, // Store dropoff locations as a map
         'participants': [user.uid],
         'isComplete': false,
         'timestamp': FieldValue.serverTimestamp(),
@@ -329,14 +416,14 @@ class _HomePageState extends State<HomePage> with RouteAware {
       });
 
       rideId = newRide.id;
-    } 
-
+    }
 
     // Reset the selected ride time after the request
     _selectedRideTime = null;
 
     return rideId;
-  }
+}
+
 
 Future<bool> _isValidRoute(LatLng pickup, LatLng newDropoff, List<LatLng> existingDropoffs) async {
   // Convert the list of existing drop-offs into LatLng objects (if necessary)
@@ -576,6 +663,88 @@ bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<Str
     return distance <= maxDistance;
   }
 
+  Future<void> _showDateTimeAndLocationPicker() async {
+    DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (selectedDate != null) {
+      TimeOfDay? selectedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
+
+      if (selectedTime != null) {
+        DateTime selectedDateTime = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day,
+          selectedTime.hour,
+          selectedTime.minute,
+        );
+
+        // Initialize variables for pickup and dropoff locations
+        String? pickupLocation;
+        String? dropoffLocation;
+
+        // Prompt the user to select the pickup location
+        _navigateToLocationSearch(true, onSelectAddressCallback: (pickupAddress) {
+          pickupLocation = pickupAddress;
+
+          // After pickup is selected, prompt the user to select the dropoff location
+          _navigateToLocationSearch(false, onSelectAddressCallback: (dropoffAddress) {
+            dropoffLocation = dropoffAddress;
+
+            // Proceed with ride finding logic only after both locations are selected
+            if (pickupLocation != null && dropoffLocation != null) {
+              _findRideAtScheduledTime(
+                timeOfRide: selectedDateTime,
+                pickupLocation: pickupLocation!,
+                dropoffLocation: dropoffLocation!,
+              );
+            } else {
+              // Handle case where user cancels location selection
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please select both pickup and dropoff locations.')),
+              );
+            }
+          });
+        });
+      }
+    }
+  }
+
+
+void _navigateToLocationSearch(bool isPickup, {Function(String)? onSelectAddressCallback}) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => LocationSearchScreen(
+        isPickup: isPickup,
+        currentPosition: _currentPosition,
+        onSelectAddress: (address) {
+          if (onSelectAddressCallback != null) {
+            // Use the callback if provided (for the scheduled ride case)
+            onSelectAddressCallback(address);
+          } else {
+            // Otherwise, update the appropriate text controller (for the immediate ride case)
+            if (isPickup) {
+              _pickupController.text = address;
+            } else {
+              _dropoffController.text = address;
+            }
+          }
+        },
+      ),
+    ),
+  );
+}
+
+
+
   double _calculateDistance(LatLng location1, LatLng location2) {
     const double earthRadius = 6371000; // meters
     double lat1 = location1.latitude;
@@ -622,24 +791,6 @@ bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<Str
     }
   }
 
-  void _navigateToLocationSearch(bool isPickup) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LocationSearchScreen(
-          isPickup: isPickup,
-          currentPosition: _currentPosition,
-          onSelectAddress: (address) {
-            if (isPickup) {
-              _pickupController.text = address;
-            } else {
-              _dropoffController.text = address;
-            }
-          },
-        ),
-      ),
-    );
-  }
 
   Stream<int> _getNotificationCountStream() {
     User? user = _auth.currentUser;
@@ -823,7 +974,7 @@ Widget build(BuildContext context) {
           ),
           ListTile(
             leading: const Icon(Icons.directions_car),
-            title: const Text('Filtered Rides'),
+            title: const Text('Ride Marketplace'),
             onTap: () {
               User? user = _auth.currentUser;
               if (user != null) {
@@ -930,7 +1081,7 @@ Widget build(BuildContext context) {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             ElevatedButton(
-              onPressed: _showDateTimePicker,
+              onPressed: _showDateTimeAndLocationPicker,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.yellow,
               ),

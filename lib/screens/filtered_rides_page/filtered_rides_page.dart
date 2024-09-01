@@ -8,6 +8,9 @@ import 'package:http/http.dart' as http;
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'dart:convert';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
+import 'package:my_flutter_app/widgets/ride_card.dart'; 
+
+
 
 
 
@@ -94,26 +97,9 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                         final participantUsernames = participantsSnapshot.data!;
                         print('Participant usernames for ride $index: $participantUsernames');
 
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                          color: Colors.grey[200],
-                          child: ListTile(
-                            title: Text(
-                              'Pickup: ${ride['pickupLocations'].values.join(", ")}',
-                              style: const TextStyle(color: Colors.black),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Dropoff: ${ride['dropoffLocations'].values.join(", ")}'),
-                                Text('Time: ${ride['timeOfRide'].toDate()}'),
-                                Text('Participants: ${participantUsernames.join(", ")}'),
-                              ],
-                            ),
-                            onTap: () {
-                              _showRideDetailsModal(context, ride, participantUsernames);
-                            },
-                          ),
+                        return RideCard(
+                          ride: ride.data() as Map<String, dynamic>,
+                          participantUsernames: participantUsernames,
                         );
                       },
                     );
