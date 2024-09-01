@@ -21,7 +21,6 @@ import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
-import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
 import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
 
 import 'package:http/http.dart' as http;
