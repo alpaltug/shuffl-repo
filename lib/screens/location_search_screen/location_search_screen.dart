@@ -3,6 +3,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:my_flutter_app/constants.dart';
+
 class LocationSearchScreen extends StatefulWidget {
   final bool isPickup; 
   final Function(String) onSelectAddress;
@@ -60,7 +62,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isPickup ? 'Pick-up Location' : 'Drop-off Location'),
-        backgroundColor: Colors.yellow,
+        backgroundColor: kBackgroundColor,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -73,7 +75,16 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 prefixIcon: const Icon(Icons.location_on),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.black)
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.black), 
+              ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.black), 
+              ),
               ),
               style: const TextStyle(color: Colors.black),
               onChanged: (query) => _fetchPredictions(query),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 
@@ -130,121 +131,128 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text('Group Chat'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.group),
-            onPressed: () => _showParticipants(context),
-          ),
-        ],
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: kBackgroundColor, // Set the background color
+    appBar: AppBar(
+      backgroundColor: kBackgroundColor, // Set AppBar background color to match
+      title: const Text(
+        'Group Chat',
+        style: TextStyle(
+          color: Colors.white, // Set the text color to white
+          fontWeight: FontWeight.bold, // Make the text bold
+        ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore.collection('active_rides').doc(widget.rideId)
-                  .collection('messages')
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.group),
+          onPressed: () => _showParticipants(context),
+        ),
+      ],
+    ),
+    body: Column(
+      children: [
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _firestore.collection('active_rides').doc(widget.rideId)
+                .collection('messages')
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                var messages = snapshot.data!.docs;
-                User? currentUser = _auth.currentUser;
+              var messages = snapshot.data!.docs;
+              User? currentUser = _auth.currentUser;
 
-                return ListView.builder(
-                  reverse: true,
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    var message = messages[index];
-                    var senderId = message['senderId'];
-                    var isMe = senderId == currentUser?.uid;
+              return ListView.builder(
+                reverse: true,
+                itemCount: messages.length,
+                itemBuilder: (context, index) {
+                  var message = messages[index];
+                  var senderId = message['senderId'];
+                  var isMe = senderId == currentUser?.uid;
 
-                    return ListTile(
-                      trailing: isMe
-                          ? GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const UserProfile(),
-                                  ),
-                                );
-                              },
-                              child: CircleAvatar(
-                                backgroundImage: _userProfilePictures[senderId] != null && _userProfilePictures[senderId]!.isNotEmpty
-                                    ? NetworkImage(_userProfilePictures[senderId]!)
-                                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                              ),
-                            )
-                          : null,
-                      leading: !isMe
-                          ? GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ViewUserProfile(uid: senderId),
-                                  ),
-                                );
-                              },
-                              child: CircleAvatar(
-                                backgroundImage: _userProfilePictures[senderId] != null && _userProfilePictures[senderId]!.isNotEmpty
-                                    ? NetworkImage(_userProfilePictures[senderId]!)
-                                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                              ),
-                            )
-                          : null,
-                      title: Align(
-                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: isMe ? Colors.blue : Colors.grey[300],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            message['content'],
-                            style: TextStyle(color: isMe ? Colors.white : Colors.black),
-                          ),
+                  return ListTile(
+                    trailing: isMe
+                        ? GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const UserProfile(),
+                                ),
+                              );
+                            },
+                            child: CircleAvatar(
+                              backgroundImage: _userProfilePictures[senderId] != null && _userProfilePictures[senderId]!.isNotEmpty
+                                  ? NetworkImage(_userProfilePictures[senderId]!)
+                                  : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                            ),
+                          )
+                        : null,
+                    leading: !isMe
+                        ? GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ViewUserProfile(uid: senderId),
+                                ),
+                              );
+                            },
+                            child: CircleAvatar(
+                              backgroundImage: _userProfilePictures[senderId] != null && _userProfilePictures[senderId]!.isNotEmpty
+                                  ? NetworkImage(_userProfilePictures[senderId]!)
+                                  : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                            ),
+                          )
+                        : null,
+                    title: Align(
+                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isMe ? Colors.blue : Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          message['content'],
+                          style: TextStyle(color: isMe ? Colors.white : Colors.black),
                         ),
                       ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      hintStyle: TextStyle(color: Colors.black),
-                      contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0),
                     ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  style: const TextStyle(color: Colors.black),
+                  decoration: const InputDecoration(
+                    hintText: 'Type a message...',
+                    hintStyle: TextStyle(color: Colors.black),
+                    contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
-              ],
-            ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.send),
+                onPressed: _sendMessage,
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 }
