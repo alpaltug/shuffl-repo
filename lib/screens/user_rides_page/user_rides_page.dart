@@ -78,7 +78,7 @@ class _UserRidesPageState extends State<UserRidesPage> {
                     const Padding(
                       padding: EdgeInsets.all(10.0),
                       child: Text(
-                        'Waiting Room',
+                        'Pending Rides',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
