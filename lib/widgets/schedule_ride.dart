@@ -19,6 +19,9 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
   TimeOfDay? _selectedTime;
   String? _pickupLocation;
   String? _dropoffLocation;
+  String? _dateTimeError;
+  String? _pickupError;
+  String? _dropoffError;
 
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropoffController = TextEditingController();
@@ -47,10 +50,25 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
           ),
           const SizedBox(height: 20),
           _buildDateTimePicker(),
+          if (_dateTimeError != null)
+            Text(
+              _dateTimeError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
           const SizedBox(height: 10),
           _buildLocationPicker("Pick-up Location", _pickupController, true),
+          if (_pickupError != null)
+            Text(
+              _pickupError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
           const SizedBox(height: 10),
           _buildLocationPicker("Drop-off Location", _dropoffController, false),
+          if (_dropoffError != null)
+            Text(
+              _dropoffError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -86,6 +104,7 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
             setState(() {
               _selectedDate = pickedDate;
               _selectedTime = pickedTime;
+              _dateTimeError = null;
             });
           }
         }
@@ -121,8 +140,10 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
           controller.text = address;
           if (isPickup) {
             _pickupLocation = address;
+            _pickupError = null;
           } else {
             _dropoffLocation = address;
+            _dropoffError = null;
           }
         });
       }),
@@ -156,6 +177,12 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
   }
 
   void _onScheduleRidePressed() {
+    setState(() {
+      _dateTimeError = _selectedDate == null || _selectedTime == null ? 'Please select a date and time' : null;
+      _pickupError = _pickupLocation == null ? 'Please select a pickup location' : null;
+      _dropoffError = _dropoffLocation == null ? 'Please select a dropoff location' : null;
+    });
+
     if (_selectedDate != null &&
         _selectedTime != null &&
         _pickupLocation != null &&
@@ -174,11 +201,7 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
         _dropoffLocation!,
       );
 
-      Navigator.pop(context); // Close the bottom sheet
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete all fields.')),
-      );
+      Navigator.pop(context); 
     }
   }
 }
