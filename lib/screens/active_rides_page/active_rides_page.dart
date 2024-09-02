@@ -154,7 +154,7 @@ Widget build(BuildContext context) {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => GroupChatScreen(rideId: widget.rideId),
+                builder: (context) => GroupChatScreen(chatId: widget.rideId),
               ),
             );
           },
