@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/widgets.dart'; 
 
@@ -27,7 +28,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
   Future<void> checkEmailVerified() async {
     await user?.reload();
     user = _auth.currentUser;
-    print('Checking email verification status: ${user!.emailVerified}');
     if (user!.emailVerified) {
       setState(() {
         isEmailVerified = true;
@@ -44,8 +44,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
   @override
 Widget build(BuildContext context) {
   return Scaffold(
+    backgroundColor: kBackgroundColor, // Set the background color
     appBar: AppBar(
-      title: const Text('Email Verification'),
+      backgroundColor: kBackgroundColor, // Match the AppBar background color
+      title: const Text(
+        'Email Verification',
+        style: TextStyle(
+          color: Colors.white, // Set the text color to white
+          fontWeight: FontWeight.bold, // Make the text bold
+        ),
+      ),
     ),
     body: Center(
       child: Padding(
@@ -66,7 +74,7 @@ Widget build(BuildContext context) {
             ),
             const SizedBox(height: 20),
             if (!isEmailVerified && isChecking)
-              const CircularProgressIndicator(),
+              const CircularProgressIndicator(color: Colors.black),
             if (!isEmailVerified && !isChecking)
               ElevatedButton(
                 onPressed: () {
