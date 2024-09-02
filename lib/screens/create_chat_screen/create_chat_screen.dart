@@ -16,7 +16,9 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<String> _selectedFriends = [];
+  String? _groupTitle; // New variable to store the group title
 
+  // Fetch friends only once to avoid unnecessary refreshes
   Future<List<Map<String, dynamic>>> _getFriends() async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return [];
@@ -74,6 +76,14 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
         );
       }
     } else {
+      // Ensure group title is provided
+      if (_groupTitle == null || _groupTitle!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a group title.')),
+        );
+        return;
+      }
+
       // Create a group chat
       List<String> participants = [currentUser.uid, ..._selectedFriends];
       participants.sort();
@@ -98,6 +108,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
 
       Map<String, dynamic> newChatData = {
         'participants': participants,
+        'groupTitle': _groupTitle, // Save the group title
         'lastMessage': {
           'content': '',
           'timestamp': FieldValue.serverTimestamp(),
@@ -166,9 +177,9 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _getFriends(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          // if (snapshot.connectionState == ConnectionState.waiting) {
+          //   return const Center(child: CircularProgressIndicator());
+          // }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text('No friends found.'));
@@ -178,6 +189,32 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
 
           return Column(
             children: [
+              if (_selectedFriends.length > 1)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    onChanged: (value) {
+                      _groupTitle = value; // No setState here to prevent unnecessary rebuilds
+                    },
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      labelText: 'Group Title',
+                      labelStyle: const TextStyle(color: Colors.black),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30.0),
+                        borderSide: const BorderSide(color: Colors.black),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30.0),
+                        borderSide: const BorderSide(color: Colors.black),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30.0),
+                        borderSide: const BorderSide(color: Colors.black, width: 2.0),
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: ListView.builder(
                   itemCount: friends.length,
@@ -220,6 +257,10 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey,
                     foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.0),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 15),
                   ),
                   child: const Text('Create Chat'),
                 ),

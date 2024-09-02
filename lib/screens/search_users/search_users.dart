@@ -32,6 +32,7 @@ class _SearchUsersState extends State<SearchUsers> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      
     });
 
     try {
@@ -60,12 +61,12 @@ class _SearchUsersState extends State<SearchUsers> {
         title: const Text(
           'Search Users',
           style: TextStyle(
-            color: Colors.white, // Set the text color to white
-            fontWeight: FontWeight.bold, // Set the text to bold
+            color: Colors.white, 
+            fontWeight: FontWeight.bold, 
           ),
         ),
-        backgroundColor: kBackgroundColor, // Use the same background color
-        iconTheme: const IconThemeData(color: Colors.black), // Set the icon color to white
+        backgroundColor: kBackgroundColor, 
+        iconTheme: const IconThemeData(color: Colors.black), 
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -78,11 +79,11 @@ class _SearchUsersState extends State<SearchUsers> {
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Colors.black), // Set default border color
+                  borderSide: const BorderSide(color: Colors.black),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Colors.black), // Set focused border color
+                  borderSide: const BorderSide(color: Colors.black),
                 ),
               ),
               onChanged: _searchUsers,

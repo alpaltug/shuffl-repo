@@ -100,7 +100,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     String currentUserUid = _auth.currentUser!.uid;
 
                     return FutureBuilder<Map<String, dynamic>>(
-                      future: _getChatInfo(participants, currentUserUid, isGroupChat),
+                      future: _getChatInfo(chat, participants, currentUserUid, isGroupChat),
                       builder: (context, chatInfoSnapshot) {
                         if (!chatInfoSnapshot.hasData) {
                           return const ListTile(title: Text('Loading...'));
@@ -109,6 +109,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
                         var chatInfo = chatInfoSnapshot.data!;
                         var chatName = chatInfo['name'];
                         var profileImageUrl = chatInfo['imageUrl'];
+
+                        // Apply search filter based on chat name
+                        if (_searchQuery.isNotEmpty &&
+                            !chatName.toLowerCase().contains(_searchQuery)) {
+                          return const SizedBox.shrink(); // Hide items not matching the search query
+                        }
 
                         return ListTile(
                           leading: _buildAvatar(profileImageUrl),
@@ -181,15 +187,48 @@ class _ChatsScreenState extends State<ChatsScreen> {
     );
   }
 
-  Future<Map<String, dynamic>> _getChatInfo(List<String> participants, String currentUserUid, bool isGroupChat) async {
+  Future<Map<String, dynamic>> _getChatInfo(
+      DocumentSnapshot chat, List<String> participants, String currentUserUid, bool isGroupChat) async {
     if (isGroupChat) {
+      // Fetch the last message's sender UID for group chats only
+      String? lastMessageSenderUid;
+
+      try {
+        QuerySnapshot messagesSnapshot = await _firestore
+            .collection('users')
+            .doc(currentUserUid)
+            .collection('chats')
+            .doc(chat.id)
+            .collection('messages')
+            .orderBy('timestamp', descending: true)
+            .limit(1)
+            .get();
+
+        if (messagesSnapshot.docs.isNotEmpty) {
+          lastMessageSenderUid = messagesSnapshot.docs.first['senderId'];
+        }
+      } catch (e) {
+        lastMessageSenderUid = null;
+      }
+
+      // Fetch the sender's profile image URL for group chats
+      String? imageUrl;
+      if (lastMessageSenderUid != null) {
+        try {
+          DocumentSnapshot senderProfile = await _firestore.collection('users').doc(lastMessageSenderUid).get();
+          imageUrl = senderProfile['imageUrl'] ?? '';
+        } catch (e) {
+          imageUrl = null;
+        }
+      }
+
       List<String> usernames = await _firestoreService.getParticipantUsernames(
-        participants.where((uid) => uid != currentUserUid).toList()
+        participants.where((uid) => uid != currentUserUid).toList(),
       );
       String name = usernames.join(', ');
-      String? imageUrl = await _firestoreService.getFirstParticipantImageUrl(participants, currentUserUid);
       return {'name': name, 'imageUrl': imageUrl};
     } else {
+      // For private messages, use the existing logic
       String friendUid = participants.firstWhere((uid) => uid != currentUserUid);
       DocumentSnapshot friendProfile = await _firestore.collection('users').doc(friendUid).get();
       String name = friendProfile['username'] ?? 'Unknown User';
