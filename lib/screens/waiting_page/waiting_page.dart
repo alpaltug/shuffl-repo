@@ -42,51 +42,52 @@ class _WaitingPageState extends State<WaitingPage> {
     _loadRideDetails();
   }
 
-  Future<void> _loadRideDetails() async {
-  DocumentSnapshot rideDoc = await FirebaseFirestore.instance
-      .collection('rides')
-      .doc(widget.rideId)
-      .get();
+  void _loadRideDetails() {
+    FirebaseFirestore.instance
+        .collection('rides')
+        .doc(widget.rideId)
+        .snapshots()
+        .listen((rideDoc) async {
+      if (rideDoc.exists) {
+        List<LatLng> pickupLocations = [];
+        Map<String, String> pickupLocationsMap = Map<String, String>.from(rideDoc['pickupLocations']);
 
-  if (rideDoc.exists) {
-    // Asynchronous operations outside of setState
-    List<LatLng> pickupLocations = [];
-    Map<String, String> pickupLocationsMap = Map<String, String>.from(rideDoc['pickupLocations']);
+        for (var location in pickupLocationsMap.values) {
+          pickupLocations.add(await _getLatLngFromAddress(location));
+        }
 
-    for (var location in pickupLocationsMap.values) {
-      pickupLocations.add(await _getLatLngFromAddress(location));
-    }
-    
-    Map<String, bool> readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
-    int participantsCount = (rideDoc['participants'] as List).length;
-    List<String> userIds = List<String>.from(rideDoc['participants']);
-    List<DocumentSnapshot> userDocs = [];
+        Map<String, bool> readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
+        int participantsCount = (rideDoc['participants'] as List).length;
+        List<String> userIds = List<String>.from(rideDoc['participants']);
+        List<DocumentSnapshot> userDocs = [];
 
-    for (String uid in userIds) {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-      userDocs.add(userDoc);
-    }
+        for (String uid in userIds) {
+          DocumentSnapshot userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+          userDocs.add(userDoc);
+        }
 
-    loc = pickupLocations.isNotEmpty ? pickupLocations[0] : _center;
+        loc = pickupLocations.isNotEmpty ? pickupLocations[0] : _center;
 
-    // Only update the state with the final results
-    setState(() {
-      _pickupLocations = pickupLocations;
-      _readyStatus = readyStatus;
-      _participantsCount = participantsCount;
-      _users = userDocs;
-    });
+        // Only update the state with the final results
+        setState(() {
+          _pickupLocations = pickupLocations;
+          _readyStatus = readyStatus;
+          _participantsCount = participantsCount;
+          _users = userDocs;
+        });
 
-    // After setting state, load markers and check capacity
-    _loadMarkers();
-    _checkMaxCapacity(rideDoc.reference);
-  } else {
-    print('Ride document does not exist.');
-  }
+        // After setting state, load markers and check capacity
+        _loadMarkers();
+        _checkMaxCapacity(rideDoc.reference);
+      } else {
+        print('Ride document does not exist.');
+      }
+  });
 }
+
 
 Future<void> _toggleReadyStatus(String userId) async {
   if (userId != _auth.currentUser?.uid) return;
