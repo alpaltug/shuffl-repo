@@ -270,4 +270,45 @@ class FirestoreService {
     });
   }
   }
+  Future<Map<String, dynamic>> getUserData(String uid) async {
+    DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
+    return userDoc.data() as Map<String, dynamic>;
+  }
+
+  Future<String?> getUserImageUrl(String uid) async {
+    DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
+    String? imageUrl = (userDoc.data() as Map<String, dynamic>)['imageUrl'] as String?;
+    
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return Uri.encodeFull(imageUrl);
+    }
+    
+    return null;
+  }
+
+  Future<String> getUserUsername(String uid) async {
+    DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
+    return (userDoc.data() as Map<String, dynamic>)['username'] as String? ?? 'Unknown';
+  }
+
+  Future<List<String>> getParticipantUsernames(List<String> participants) async {
+    List<String> usernames = [];
+    for (String uid in participants) {
+      String username = await getUserUsername(uid);
+      usernames.add(username);
+    }
+    return usernames;
+  }
+
+  Future<String?> getFirstParticipantImageUrl(List<String> participants, String currentUserUid) async {
+    for (String uid in participants) {
+      if (uid != currentUserUid) {
+        String? imageUrl = await getUserImageUrl(uid);
+        if (imageUrl != null) {
+          return imageUrl;
+        }
+      }
+    }
+    return null;
+  }
 }

@@ -3,10 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/screens/friend_chat_screen/friend_chat_screen.dart';
 import 'package:my_flutter_app/screens/create_chat_screen/create_chat_screen.dart';
+import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
 import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/firestore_service.dart';
 
 class ChatsScreen extends StatefulWidget {
-  const ChatsScreen({super.key});
+  const ChatsScreen({Key? key}) : super(key: key);
 
   @override
   _ChatsScreenState createState() => _ChatsScreenState();
@@ -15,13 +17,8 @@ class ChatsScreen extends StatefulWidget {
 class _ChatsScreenState extends State<ChatsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirestoreService _firestoreService = FirestoreService();
   String _searchQuery = '';
-
-  Future<String> _getFriendUsername(String friendUid) async {
-    DocumentSnapshot userSnapshot =
-        await _firestore.collection('users').doc(friendUid).get();
-    return userSnapshot.get('username') ?? 'Unknown';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,8 +39,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (context) => const CreateChatScreen()),
+                MaterialPageRoute(builder: (context) => const CreateChatScreen()),
               );
             },
           ),
@@ -53,8 +49,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       body: Column(
         children: [
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: TextField(
               onChanged: (value) {
                 setState(() {
@@ -96,98 +91,52 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
                 var chats = snapshot.data!.docs;
 
-                return FutureBuilder<List<String>>(
-                  future: Future.wait(chats.map((chat) async {
+                return ListView.builder(
+                  itemCount: chats.length,
+                  itemBuilder: (context, index) {
+                    var chat = chats[index];
                     var participants = List<String>.from(chat['participants']);
-                    var friendUid = participants
-                        .firstWhere((uid) => uid != _auth.currentUser!.uid);
-                    var friendUsername = await _getFriendUsername(friendUid);
-                    return friendUsername;
-                  })),
-                  builder: (context, usernameSnapshot) {
-                    if (!usernameSnapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                    var isGroupChat = participants.length > 2;
+                    String currentUserUid = _auth.currentUser!.uid;
 
-                    var usernames = usernameSnapshot.data!;
-                    var filteredChats = _searchQuery.isNotEmpty
-                        ? chats.where((chat) {
-                            int index = chats.indexOf(chat);
-                            return index < usernames.length &&
-                                usernames[index]
-                                    .toLowerCase()
-                                    .contains(_searchQuery);
-                          }).toList()
-                        : chats;
+                    return FutureBuilder<Map<String, dynamic>>(
+                      future: _getChatInfo(participants, currentUserUid, isGroupChat),
+                      builder: (context, chatInfoSnapshot) {
+                        if (!chatInfoSnapshot.hasData) {
+                          return const ListTile(title: Text('Loading...'));
+                        }
 
-                    return ListView.separated(
-                      itemCount: filteredChats.length,
-                      separatorBuilder: (context, index) => const Divider(
-                        color: Colors.grey,
-                        thickness: 0.5,
-                        indent: 16,
-                        endIndent: 16,
-                      ),
-                      itemBuilder: (context, index) {
-                        var chat = filteredChats[index];
-                        var participants =
-                            List<String>.from(chat['participants']);
-                        var friendUid = participants.firstWhere(
-                            (uid) => uid != _auth.currentUser!.uid,
-                            orElse: () => participants[0]); // Fallback safety
+                        var chatInfo = chatInfoSnapshot.data!;
+                        var chatName = chatInfo['name'];
+                        var profileImageUrl = chatInfo['imageUrl'];
 
-                        // Safety check to ensure index is within bounds
-                        String friendUsername = index < usernames.length
-                            ? usernames[index]
-                            : 'Unknown';
-
-                        return FutureBuilder<DocumentSnapshot>(
-                          future: _firestore
-                              .collection('users')
-                              .doc(friendUid)
-                              .get(),
-                          builder: (context, friendSnapshot) {
-                            if (!friendSnapshot.hasData) {
-                              return const ListTile();
+                        return ListTile(
+                          leading: _buildAvatar(profileImageUrl),
+                          title: Text(
+                            chatName,
+                            style: const TextStyle(color: Colors.black),
+                          ),
+                          subtitle: Text(
+                            chat['lastMessage']?['content'] ?? 'No message',
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                          onTap: () {
+                            if (isGroupChat) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => GroupChatScreen(chatId: chat.id),
+                                ),
+                              );
+                            } else {
+                              String friendUid = participants.firstWhere((uid) => uid != currentUserUid);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ChatScreen(friendUid: friendUid),
+                                ),
+                              );
                             }
-
-                            var friendData = friendSnapshot.data!;
-                            var friendImageUrl = friendData['imageUrl'];
-                            var lastMessage =
-                                chat['lastMessage']?['content'] ?? 'No message';
-
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundImage:
-                                    friendImageUrl != null &&
-                                            friendImageUrl.isNotEmpty
-                                        ? NetworkImage(friendImageUrl)
-                                        : const AssetImage(
-                                                'assets/icons/ShuffleLogo.jpeg')
-                                            as ImageProvider,
-                              ),
-                              title: Text(
-                                friendUsername,
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                ),
-                              ),
-                              subtitle: Text(
-                                lastMessage,
-                                style: const TextStyle(
-                                  color: Colors.black54,
-                                ),
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        ChatScreen(friendUid: friendUid),
-                                  ),
-                                );
-                              },
-                            );
                           },
                         );
                       },
@@ -200,5 +149,52 @@ class _ChatsScreenState extends State<ChatsScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildAvatar(String? imageUrl) {
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: Colors.grey[300],
+      child: ClipOval(
+        child: imageUrl != null && imageUrl.isNotEmpty
+            ? Image.network(
+                imageUrl,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Image.asset(
+                    'assets/icons/ShuffleLogo.jpeg',
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover,
+                  );
+                },
+              )
+            : Image.asset(
+                'assets/icons/ShuffleLogo.jpeg',
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+              ),
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> _getChatInfo(List<String> participants, String currentUserUid, bool isGroupChat) async {
+    if (isGroupChat) {
+      List<String> usernames = await _firestoreService.getParticipantUsernames(
+        participants.where((uid) => uid != currentUserUid).toList()
+      );
+      String name = usernames.join(', ');
+      String? imageUrl = await _firestoreService.getFirstParticipantImageUrl(participants, currentUserUid);
+      return {'name': name, 'imageUrl': imageUrl};
+    } else {
+      String friendUid = participants.firstWhere((uid) => uid != currentUserUid);
+      DocumentSnapshot friendProfile = await _firestore.collection('users').doc(friendUid).get();
+      String name = friendProfile['username'] ?? 'Unknown User';
+      String? imageUrl = friendProfile['imageUrl'];
+      return {'name': name, 'imageUrl': imageUrl};
+    }
   }
 }

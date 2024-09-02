@@ -89,7 +89,6 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
                         }
 
                         final participants = participantsSnapshot.data!;
-                        print('Participant details for ride $index: $participants');
 
                         return GestureDetector(
                           onTap: () => _showRideDetailsPopup(context, ride, participants),

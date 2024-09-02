@@ -19,15 +19,26 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _controller = TextEditingController();
   List<DocumentSnapshot> _participants = [];
+  String? currentUserImageUrl;
 
   @override
   void initState() {
     super.initState();
     _loadParticipants();
+    _loadCurrentUserImage();
   }
 
   Future<void> _loadParticipants() async {
-    DocumentSnapshot chatDoc = await _firestore.collection('group_chats').doc(widget.chatId).get();
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    DocumentSnapshot chatDoc = await _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('chats')
+        .doc(widget.chatId)
+        .get();
+
     if (chatDoc.exists) {
       List<String> participantUids = List<String>.from(chatDoc['participants'] ?? []);
 
@@ -45,26 +56,67 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
+  Future<void> _loadCurrentUserImage() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      DocumentSnapshot currentUserDoc =
+          await _firestore.collection('users').doc(currentUser.uid).get();
+      if (currentUserDoc.exists) {
+        setState(() {
+          currentUserImageUrl = currentUserDoc['imageUrl'];
+        });
+      }
+    }
+  }
+
   void _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
 
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
-    await _firestore.collection('group_chats').doc(widget.chatId).collection('messages').add({
-      'senderId': currentUser.uid,
-      'content': _controller.text.trim(),
-      'timestamp': FieldValue.serverTimestamp(),
-    });
+    String messageContent = _controller.text.trim();
 
-    await _firestore.collection('group_chats').doc(widget.chatId).update({
-      'lastMessage': {
-        'content': _controller.text.trim(),
+    // Add the message to each participant's chat subcollection
+    for (String uid in _participants.map((doc) => doc.id).toList()) {
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('chats')
+          .doc(widget.chatId)
+          .collection('messages')
+          .add({
+        'senderId': currentUser.uid,
+        'content': messageContent,
         'timestamp': FieldValue.serverTimestamp(),
-      },
-    });
+      });
+    }
+
+    // Update the last message in each participant's chat document
+    for (String uid in _participants.map((doc) => doc.id).toList()) {
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('chats')
+          .doc(widget.chatId)
+          .update({
+        'lastMessage': {
+          'content': messageContent,
+          'timestamp': FieldValue.serverTimestamp(),
+        },
+      });
+    }
 
     _controller.clear();
+  }
+
+  ImageProvider<Object> _getProfileImage(String? imageUrl) {
+    // Check if the image URL is valid and use it directly if it is.
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return NetworkImage(imageUrl);
+    }
+    // Use the default asset image when the URL is invalid.
+    return const AssetImage('assets/icons/ShuffleLogo.jpeg');
   }
 
   @override
@@ -76,20 +128,30 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         title: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: _participants.isNotEmpty && _participants[0]['imageUrl'] != null
-                    ? NetworkImage(_participants[0]['imageUrl'])
-                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                _participants.map((p) => p['username'] ?? 'Unknown').join(', '),
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+            children: _participants.map((participant) {
+              String uid = participant.id;
+              String? imageUrl = participant['imageUrl'];
+
+              return GestureDetector(
+                onTap: () {
+                  if (uid == _auth.currentUser?.uid) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const UserProfile()),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ViewUserProfile(uid: uid)),
+                    );
+                  }
+                },
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundImage: _getProfileImage(imageUrl), // Use the function to get the correct image.
+                ),
+              );
+            }).toList(),
           ),
         ),
       ),
@@ -98,7 +160,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestore
-                  .collection('group_chats')
+                  .collection('users')
+                  .doc(_auth.currentUser!.uid)
+                  .collection('chats')
                   .doc(widget.chatId)
                   .collection('messages')
                   .orderBy('timestamp', descending: true)
@@ -132,9 +196,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                 );
                               },
                               child: CircleAvatar(
-                                backgroundImage: currentUser?.photoURL != null
-                                    ? NetworkImage(currentUser!.photoURL!)
-                                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                                backgroundImage: _getProfileImage(currentUserImageUrl),
                               ),
                             )
                           : null,
@@ -150,9 +212,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                               },
                               child: CircleAvatar(
                                 backgroundImage: _participants.any((p) => p.id == senderId)
-                                    ? NetworkImage(
-                                        _participants.firstWhere((p) => p.id == senderId)['imageUrl'] ?? '',
-                                      )
+                                    ? _getProfileImage(_participants.firstWhere((p) => p.id == senderId)['imageUrl'])
                                     : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
                               ),
                             )

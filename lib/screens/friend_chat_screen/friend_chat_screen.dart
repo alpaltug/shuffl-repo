@@ -23,12 +23,13 @@ class _ChatScreenState extends State<ChatScreen> {
   late String chatId;
   String? friendUsername;
   String? friendImageUrl;
+  String? currentUserImageUrl;
 
   @override
   void initState() {
     super.initState();
     _initializeChat();
-    _fetchFriendProfile();
+    _fetchProfiles();
   }
 
   void _initializeChat() async {
@@ -40,13 +41,27 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _fetchFriendProfile() async {
-    DocumentSnapshot friendProfile = await _firestore.collection('users').doc(widget.friendUid).get();
+  void _fetchProfiles() async {
+    // Fetch friend profile
+    DocumentSnapshot friendProfile =
+        await _firestore.collection('users').doc(widget.friendUid).get();
     if (friendProfile.exists) {
       setState(() {
         friendUsername = friendProfile['username'];
         friendImageUrl = friendProfile['imageUrl'];
       });
+    }
+
+    // Fetch current user profile
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      DocumentSnapshot currentUserProfile =
+          await _firestore.collection('users').doc(currentUser.uid).get();
+      if (currentUserProfile.exists) {
+        setState(() {
+          currentUserImageUrl = currentUserProfile['imageUrl'];
+        });
+      }
     }
   }
 
@@ -59,11 +74,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
-      await _firestoreService.sendMessage(chatId, currentUser.uid, widget.friendUid, _controller.text);
+      await _firestoreService.sendMessage(
+          chatId, currentUser.uid, widget.friendUid, _controller.text);
       // Mark the message as read for the sender
       await _firestoreService.markMessagesAsRead(chatId, currentUser.uid);
       _controller.clear();
     }
+  }
+
+  ImageProvider<Object> _getProfileImage(String? imageUrl) {
+    // Always use the imageUrl from Firestore.
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return NetworkImage(imageUrl);
+    }
+    // Use the default Shuffle logo if imageUrl is invalid.
+    return const AssetImage('assets/icons/ShuffleLogo.jpeg');
   }
 
   @override
@@ -83,13 +108,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 );
               },
               child: CircleAvatar(
-                backgroundImage: friendImageUrl != null && friendImageUrl!.isNotEmpty
-                    ? NetworkImage(friendImageUrl!)
-                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                backgroundImage: _getProfileImage(friendImageUrl), // Use imageUrl from Firestore
               ),
             ),
             const SizedBox(width: 10),
-            Text(friendUsername ?? 'Shuffl User', style: const TextStyle(color: Colors.black)), // Set text color to black
+            Text(friendUsername ?? 'Shuffl User',
+                style: const TextStyle(color: Colors.black)), // Set text color to black
           ],
         ),
       ),
@@ -97,8 +121,11 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore.collection('users').doc(_auth.currentUser!.uid)
-                  .collection('chats').doc(chatId)
+              stream: _firestore
+                  .collection('users')
+                  .doc(_auth.currentUser!.uid)
+                  .collection('chats')
+                  .doc(chatId)
                   .collection('messages')
                   .orderBy('timestamp', descending: true)
                   .snapshots(),
@@ -128,9 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 );
                               },
                               child: CircleAvatar(
-                                backgroundImage: _auth.currentUser!.photoURL != null && _auth.currentUser!.photoURL!.isNotEmpty
-                                    ? NetworkImage(_auth.currentUser!.photoURL!)
-                                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                                backgroundImage: _getProfileImage(currentUserImageUrl),
                               ),
                             )
                           : null,
@@ -140,14 +165,13 @@ class _ChatScreenState extends State<ChatScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => ViewUserProfile(uid: widget.friendUid),
+                                    builder: (context) =>
+                                        ViewUserProfile(uid: widget.friendUid),
                                   ),
                                 );
                               },
                               child: CircleAvatar(
-                                backgroundImage: friendImageUrl != null && friendImageUrl!.isNotEmpty
-                                    ? NetworkImage(friendImageUrl!)
-                                    : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                                backgroundImage: _getProfileImage(friendImageUrl),
                               ),
                             )
                           : null,
@@ -178,11 +202,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    style: const TextStyle(color: Colors.black),  // Set the text color to black
+                    style: const TextStyle(color: Colors.black), // Set the text color to black
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',
-                      hintStyle: TextStyle(color: Colors.black), 
-                      contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0), // Move the text up
+                      hintStyle: TextStyle(color: Colors.black),
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0), // Move the text up
                     ),
                   ),
                 ),

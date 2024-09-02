@@ -88,14 +88,10 @@ class _HomePageState extends State<HomePage> with RouteAware {
   if (user != null) {
     DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-    // Debug print statements to check what is being fetched
-    print('User Profile: ${userProfile.data()}');
-    print('Full Name: ${userProfile['fullName']}');
-
     setState(() {
       _profileImageUrl = userProfile['imageUrl'];
       _username = userProfile['username'];
-      _fullName = userProfile['fullName'] ?? 'Shuffl User'; // Fallback in case fullName is null
+      _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
       _goOnline = userProfile['goOnline'] ?? false;
     });
   }

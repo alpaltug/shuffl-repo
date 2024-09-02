@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
-import 'package:collection/collection.dart'; // For list equality comparison
+import 'package:my_flutter_app/screens/friend_chat_screen/friend_chat_screen.dart';
 
 class CreateChatScreen extends StatefulWidget {
   const CreateChatScreen({super.key});
@@ -50,56 +50,102 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
-    // Include current user and selected friends in participants list
-    List<String> participants = [currentUser.uid, ..._selectedFriends];
-    participants.sort(); // Sort participants to standardize chat ID
+    if (_selectedFriends.length == 1) {
+      String friendUid = _selectedFriends[0];
+      String chatId = _getChatId(currentUser.uid, friendUid);
 
-    // Create a unique chat ID by concatenating the sorted UIDs
-    String chatId = participants.join('_');
-
-    // Check if a group chat with the same chat ID already exists for any participant
-    for (String uid in participants) {
       DocumentSnapshot chatSnapshot = await _firestore
           .collection('users')
-          .doc(uid)
+          .doc(currentUser.uid)
           .collection('chats')
           .doc(chatId)
           .get();
 
       if (chatSnapshot.exists) {
-        // Chat already exists, navigate to the existing chat
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => GroupChatScreen(chatId: chatId)),
+          MaterialPageRoute(builder: (context) => ChatScreen(friendUid: friendUid)),
         );
-        return;
+      } else {
+        await _createOneOnOneChat(currentUser.uid, friendUid, chatId);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => ChatScreen(friendUid: friendUid)),
+        );
       }
-    }
+    } else {
+      // Create a group chat
+      List<String> participants = [currentUser.uid, ..._selectedFriends];
+      participants.sort();
+      String chatId = participants.join('_');
 
-    // Chat does not exist, create a new chat
-    Map<String, dynamic> newChatData = {
-      'participants': participants,
+      for (String uid in participants) {
+        DocumentSnapshot chatSnapshot = await _firestore
+            .collection('users')
+            .doc(uid)
+            .collection('chats')
+            .doc(chatId)
+            .get();
+
+        if (chatSnapshot.exists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => GroupChatScreen(chatId: chatId)),
+          );
+          return;
+        }
+      }
+
+      Map<String, dynamic> newChatData = {
+        'participants': participants,
+        'lastMessage': {
+          'content': '',
+          'timestamp': FieldValue.serverTimestamp(),
+        },
+      };
+
+      for (String uid in participants) {
+        await _firestore
+            .collection('users')
+            .doc(uid)
+            .collection('chats')
+            .doc(chatId)
+            .set(newChatData);
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => GroupChatScreen(chatId: chatId)),
+      );
+    }
+  }
+
+  String _getChatId(String uid1, String uid2) {
+    return uid1.hashCode <= uid2.hashCode ? '$uid1-$uid2' : '$uid2-$uid1';
+  }
+
+  Future<void> _createOneOnOneChat(String currentUserUid, String friendUid, String chatId) async {
+    Map<String, dynamic> chatData = {
+      'participants': [currentUserUid, friendUid],
       'lastMessage': {
         'content': '',
         'timestamp': FieldValue.serverTimestamp(),
       },
     };
 
-    // Add the chat to each participant's 'chats' subcollection
-    for (String uid in participants) {
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('chats')
-          .doc(chatId) // Use the standardized chat ID
-          .set(newChatData);
-    }
+    await _firestore
+        .collection('users')
+        .doc(currentUserUid)
+        .collection('chats')
+        .doc(chatId)
+        .set(chatData);
 
-    // Navigate to the chat screen for the creator
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => GroupChatScreen(chatId: chatId)),
-    );
+    await _firestore
+        .collection('users')
+        .doc(friendUid)
+        .collection('chats')
+        .doc(chatId)
+        .set(chatData);
   }
 
   @override
@@ -159,11 +205,9 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                       checkColor: Colors.black,
                       activeColor: kBackgroundColor,
                       secondary: CircleAvatar(
-                        backgroundImage: friendImageUrl != null &&
-                                friendImageUrl.isNotEmpty
+                        backgroundImage: friendImageUrl != null && friendImageUrl.isNotEmpty
                             ? NetworkImage(friendImageUrl)
-                            : const AssetImage('assets/icons/ShuffleLogo.jpeg')
-                                as ImageProvider,
+                            : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
                       ),
                     );
                   },
