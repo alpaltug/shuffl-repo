@@ -16,7 +16,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<String> _selectedFriends = [];
-  String? _groupTitle; // New variable to store the group title
+  String? _groupTitle;
 
   // Fetch friends only once to avoid unnecessary refreshes
   Future<List<Map<String, dynamic>>> _getFriends() async {
@@ -76,6 +76,25 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
         );
       }
     } else {
+      // Check for existing one-on-one chat between selected friends
+      if (_selectedFriends.length == 2) {
+        String chatId = _getChatId(_selectedFriends[0], _selectedFriends[1]);
+        DocumentSnapshot chatSnapshot = await _firestore
+            .collection('users')
+            .doc(currentUser.uid)
+            .collection('chats')
+            .doc(chatId)
+            .get();
+
+        if (chatSnapshot.exists) {
+          // If a one-on-one chat exists, show a message and return
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('A chat already exists between these users.')),
+          );
+          return;
+        }
+      }
+
       // Ensure group title is provided
       if (_groupTitle == null || _groupTitle!.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -108,7 +127,8 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
 
       Map<String, dynamic> newChatData = {
         'participants': participants,
-        'groupTitle': _groupTitle, // Save the group title
+        'groupTitle': _groupTitle,
+        'isGroupChat': true,
         'lastMessage': {
           'content': '',
           'timestamp': FieldValue.serverTimestamp(),
@@ -138,6 +158,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   Future<void> _createOneOnOneChat(String currentUserUid, String friendUid, String chatId) async {
     Map<String, dynamic> chatData = {
       'participants': [currentUserUid, friendUid],
+      'isGroupChat': false,
       'lastMessage': {
         'content': '',
         'timestamp': FieldValue.serverTimestamp(),
@@ -177,10 +198,6 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _getFriends(),
         builder: (context, snapshot) {
-          // if (snapshot.connectionState == ConnectionState.waiting) {
-          //   return const Center(child: CircularProgressIndicator());
-          // }
-
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text('No friends found.'));
           }
@@ -194,7 +211,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                   padding: const EdgeInsets.all(16.0),
                   child: TextField(
                     onChanged: (value) {
-                      _groupTitle = value; // No setState here to prevent unnecessary rebuilds
+                      _groupTitle = value;
                     },
                     style: const TextStyle(color: Colors.black),
                     decoration: InputDecoration(

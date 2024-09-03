@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:my_flutter_app/widgets.dart';
+import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 
@@ -34,8 +34,12 @@ class _UserFriendsState extends State<UserFriends> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: LogoAppBar(
-        title: 'Friends',
+      appBar: AppBar(
+        title: const Text(
+          'Friends',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: kBackgroundColor,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),

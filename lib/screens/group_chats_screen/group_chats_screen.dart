@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/screens/group_details_screen/group_details_screen.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
+
 
 class GroupChatScreen extends StatefulWidget {
   final String chatId;
@@ -55,7 +57,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
       setState(() {
         _participants = participantDocs;
-        _isLoading = false;  // Set loading to false once participants are loaded
+        _isLoading = false;  
       });
     }
   }
@@ -161,27 +163,44 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Row(
-          children: [
-            ..._participants.map((participant) {
-              String? imageUrl = participant['imageUrl'];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: CircleAvatar(
-                  radius: 12,
-                  backgroundImage: _getProfileImage(imageUrl),
+        title: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroupDetailScreen(
+                  chatId: widget.chatId,
+                  participants: _participants,
                 ),
-              );
-            }).toList(),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                groupTitle ?? 'Group Chat',
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 20),
               ),
-            ),
-          ],
+            );
+          },
+          child: Row(
+            children: [
+              ..._participants.map((participant) {
+                String? imageUrl = participant['imageUrl'];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: CircleAvatar(
+                    radius: 12,
+                    backgroundImage: _getProfileImage(imageUrl),
+                  ),
+                );
+              }).toList(),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  groupTitle ?? 'Group Chat',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.black, 
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       body: Column(
