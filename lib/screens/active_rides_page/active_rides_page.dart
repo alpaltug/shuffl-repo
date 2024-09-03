@@ -152,7 +152,21 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   }
 
   Future<List<LatLng>> _getDropoffLocations() async {
-    return await Future.wait(_dropoffAddresses.map((address) => _getLatLngFromAddress(address)));
+    if (_dropoffAddresses.isEmpty) {
+      return [];
+    }
+
+    List<LatLng> latLngList = [];
+    for (String address in _dropoffAddresses) {
+      try {
+        LatLng latLng = await _getLatLngFromAddress(address);
+        latLngList.add(latLng);
+      } catch (e) {
+        print('Failed to convert address: $address to LatLng, error: $e');
+      }
+    }
+
+    return latLngList;
   }
 
   void _endRide() async {
@@ -229,17 +243,15 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
             return Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Error loading dropoff locations'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No dropoff locations available'));
           } else {
-            final dropoffLocations = snapshot.data!;
+            final dropoffLocations = snapshot.data ?? [];
             return Column(
               children: [
                 if (_pickupLocation != null)
                   Expanded(
                     child: MapWidget(
                       pickupLocation: _pickupLocation!,
-                      dropoffLocations: dropoffLocations.isEmpty ? [] : dropoffLocations,
+                      dropoffLocations: dropoffLocations,
                       showCurrentLocation: true,
                       showDirections: true,
                       initialZoom: 14,
@@ -249,7 +261,6 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
                   RideInfoWidget(
                     rideDetails: _rideDetailsText!,
                     rideTimeText: _getRideTimeText(),
-                    estimatedTime: _estimatedTime!,
                     dropoffAddresses: _dropoffAddresses, // Pass dropoff addresses as a list
                   ),
                 if (_users.isNotEmpty)

@@ -3,14 +3,12 @@ import 'package:flutter/material.dart';
 class RideInfoWidget extends StatelessWidget {
   final String rideDetails;
   final String rideTimeText;
-  final int estimatedTime;
   final List<String> dropoffAddresses;
 
   const RideInfoWidget({
     Key? key,
     required this.rideDetails,
     required this.rideTimeText,
-    required this.estimatedTime,
     required this.dropoffAddresses,
   }) : super(key: key);
 
@@ -51,14 +49,6 @@ class RideInfoWidget extends StatelessWidget {
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 6.0),
-          Text(
-            'Estimated Time: ${estimatedTime > 0 ? '$estimatedTime minutes' : 'Elapsed'}',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14.0, // Reduced font size
-            ),
           ),
           const SizedBox(height: 6.0),
           if (dropoffAddresses.isNotEmpty)
