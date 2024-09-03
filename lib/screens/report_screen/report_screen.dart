@@ -18,7 +18,7 @@ class ReportPage extends StatelessWidget {
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           child: Container(
-            width: MediaQuery.of(context).size.width * 0.9, // Expanded width
+            width: MediaQuery.of(context).size.width * 0.9, 
             padding: const EdgeInsets.all(20.0),
             decoration: BoxDecoration(
               color: kBackgroundColor,
@@ -95,7 +95,7 @@ class ReportPage extends StatelessWidget {
                     maxLength: 500,
                     decoration: InputDecoration(
                       labelText: 'Description',
-                      alignLabelWithHint: true, // Align label with the top of the field
+                      alignLabelWithHint: true, 
                       labelStyle: const TextStyle(color: Colors.black),
                       focusedBorder: const OutlineInputBorder(
                         borderSide: BorderSide(color: Colors.black),
@@ -125,13 +125,12 @@ class ReportPage extends StatelessWidget {
                             reportData['topic'] = _topicController.text;
                           }
 
-                          // Save report as a new document within the appropriate subcollection
                           try {
                             await _firestore
                                 .collection('reports')
-                                .doc(type.toLowerCase()) // Ensure a consistent path for subcollections
-                                .collection('entries') // Use 'entries' as a subcollection to store individual reports
-                                .add(reportData); // Creates a new document for each report
+                                .doc(type.toLowerCase()) 
+                                .collection('entries') 
+                                .add(reportData); 
 
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('$type reported successfully.')),
@@ -169,7 +168,7 @@ class ReportPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Report'),
+        title: const Text('Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),),
         backgroundColor: kBackgroundColor,
       ),
       body: Padding(
