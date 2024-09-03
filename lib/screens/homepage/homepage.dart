@@ -65,6 +65,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     _fetchOnlineUsers();
   }
 
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -133,28 +134,40 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   Future<void> _determinePosition() async {
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    LatLng currentPosition = LatLng(position.latitude, position.longitude);
-    String address = await _getAddressFromLatLng(currentPosition);
+    if (!_goOnline) return;
 
-    setState(() {
-      _currentPosition = currentPosition;
-      _pickupController.text = address;
-      _addCurrentLocationMarker();
-    });
+    Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // Update every 10 meters
+      ),
+    ).listen((Position position) async {
+      LatLng currentPosition = LatLng(position.latitude, position.longitude);
+      String address = await _getAddressFromLatLng(currentPosition);
 
-    mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(currentPosition, 15.0),
-    );
-
-    User? user = _auth.currentUser;
-    if (user != null) {
-      await _firestore.collection('users').doc(user.uid).update({
-        'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
-        'lastPickupTime': FieldValue.serverTimestamp(),
+      setState(() {
+        _currentPosition = currentPosition;
+        _pickupController.text = address;
       });
-    }
+
+      _updateUserLocationInFirestore(currentPosition);
+      _updateCurrentLocationMarker(currentPosition);
+      mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(currentPosition, 15.0),
+      );
+    });
   }
+
+Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
+  User? user = _auth.currentUser;
+  if (user != null) {
+    await _firestore.collection('users').doc(user.uid).update({
+      'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
+      'lastPickupTime': FieldValue.serverTimestamp(),
+    });
+  }
+}
+
 
   void _onMapCreated(GoogleMapController controller) {
   mapController = controller;
@@ -169,88 +182,92 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 }
 
-  void _addCurrentLocationMarker() {
-    if (_currentPosition != null) {
-      setState(() {
-        _markers.add(
-          Marker(
-            markerId: const MarkerId("current_location"),
-            position: _currentPosition!,
-            infoWindow: const InfoWindow(title: "You're here"),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          ),
-        );
-      });
-    }
+  void _updateCurrentLocationMarker(LatLng position) {
+    setState(() {
+      _markers.removeWhere((marker) => marker.markerId.value == 'current_location');
+      _markers.add(
+        Marker(
+          markerId: const MarkerId("current_location"),
+          position: position,
+          infoWindow: const InfoWindow(title: "You're here"),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        ),
+      );
+    });
   }
+
 
   Future<void> _fetchOnlineUsers() async {
-  User? currentUser = _auth.currentUser;
-  if (currentUser == null) return;
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
 
-  Stream<QuerySnapshot> _getOnlineUsersStream() {
-    return _firestore.collection('users').where('goOnline', isEqualTo: true).snapshots();
+    _firestore
+        .collection('users')
+        .where('goOnline', isEqualTo: true)
+        .snapshots()
+        .listen((QuerySnapshot userSnapshot) {
+      Set<Marker> markers = {};
+      Map<String, int> locationCount = {};
+
+      for (var doc in userSnapshot.docs) {
+        var userData = doc.data() as Map<String, dynamic>;
+
+        if (userData.containsKey('lastPickupLocation') &&
+            userData.containsKey('lastPickupTime') &&
+            userData['lastPickupTime'].toDate().isAfter(
+                DateTime.now().subtract(const Duration(minutes: 15)))) {
+          GeoPoint location = userData['lastPickupLocation'];
+          String locationKey = '${location.latitude},${location.longitude}';
+
+          // Count how many users are at the same location
+          if (locationCount.containsKey(locationKey)) {
+            locationCount[locationKey] = locationCount[locationKey]! + 1;
+          } else {
+            locationCount[locationKey] = 1;
+          }
+
+          // Offset markers slightly if more than one user is at the same location
+          double offset = 0.0001 * (locationCount[locationKey]! - 1);
+
+          LatLng adjustedPosition = LatLng(
+            location.latitude + offset,
+            location.longitude + offset,
+          );
+
+          // Customize marker color based on user type
+          Color markerColor = Colors.yellow; // Default for others
+          if (doc.id == currentUser.uid) {
+            markerColor = Colors.blue; // Blue for the current user
+          } else if (userData.containsKey('friends') &&
+              userData['friends'].contains(currentUser.uid)) {
+            markerColor = Colors.green; // Green for friends
+          }
+
+          markers.add(
+            Marker(
+              markerId: MarkerId(doc.id),
+              position: adjustedPosition,
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                  markerColor == Colors.blue
+                      ? BitmapDescriptor.hueBlue
+                      : markerColor == Colors.green
+                          ? BitmapDescriptor.hueGreen
+                          : BitmapDescriptor.hueYellow),
+              infoWindow: InfoWindow(
+                title: userData['fullName'] ?? 'Unknown',
+                snippet: userData['username'],
+              ),
+            ),
+          );
+        }
+      }
+
+      setState(() {
+        _markers = markers;
+      });
+    });
   }
 
-  _getOnlineUsersStream().listen((QuerySnapshot userSnapshot) {
-    Set<Marker> markers = {};
-    Map<String, int> locationCount = {};
-
-    for (var doc in userSnapshot.docs) {
-      var userData = doc.data() as Map<String, dynamic>;
-
-      if (userData.containsKey('lastPickupLocation') && userData.containsKey('lastPickupTime') && userData['lastPickupTime'].toDate().isAfter(DateTime.now().subtract(Duration(minutes: 15)))) {
-        GeoPoint location = userData['lastPickupLocation'];
-        String locationKey = '${location.latitude},${location.longitude}';
-
-        // Count how many users are at the same location
-        if (locationCount.containsKey(locationKey)) {
-          locationCount[locationKey] = locationCount[locationKey]! + 1;
-        } else {
-          locationCount[locationKey] = 1;
-        }
-
-        // Offset markers slightly if more than one user is at the same location
-        double offset = 0.0001 * (locationCount[locationKey]! - 1);
-
-        LatLng adjustedPosition = LatLng(
-          location.latitude + offset,
-          location.longitude + offset,
-        );
-
-        // Customize marker color based on user type
-        Color markerColor = Colors.yellow; // Default for others
-        if (doc.id == currentUser.uid) {
-          markerColor = Colors.blue; // Blue for the current user
-        } else if (userData.containsKey('friends') && userData['friends'].contains(currentUser.uid)) {
-          markerColor = Colors.green; // Green for friends
-        }
-
-        markers.add(
-          Marker(
-            markerId: MarkerId(doc.id),
-            position: adjustedPosition,
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-                markerColor == Colors.blue
-                    ? BitmapDescriptor.hueBlue
-                    : markerColor == Colors.green
-                        ? BitmapDescriptor.hueGreen
-                        : BitmapDescriptor.hueYellow),
-            infoWindow: InfoWindow(
-              title: userData['fullName'] ?? 'Unknown',
-              snippet: userData['username'],
-            ),
-          ),
-        );
-      } else {
-      }
-    }
-
-    setState(() {
-      _markers = markers;
-    });
-  });
-}
 
   Future<void> _showDateTimePicker() async {
     DateTime? selectedDate = await showDatePicker(
@@ -818,14 +835,21 @@ void _navigateToLocationSearch(bool isPickup, {Function(String)? onSelectAddress
     return Stream.value(0);
   }
 
+
   void _listenToUnreadMessageSenderCount() {
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
-      _firestore.collection('users').doc(currentUser.uid).collection('chats').snapshots().listen((snapshot) {
+      _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .collection('chats')
+          .snapshots()
+          .listen((snapshot) {
         _getUniqueUnreadMessageSenderCount();
       });
     }
   }
+
 
   Future<void> _getUniqueUnreadMessageSenderCount() async {
     User? currentUser = _auth.currentUser;

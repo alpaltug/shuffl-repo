@@ -82,44 +82,52 @@ class _WaitingPageState extends State<WaitingPage> {
         // After setting state, load markers and check capacity
         _loadMarkers();
         _checkMaxCapacity(rideDoc.reference);
+
+        // If the ride has been marked as complete, navigate to the ActiveRidesPage
+        if (rideDoc['isComplete'] == true) {
+          _navigateToActiveRide(rideDoc);
+        }
       } else {
         print('Ride document does not exist.');
       }
-  });
-}
-
-
-Future<void> _toggleReadyStatus(String userId) async {
-  if (userId != _auth.currentUser?.uid) return;
-
-  DocumentReference rideDocRef =
-      FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
-
-  DocumentSnapshot rideDoc = await rideDocRef.get();
-  
-  if (!rideDoc.exists) {
-    print('Ride document does not exist.');
-    return;
+    });
   }
 
-  bool currentStatus = _readyStatus[userId] ?? false;
-  setState(() {
-    _readyStatus[userId] = !currentStatus;
-  });
-
-  await rideDocRef.update({
-    'readyStatus.$userId': !currentStatus,
-  });
-
-  List<dynamic> participants = rideDoc['participants'];
-
-  // Check if all participants are ready and there's more than one participant
-  if (_readyStatus.values.every((status) => status) &&
-      participants.length > 1) {
-    await _initRide(rideDocRef);
+  void _navigateToActiveRide(DocumentSnapshot rideDoc) async {
+    await _initRide(rideDoc.reference);
   }
-}
 
+  Future<void> _toggleReadyStatus(String userId) async {
+    if (userId != _auth.currentUser?.uid) return;
+
+    DocumentReference rideDocRef =
+        FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
+
+    DocumentSnapshot rideDoc = await rideDocRef.get();
+
+    // Check if the document exists before proceeding
+    if (!rideDoc.exists) {
+      print('Ride document does not exist.');
+      return;
+    }
+
+    bool currentStatus = _readyStatus[userId] ?? false;
+    setState(() {
+      _readyStatus[userId] = !currentStatus;
+    });
+
+    await rideDocRef.update({
+      'readyStatus.$userId': !currentStatus,
+    });
+
+    List<dynamic> participants = rideDoc['participants'];
+
+    // Check if all participants are ready and there's more than one participant
+    if (_readyStatus.values.every((status) => status) &&
+        participants.length > 1) {
+      await _initRide(rideDocRef);
+    }
+  }
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
@@ -175,6 +183,14 @@ Future<void> _toggleReadyStatus(String userId) async {
   }
 
   Future<void> _checkMaxCapacity(DocumentReference rideDocRef) async {
+    DocumentSnapshot rideDoc = await rideDocRef.get();
+
+    // Check if the document exists before proceeding
+    if (!rideDoc.exists) {
+      print('Ride document does not exist.');
+      return;
+    }
+
     bool isComplete = false;
 
     for (var userDoc in _users) {
@@ -187,9 +203,12 @@ Future<void> _toggleReadyStatus(String userId) async {
       }
     }
 
-    await rideDocRef.update({
-      'isComplete': isComplete,
-    });
+    // Only update if the document still exists
+    if (rideDoc.exists) {
+      await rideDocRef.update({
+        'isComplete': isComplete,
+      });
+    }
   }
 
   void _showMaxCapacityAlert(String username) {
@@ -216,35 +235,55 @@ Future<void> _toggleReadyStatus(String userId) async {
   }
 
   Future<void> _initRide(DocumentReference rideDocRef) async {
-    DocumentSnapshot rideDoc = await rideDocRef.get();
-    Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
 
-    // Transfer chat messages from waiting room to active rides
-    QuerySnapshot messagesSnapshot =
-        await rideDocRef.collection('messages').get();
-    List<Map<String, dynamic>> messages = messagesSnapshot.docs
-        .map((doc) => doc.data() as Map<String, dynamic>)
-        .toList();
+      // Ensure the document still exists before proceeding
+      if (!rideDoc.exists) {
+        print('Ride document does not exist.');
+        return;
+      }
 
-    // Add to active_rides collection and get the new document ID
-    DocumentReference activeRideDocRef = await FirebaseFirestore.instance
-        .collection('active_rides')
-        .add(rideData);
+      Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
 
-    // Transfer chat messages to active rides
-    for (var message in messages) {
-      await activeRideDocRef.collection('messages').add(message);
-    }
+      // Check if the ride is already in the active_rides collection
+      if (rideData['isComplete'] == true) {
+        print('Ride already active.');
+        return;
+      }
 
-    // Delete the ride document from the waiting room (including the chat)
-    await rideDocRef.delete();
+      // Set isComplete to true to prevent duplicate processing
+      transaction.update(rideDocRef, {'isComplete': true});
 
-    // Navigate to active ride page using the new document ID
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-          builder: (context) => ActiveRidesPage(rideId: activeRideDocRef.id)),
-    );
+      // Add to active_rides collection and get the new document ID
+      DocumentReference activeRideDocRef = FirebaseFirestore.instance
+          .collection('active_rides')
+          .doc(rideDocRef.id);
+
+      // Transfer the ride data to the active_rides collection
+      transaction.set(activeRideDocRef, rideData);
+
+      // Transfer chat messages from waiting room to active rides
+      QuerySnapshot messagesSnapshot =
+          await rideDocRef.collection('messages').get();
+
+      for (var messageDoc in messagesSnapshot.docs) {
+        transaction.set(
+          activeRideDocRef.collection('messages').doc(messageDoc.id),
+          messageDoc.data(),
+        );
+      }
+
+      // Delete the ride document from the waiting room (including the chat)
+      transaction.delete(rideDocRef);
+
+      // Navigate to active ride page using the new document ID
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (context) => ActiveRidesPage(rideId: activeRideDocRef.id)),
+      );
+    });
   }
 
   Future<void> _leaveGroup() async {
@@ -253,6 +292,14 @@ Future<void> _toggleReadyStatus(String userId) async {
 
     DocumentReference rideDocRef =
         FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
+
+    DocumentSnapshot rideDoc = await rideDocRef.get();
+
+    // Check if the document exists before proceeding
+    if (!rideDoc.exists) {
+      print('Ride document does not exist.');
+      return;
+    }
 
     // Remove the user from the participants array
     await rideDocRef.update({
@@ -263,7 +310,7 @@ Future<void> _toggleReadyStatus(String userId) async {
     });
 
     // Check the number of participants remaining
-    DocumentSnapshot rideDoc = await rideDocRef.get();
+    rideDoc = await rideDocRef.get();
     List<String> participants = List<String>.from(rideDoc['participants']);
 
     if (participants.isEmpty) {
@@ -290,151 +337,150 @@ Future<void> _toggleReadyStatus(String userId) async {
       }
     }
 
-    // Navigate back to the homepage
-    Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (context) => HomePage()));
-  }
-
+  // Navigate back to the homepage
+  Navigator.pushReplacement(
+    context, MaterialPageRoute(builder: (context) => HomePage()));
+}
 
   @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: kBackgroundColor, 
-    appBar: AppBar(
-      title: const Text(
-        'Waiting Page',
-        style: TextStyle(
-          color: Colors.white, 
-          fontWeight: FontWeight.bold, 
-        ),
-      ),
+  Widget build(BuildContext context) {
+    return Scaffold(
       backgroundColor: kBackgroundColor, 
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.chat),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => GroupChatScreen(chatId: widget.rideId),
-              ),
-            );
-          },
-        ),
-      ],
-    ),
-    body: Column(
-      children: [
-        if (_pickupLocations.isNotEmpty)
-          Container(
-            height: 200,
-            child: GoogleMap(
-              onMapCreated: _onMapCreated,
-              initialCameraPosition: CameraPosition(
-                target: loc ?? _center,
-                zoom: 14,
-              ),
-              markers: _markers,
-            ),
+      appBar: AppBar(
+        title: const Text(
+          'Waiting Page',
+          style: TextStyle(
+            color: Colors.white, 
+            fontWeight: FontWeight.bold, 
           ),
-        if (_users.isEmpty)
-          const Text('No users found.', style: TextStyle(color: Colors.black))
-        else
-          Expanded(
-            child: ListView.builder(
-              itemCount: _users.length,
-              itemBuilder: (context, index) {
-                var user = _users[index];
-                var username = user['username'] ?? '';
-                var fullName = user['fullName'] ?? '';
-                var imageUrl = user.data().toString().contains('imageUrl')
-                    ? user['imageUrl']
-                    : null;
-                bool isReady = _readyStatus[user.id] ?? false;
+        ),
+        backgroundColor: kBackgroundColor, 
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupChatScreen(chatId: widget.rideId),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (_pickupLocations.isNotEmpty)
+            Container(
+              height: 200,
+              child: GoogleMap(
+                onMapCreated: _onMapCreated,
+                initialCameraPosition: CameraPosition(
+                  target: loc ?? _center,
+                  zoom: 14,
+                ),
+                markers: _markers,
+              ),
+            ),
+          if (_users.isEmpty)
+            const Text('No users found.', style: TextStyle(color: Colors.black))
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: _users.length,
+                itemBuilder: (context, index) {
+                  var user = _users[index];
+                  var username = user['username'] ?? '';
+                  var fullName = user['fullName'] ?? '';
+                  var imageUrl = user.data().toString().contains('imageUrl')
+                      ? user['imageUrl']
+                      : null;
+                  bool isReady = _readyStatus[user.id] ?? false;
 
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                      vertical: 10, horizontal: 15),
-                  child: ListTile(
-                    onTap: () {
-                      if (user.id == _auth.currentUser?.uid) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => UserProfile(),
-                          ),
-                        );
-                      } else {
-                        // Navigate to the selected user's profile
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ViewUserProfile(uid: user.id),
-                          ),
-                        );
-                      }
-                    },
-                    leading: CircleAvatar(
-                      radius: 30,
-                      backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                          ? NetworkImage(imageUrl)
-                          : const AssetImage('assets/icons/ShuffleLogo.jpeg')
-                              as ImageProvider,
-                    ),
-                    title: Text(
-                      fullName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                  return Card(
+                    margin: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 15),
+                    child: ListTile(
+                      onTap: () {
+                        if (user.id == _auth.currentUser?.uid) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UserProfile(),
+                            ),
+                          );
+                        } else {
+                          // Navigate to the selected user's profile
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ViewUserProfile(uid: user.id),
+                            ),
+                          );
+                        }
+                      },
+                      leading: CircleAvatar(
+                        radius: 30,
+                        backgroundImage: imageUrl != null && imageUrl.isNotEmpty
+                            ? NetworkImage(imageUrl)
+                            : const AssetImage('assets/icons/ShuffleLogo.jpeg')
+                                as ImageProvider,
                       ),
-                    ),
-                    subtitle: Text(
-                      '@$username',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black,
-                      ),
-                    ),
-                    trailing: ElevatedButton(
-                      onPressed: user.id == _auth.currentUser?.uid
-                          ? () => _toggleReadyStatus(user.id)
-                          : null, // Disable button for others
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isReady ? Colors.green : Colors.white,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18.0),
+                      title: Text(
+                        fullName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
                         ),
                       ),
-                      child: Text(isReady ? 'Unready' : 'Ready'),
+                      subtitle: Text(
+                        '@$username',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black,
+                        ),
+                      ),
+                      trailing: ElevatedButton(
+                        onPressed: user.id == _auth.currentUser?.uid
+                            ? () => _toggleReadyStatus(user.id)
+                            : null, // Disable button for others
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isReady ? Colors.green : Colors.white,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18.0),
+                          ),
+                        ),
+                        child: Text(isReady ? 'Unready' : 'Ready'),
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: ElevatedButton(
-            onPressed: _leaveGroup,
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(
-                  vertical: 12.0, horizontal: 20.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20.0),
+                  );
+                },
               ),
             ),
-            child: const Text(
-              'Leave Group',
-              style: TextStyle(fontSize: 18),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton(
+              onPressed: _leaveGroup,
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(
+                    vertical: 12.0, horizontal: 20.0),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20.0),
+                ),
+              ),
+              child: const Text(
+                'Leave Group',
+                style: TextStyle(fontSize: 18),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 }

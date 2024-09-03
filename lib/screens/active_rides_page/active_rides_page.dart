@@ -33,88 +33,87 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   }
 
   Future<void> _loadActiveRideDetails() async {
-  try {
-    DocumentSnapshot rideDoc = await FirebaseFirestore.instance
-        .collection('active_rides')
-        .doc(widget.rideId)
-        .get();
+    try {
+      DocumentSnapshot rideDoc = await FirebaseFirestore.instance
+          .collection('active_rides')
+          .doc(widget.rideId)
+          .get();
 
-    if (rideDoc.exists) {
-      bool isFinished = await _isRideFinished();
+      if (rideDoc.exists) {
+        print('Ride document found.');
+        bool isFinished = await _isRideFinished();
 
-      // Check if the widget is still mounted before navigating
-      if (mounted && isFinished) {
-        List<String> participants = List<String>.from(rideDoc['participants']);
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => RatingPage(
-              rideId: widget.rideId,
-              participants: participants,
+        if (mounted && isFinished) {
+          List<String> participants = List<String>.from(rideDoc['participants']);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RatingPage(
+                rideId: widget.rideId,
+                participants: participants,
+              ),
             ),
-          ),
-        );
-        return; // Exit the function to avoid further execution
-      }
-
-      if (mounted) {
-        setState(() {
-          _rideData = rideDoc;
-          _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
-          _loadMarkers();
-        });
-      }
-
-      List<String> userIds = List<String>.from(rideDoc['participants']);
-      List<DocumentSnapshot> userDocs = [];
-      for (String uid in userIds) {
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .get();
-        if (userDoc.exists) {
-          userDocs.add(userDoc);
-        } else {
-          print('User with UID $uid not found.');
+          );
+          return;
         }
-      }
 
-      // Check if the widget is still mounted before updating the state
+        List<String> userIds = List<String>.from(rideDoc['participants']);
+        List<DocumentSnapshot> userDocs = [];
+        for (String uid in userIds) {
+          DocumentSnapshot userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+          if (userDoc.exists) {
+            userDocs.add(userDoc);
+          } else {
+            print('User with UID $uid not found.');
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _rideData = rideDoc;
+            _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
+            _users = userDocs;
+          });
+
+          // Call _loadMarkers only after setting _rideData and _users
+          _loadMarkers();
+        }
+
+      } else {
+        print('Ride document does not exist.');
+      }
+    } catch (e) {
       if (mounted) {
-        setState(() {
-          _users = userDocs;
-        });
+        print('Error loading ride details: $e');
       }
-
-      print('Number of users found: ${_users.length}');
-    } else {
-      print('Ride document does not exist.');
-    }
-  } catch (e) {
-    if (mounted) {
-      // Handle the error safely
-      print('Error loading ride details: $e');
     }
   }
-}
+
 
   Future<void> _loadMarkers() async {
-    if (_rideData == null) return;
+    if (_rideData == null || _users.isEmpty) return;
 
     User? user = _auth.currentUser;
     if (user == null) return;
 
-    // Retrieve the pickup location for the current user
     String address = _rideData!['pickupLocations'][user.uid];
-    LatLng location = await _getLatLngFromAddress(address);
+    try {
+      LatLng location = await _getLatLngFromAddress(address);
 
-    setState(() {
-      _markers.add(Marker(
-        markerId: MarkerId(address),
-        position: location,
-      ));
-    });
+      setState(() {
+        _markers.add(Marker(
+          markerId: MarkerId(address),
+          position: location,
+        ));
+      });
+    } catch (e) {
+      print('Error loading markers: $e');
+    }
   }
+
 
     Future<bool> _isRideFinished() async {
        // Placeholder function to check if the ride is finished - to be updated with prediction/maps API later..
