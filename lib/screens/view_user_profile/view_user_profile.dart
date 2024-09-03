@@ -159,7 +159,106 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
     );
   }
 
-   @override
+  void _showReportDialog(BuildContext context) {
+  final TextEditingController _descriptionController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          padding: const EdgeInsets.all(20.0),
+          decoration: BoxDecoration(
+            color: kBackgroundColor,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Report User',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _descriptionController,
+                  maxLines: 5,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    alignLabelWithHint: true,
+                    labelStyle: const TextStyle(color: Colors.black),
+                    focusedBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
+                    enabledBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
+                  ),
+                  style: const TextStyle(color: Colors.black),
+                ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      User? currentUser = _auth.currentUser;
+                      if (currentUser != null) {
+                        Map<String, dynamic> reportData = {
+                          'description': _descriptionController.text,
+                          'reportedUsername': _username, // This is now correct - it's the username of the user being viewed/reported
+                          'timestamp': FieldValue.serverTimestamp(),
+                          'userId': currentUser.uid,
+                        };
+
+                        try {
+                          await _firestore
+                              .collection('reports')
+                              .doc('user')
+                              .collection('entries')
+                              .add(reportData);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('User reported successfully.')),
+                          );
+
+                          Navigator.pop(context);
+                        } catch (e) {
+                          print('Error reporting user: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Failed to submit report. Please try again.')),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[300],
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    ),
+                    child: const Text(
+                      'Report',
+                      style: TextStyle(color: Colors.black),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -266,6 +365,12 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
                                 }
                               },
                             ),
+                          const SizedBox(height: 10),
+                          GreenActionButton(
+                            text: 'Report User',
+                            color: Colors.red,
+                            onPressed: () => _showReportDialog(context),
+                          ),
                         ],
                       ),
                     ),

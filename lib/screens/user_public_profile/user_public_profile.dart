@@ -27,7 +27,7 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
 
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
+  // final TextEditingController _usernameController = TextEditingController();
 
   String? _displayName;
   String? _email;
@@ -54,7 +54,7 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
         _imageUrl = userProfile['imageUrl'];
         _descriptionController.text = _description ?? '';
         _nameController.text = _displayName ?? '';
-        _usernameController.text = _username ?? '';
+        // _usernameController.text = _username ?? '';
       });
     }
   }
@@ -88,15 +88,6 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
       return;
     }
 
-    if (_usernameController.text.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Username is required.')),
-        );
-      }
-      return;
-    }
-
     if (_descriptionController.text.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -107,7 +98,6 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
     }
 
     if (_containsProfanity(_nameController.text) ||
-        _containsProfanity(_usernameController.text) ||
         _containsProfanity(_descriptionController.text)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -115,19 +105,6 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
         );
       }
       return;
-    }
-
-    User? user = _auth.currentUser;
-    if (user != null && _usernameController.text != _username) {
-      bool usernameExists = await _firestoreService.checkIfUsernameExists(_usernameController.text);
-      if (usernameExists) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('The username already exists. Please choose a different username.')),
-          );
-        }
-        return;
-      }
     }
 
     String? imageUrl;
@@ -140,10 +117,10 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
     }
 
     try {
+      User? user = _auth.currentUser;
       if (user != null) {
         await _firestore.collection('users').doc(user.uid).update({
           'fullName': _nameController.text,
-          'username': _usernameController.text,
           'description': _descriptionController.text,
           'imageUrl': imageUrl != null && imageUrl.isNotEmpty ? imageUrl : _imageUrl,
         });
@@ -206,8 +183,8 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: kBackgroundColor, // Use the consistent background color
-        automaticallyImplyLeading: true, // Enable back button
+        backgroundColor: kBackgroundColor,
+        automaticallyImplyLeading: true,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -250,11 +227,11 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
                       controller: _nameController,
                     ),
                     const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'Username',
-                      controller: _usernameController,
-                    ),
-                    const SizedBox(height: 20),
+                    // GreyTextField(
+                    //   labelText: 'Username',
+                    //   controller: _usernameController,
+                    // ),
+                    // const SizedBox(height: 20),
                     GreyTextField(
                       labelText: 'Short Description',
                       controller: _descriptionController,
