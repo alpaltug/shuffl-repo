@@ -214,10 +214,14 @@ Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
     for (var doc in userSnapshot.docs) {
       var userData = doc.data() as Map<String, dynamic>;
 
+      // Check if 'lastPickupTime' is null, if so, set it to current DateTime
+      DateTime lastPickupTime = userData['lastPickupTime'] != null
+          ? userData['lastPickupTime'].toDate()
+          : DateTime.now(); // Assign current time if lastPickupTime is null
+
+      // Continue only if lastPickupTime is within the last 15 minutes
       if (userData.containsKey('lastPickupLocation') &&
-          userData.containsKey('lastPickupTime') &&
-          userData['lastPickupTime'].toDate().isAfter(
-              DateTime.now().subtract(const Duration(minutes: 15)))) {
+          lastPickupTime.isAfter(DateTime.now().subtract(const Duration(minutes: 15)))) {
         GeoPoint location = userData['lastPickupLocation'];
         String locationKey = '${location.latitude},${location.longitude}';
 
@@ -236,7 +240,6 @@ Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
           location.longitude + offset,
         );
 
-        
         Color markerColor = Colors.yellow; 
         String? displayName;
 

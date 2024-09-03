@@ -42,36 +42,6 @@ class _UserRidesPageState extends State<UserRidesPage> with SingleTickerProvider
     return usernames;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    User? user = _auth.currentUser;
-
-    if (user == null) {
-      return const Center(child: Text('Please log in to view your rides.'));
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Rides'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: "Pending Rides"),
-            Tab(text: "Active Rides"),
-          ],
-        ),
-      ),
-      backgroundColor: kBackgroundColor,
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildPendingRides(context, user.uid),
-          _buildActiveRides(context, user.uid),
-        ],
-      ),
-    );
-  }
-
   Widget _buildRideCard(DocumentSnapshot ride, String userId) {
     return FutureBuilder<List<String>>(
       future: _getUsernamesFromUIDs(List<String>.from(ride['participants'])),
@@ -245,4 +215,48 @@ class _UserRidesPageState extends State<UserRidesPage> with SingleTickerProvider
       },
     );
   }
+ @override
+Widget build(BuildContext context) {
+  User? user = _auth.currentUser;
+
+  if (user == null) {
+    return const Center(child: Text('Please log in to view your rides.'));
+  }
+
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text(
+        'My Rides',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // Set title color to white and bold
+      ),
+      backgroundColor: kBackgroundColor,
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: Colors.black, // Set active label color to black
+        unselectedLabelColor: Colors.black, // Set unselected label color to black
+        indicatorColor: Colors.black, // Set indicator color to black
+        indicator: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: Colors.black, // Set the indicator line color to black
+              width: 2.0, // Adjust the width of the line as needed
+            ),
+          ),
+        ),
+        tabs: const [
+          Tab(text: "Pending Rides"),
+          Tab(text: "Active Rides"),
+        ],
+      ),
+    ),
+    backgroundColor: kBackgroundColor,
+    body: TabBarView(
+      controller: _tabController,
+      children: [
+        _buildPendingRides(context, user.uid),
+        _buildActiveRides(context, user.uid),
+      ],
+    ),
+  );
+}
 }

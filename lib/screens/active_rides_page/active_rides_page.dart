@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/rating_page/rating_page.dart';
-import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
+import 'package:my_flutter_app/screens/ride_group_chats_screen/ride_group_chats_screen.dart';
 import 'package:my_flutter_app/widgets/map_widget.dart';
 import 'package:my_flutter_app/widgets/ride_info_widget.dart';
 import 'package:my_flutter_app/widgets/participant_list_widget.dart';
@@ -229,7 +229,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => GroupChatScreen(chatId: widget.rideId),
+                  builder: (context) => RideGroupChatScreen(rideId: widget.rideId, isActiveRide: true),
                 ),
               );
             },

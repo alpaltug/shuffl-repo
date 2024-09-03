@@ -45,70 +45,6 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     _currentPosition = LatLng(position.latitude, position.longitude);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Available Rides'),
-      ),
-      body: Column(
-        children: [
-          _buildFilterSection(),
-          Expanded(
-            child: FutureBuilder<List<DocumentSnapshot>>(
-              future: _filteredRidesFuture,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final filteredRides = snapshot.data!;
-                print('Number of filtered rides: ${filteredRides.length}');
-
-                if (filteredRides.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No rides available that match your preferences.',
-                      style: TextStyle(color: Colors.black),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: filteredRides.length,
-                  itemBuilder: (context, index) {
-                    var ride = filteredRides[index];
-
-                    return FutureBuilder<List<Map<String, String>>>(
-                      future: _getParticipantDetails(List<String>.from(ride['participants'])),
-                      builder: (context, participantsSnapshot) {
-                        if (!participantsSnapshot.hasData) {
-                          return const ListTile(
-                            title: Text('Loading...'),
-                          );
-                        }
-
-                        final participants = participantsSnapshot.data!;
-
-                        return GestureDetector(
-                          onTap: () => _showRideDetailsPopup(context, ride, participants),
-                          child: RideCard(
-                            ride: ride.data() as Map<String, dynamic>,
-                            participantUsernames: participants.map((p) => p['username']!).toList(),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<List<Map<String, String>>> _getParticipantDetails(List<String> uids) async {
     List<Map<String, String>> participantDetails = [];
     for (String uid in uids) {
@@ -362,5 +298,75 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       print('Failed to get location from address: $address, error: $e');
       throw Exception('Failed to get location from address: $e');
     }
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Available Rides',
+          style: TextStyle(
+            color: Colors.white, 
+            fontWeight: FontWeight.bold, 
+          ),
+        ),
+        backgroundColor: kBackgroundColor, 
+      ),
+      body: Column(
+        children: [
+          _buildFilterSection(),
+          Expanded(
+            child: FutureBuilder<List<DocumentSnapshot>>(
+              future: _filteredRidesFuture,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final filteredRides = snapshot.data!;
+                print('Number of filtered rides: ${filteredRides.length}');
+
+                if (filteredRides.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No rides available that match your preferences.',
+                      style: TextStyle(color: Colors.black),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: filteredRides.length,
+                  itemBuilder: (context, index) {
+                    var ride = filteredRides[index];
+
+                    return FutureBuilder<List<Map<String, String>>>(
+                      future: _getParticipantDetails(List<String>.from(ride['participants'])),
+                      builder: (context, participantsSnapshot) {
+                        if (!participantsSnapshot.hasData) {
+                          return const ListTile(
+                            title: Text('Loading...'),
+                          );
+                        }
+
+                        final participants = participantsSnapshot.data!;
+
+                        return GestureDetector(
+                          onTap: () => _showRideDetailsPopup(context, ride, participants),
+                          child: RideCard(
+                            ride: ride.data() as Map<String, dynamic>,
+                            participantUsernames: participants.map((p) => p['username']!).toList(),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

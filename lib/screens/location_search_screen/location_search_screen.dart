@@ -61,7 +61,13 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isPickup ? 'Pick-up Location' : 'Drop-off Location'),
+       title: Text(
+        widget.isPickup ? 'Pick-up Location' : 'Drop-off Location',
+        style: const TextStyle(
+          color: Colors.white, 
+          fontWeight: FontWeight.bold, 
+  ),
+),
         backgroundColor: kBackgroundColor,
       ),
       body: Padding(

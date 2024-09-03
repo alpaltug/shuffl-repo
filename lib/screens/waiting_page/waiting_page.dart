@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:my_flutter_app/constants.dart';
-import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:my_flutter_app/screens/ride_group_chats_screen/ride_group_chats_screen.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
@@ -43,6 +42,28 @@ class _WaitingPageState extends State<WaitingPage> {
   void initState() {
     super.initState();
     _loadRideDetails();
+    _createGroupChat();
+  }
+
+Future<void> _createGroupChat() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
+    DocumentSnapshot rideDoc = await rideDocRef.get();
+
+    if (!rideDoc.exists) {
+      print('Ride document does not exist.');
+      return;
+    }
+
+    List<String> participantUids = List<String>.from(rideDoc['participants']);
+
+    // Create a new group chat document within the ride document
+    await rideDocRef.collection('groupChat').doc(widget.rideId).set({
+      'participants': participantUids,
+      'groupTitle': 'Ride Group Chat',
+    });
   }
 
 void _loadRideDetails() {
@@ -304,14 +325,14 @@ void _loadRideDetails() {
 
       transaction.set(activeRideDocRef, rideData);
 
-      QuerySnapshot messagesSnapshot = await rideDocRef.collection('messages').get();
+    QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
 
-      for (var messageDoc in messagesSnapshot.docs) {
-        transaction.set(
-          activeRideDocRef.collection('messages').doc(messageDoc.id),
-          messageDoc.data(),
-        );
-      }
+    for (var messageDoc in messagesSnapshot.docs) {
+      transaction.set(
+        activeRideDocRef.collection('groupChat').doc(messageDoc.id),
+        messageDoc.data(),
+      );
+    }
 
       transaction.delete(rideDocRef);
       
@@ -346,6 +367,10 @@ void _loadRideDetails() {
       'dropoffLocations.${user.uid}': FieldValue.delete(),
     });
 
+    await rideDocRef.collection('groupChat').doc(widget.rideId).update({
+    'participants': FieldValue.arrayRemove([user.uid]),
+  });
+
     rideDoc = await rideDocRef.get();
     List<String> participants = List<String>.from(rideDoc['participants']);
 
@@ -377,6 +402,25 @@ void _loadRideDetails() {
         MaterialPageRoute(builder: (context) => HomePage()),
       );
     }
+    Future<void> _createGroupChat() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
+    DocumentSnapshot rideDoc = await rideDocRef.get();
+
+    if (!rideDoc.exists) {
+      print('Ride document does not exist.');
+      return;
+    }
+
+    List<String> participantUids = List<String>.from(rideDoc['participants']);
+
+    await rideDocRef.collection('groupChat').doc(widget.rideId).set({
+      'participants': participantUids,
+      'groupTitle': 'Ride Group Chat',
+    });
+  }
   }
 
   @override
@@ -399,7 +443,7 @@ Widget build(BuildContext context) {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => GroupChatScreen(chatId: widget.rideId),
+                builder: (context) => RideGroupChatScreen(rideId: widget.rideId, isActiveRide: false),
               ),
             );
           },
