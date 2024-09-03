@@ -5,9 +5,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/rating_page/rating_page.dart';
-import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
-import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
+import 'package:my_flutter_app/widgets/map_widget.dart';
+import 'package:my_flutter_app/widgets/ride_info_widget.dart';
+import 'package:my_flutter_app/widgets/participant_list_widget.dart';
+
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -22,16 +24,14 @@ class ActiveRidesPage extends StatefulWidget {
 }
 
 class _ActiveRidesPageState extends State<ActiveRidesPage> {
-  late GoogleMapController _mapController;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  Set<Marker> _markers = {};
-  DocumentSnapshot? _rideData;
-  List<DocumentSnapshot> _users = [];
-  List<LatLng> _pickupLocations = [];
-  List<LatLng> _dropoffLocations = [];
+  LatLng? _pickupLocation;
+  List<String> _dropoffAddresses = [];
   DateTime? _rideTime;
-  LatLng loc = LatLng(0, 0);
-  final LatLng _center = const LatLng(37.8715, -122.2730); // Campus location
+  List<DocumentSnapshot> _users = [];
+  String? _rideDetailsText;
+  int? _estimatedTime;
+  String? _pickupAddress;
 
   @override
   void initState() {
@@ -47,20 +47,16 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
           .get();
 
       if (rideDoc.exists) {
-        bool isFinished = false;
+        _pickupLocation = LatLng(
+          rideDoc['pickupLocation']['latitude'],
+          rideDoc['pickupLocation']['longitude'],
+        );
 
-        if (mounted && isFinished) {
-          List<String> participants = List<String>.from(rideDoc['participants']);
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RatingPage(
-                rideId: widget.rideId,
-                participants: participants,
-              ),
-            ),
-          );
-          return;
+        _pickupAddress = await _getAddressFromLatLng(_pickupLocation!);
+
+        final dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
+        if (dropoffLocationsMap.isNotEmpty) {
+          _dropoffAddresses = dropoffLocationsMap.values.toList();
         }
 
         List<String> userIds = List<String>.from(rideDoc['participants']);
@@ -77,27 +73,14 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
           }
         }
 
-        _pickupLocations = await _getLocationsFromAddresses(
-          Map<String, String>.from(rideDoc['pickupLocations']),
-        );
-
-        _dropoffLocations = await _getLocationsFromAddresses(
-          Map<String, String>.from(rideDoc['dropoffLocations']),
-        );
-
-        loc = _pickupLocations.isNotEmpty ? _pickupLocations[0] : _center;
-
         if (mounted) {
           setState(() {
-            _rideData = rideDoc;
             _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
             _users = userDocs;
+            _rideDetailsText = "Pickup: $_pickupAddress";
+            _estimatedTime = _calculateEstimatedTime(_rideTime!);
           });
-
-          // Call _loadMarkers only after setting _rideData and _users
-          _loadMarkers();
         }
-
       } else {
         print('Ride document does not exist.');
       }
@@ -108,41 +91,39 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     }
   }
 
-  Future<List<LatLng>> _getLocationsFromAddresses(Map<String, String> locationsMap) async {
-    List<LatLng> locations = [];
-    for (var address in locationsMap.values) {
-      LatLng location = await _getLatLngFromAddress(address);
-      locations.add(location);
-    }
-    return locations;
+  int _calculateEstimatedTime(DateTime rideTime) {
+    return rideTime.difference(DateTime.now()).inMinutes;
   }
 
-  Future<void> _loadMarkers() async {
-    Set<Marker> markers = {};
+  String _getRideTimeText() {
+    if (_rideTime == null) return '';
 
-    for (LatLng location in _pickupLocations) {
-      markers.add(Marker(
-        markerId: MarkerId("pickup-${location.latitude}-${location.longitude}"),
-        position: location,
-        infoWindow: InfoWindow(
-          title: 'Pickup Location',
-        ),
-      ));
+    final now = DateTime.now();
+    final difference = now.difference(_rideTime!).inMinutes;
+
+    if (difference.abs() <= 15) {
+      return 'NOW: ${DateFormat('kk:mm').format(_rideTime!)}';
+    } else if (difference > 60) {
+      return 'Elapsed: ${DateFormat('kk:mm').format(_rideTime!)}';
+    } else {
+      return 'Ride Time: ${DateFormat('yyyy-MM-dd – kk:mm').format(_rideTime!)}';
     }
+  }
 
-    for (LatLng location in _dropoffLocations) {
-      markers.add(Marker(
-        markerId: MarkerId("dropoff-${location.latitude}-${location.longitude}"),
-        position: location,
-        infoWindow: InfoWindow(
-          title: 'Dropoff Location',
-        ),
-      ));
+  Future<String> _getAddressFromLatLng(LatLng position) async {
+    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$google_maps_api_key';
+
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      if (jsonResponse['status'] == 'OK') {
+        return jsonResponse['results'][0]['formatted_address'];
+      } else {
+        return 'Unknown location';
+      }
+    } else {
+      return 'Failed to get address';
     }
-
-    setState(() {
-      _markers = markers;
-    });
   }
 
   Future<LatLng> _getLatLngFromAddress(String address) async {
@@ -170,23 +151,52 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     }
   }
 
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-    if (loc != null) {
-      _mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(loc, 15.0),
-      );
-    } else {
-      _mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
+  Future<List<LatLng>> _getDropoffLocations() async {
+    return await Future.wait(_dropoffAddresses.map((address) => _getLatLngFromAddress(address)));
+  }
+
+  void _endRide() async {
+    bool? confirmEnd = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('End Ride', style: TextStyle(color: Colors.black)),
+        content: Text('Are you sure you want to end the ride? You will be directed to the rating screen.', style: TextStyle(color: Colors.black)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('End Ride', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmEnd == true) {
+      // Remove current user from participants
+      String? currentUserId = _auth.currentUser?.uid;
+      if (currentUserId != null) {
+        await FirebaseFirestore.instance
+            .collection('active_rides')
+            .doc(widget.rideId)
+            .update({
+          'participants': FieldValue.arrayRemove([currentUserId]),
+        });
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RatingPage(rideId: widget.rideId, participants: _users.map((e) => e.id).toList()),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    Duration? timeRemaining = _rideTime != null ? _rideTime!.difference(DateTime.now()) : null;
-
     return Scaffold(
       backgroundColor: kBackgroundColor,
       appBar: AppBar(
@@ -212,218 +222,55 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (_pickupLocations.isNotEmpty || _dropoffLocations.isNotEmpty)
-            Container(
-              height: 200,
-              child: GoogleMap(
-                onMapCreated: _onMapCreated,
-                initialCameraPosition: CameraPosition(
-                  target: loc,
-                  zoom: 14,
-                ),
-                markers: _markers,
-              ),
-            ),
-          if (timeRemaining != null && timeRemaining > Duration.zero)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      spreadRadius: 3,
-                      blurRadius: 5,
+      body: FutureBuilder<List<LatLng>>(
+        future: _getDropoffLocations(), // Fetch dropoff locations asynchronously
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error loading dropoff locations'));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text('No dropoff locations available'));
+          } else {
+            final dropoffLocations = snapshot.data!;
+            return Column(
+              children: [
+                if (_pickupLocation != null)
+                  Expanded(
+                    child: MapWidget(
+                      pickupLocation: _pickupLocation!,
+                      dropoffLocations: dropoffLocations.isEmpty ? [] : dropoffLocations,
+                      showCurrentLocation: true,
+                      showDirections: true,
+                      initialZoom: 14,
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    HourglassAnimation(duration: timeRemaining),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Starts in:',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-                        ),
-                        CountdownTimer(duration: timeRemaining),
-                      ],
+                  ),
+                if (_rideDetailsText != null && _estimatedTime != null)
+                  RideInfoWidget(
+                    rideDetails: _rideDetailsText!,
+                    rideTimeText: _getRideTimeText(),
+                    estimatedTime: _estimatedTime!,
+                    dropoffAddresses: _dropoffAddresses, // Pass dropoff addresses as a list
+                  ),
+                if (_users.isNotEmpty)
+                  Expanded(
+                    child: ParticipantListWidget(users: _users),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ElevatedButton(
+                    onPressed: _endRide,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red, // Red button for ending the ride
                     ),
-                  ],
+                    child: const Text('End Ride'),
+                  ),
                 ),
-              ),
-            ),
-          if (_rideTime != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                'Ride Time: ${DateFormat('yyyy-MM-dd – kk:mm').format(_rideTime!)}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-            ),
-          const SizedBox(height: 10),
-          if (_users.isEmpty)
-            const Text('No users found.', style: TextStyle(color: Colors.black))
-          else
-            Expanded(
-              child: ListView.builder(
-                itemCount: _users.length,
-                itemBuilder: (context, index) {
-                  var user = _users[index];
-                  var username = user['username'] ?? '';
-                  var fullName = user['fullName'] ?? '';
-                  var imageUrl = user.data().toString().contains('imageUrl') ? user['imageUrl'] : null;
-
-                  return Card(
-                    color: Colors.green[50],
-                    margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        radius: 30,
-                        backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                          ? NetworkImage(imageUrl) : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                      ),
-                      title: Text(
-                        fullName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '@$username',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.black,
-                        ),
-                      ),
-                      onTap: () {
-                        if (user.id == _auth.currentUser?.uid) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const UserProfile(),
-                            ),
-                          );
-                        } else {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ViewUserProfile(uid: user.id),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
+              ],
+            );
+          }
+        },
       ),
-    );
-  }
-}
-
-class CountdownTimer extends StatelessWidget {
-  final Duration duration;
-
-  const CountdownTimer({Key? key, required this.duration}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<Duration>(
-      tween: Tween(begin: duration, end: Duration.zero),
-      duration: duration,
-      onEnd: () {
-        print('Ride starting now!');
-      },
-      builder: (BuildContext context, Duration value, Widget? child) {
-        return Text(
-          _formatTimeRemaining(value),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.redAccent),
-        );
-      },
-    );
-  }
-
-  String _formatTimeRemaining(Duration duration) {
-    if (duration.inHours > 0) {
-      return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m ${duration.inSeconds.remainder(60)}s';
-    } else if (duration.inMinutes > 0) {
-      return '${duration.inMinutes}m ${duration.inSeconds.remainder(60)}s';
-    } else {
-      return '${duration.inSeconds}s';
-    }
-  }
-}
-
-class HourglassAnimation extends StatefulWidget {
-  final Duration duration;
-
-  const HourglassAnimation({Key? key, required this.duration}) : super(key: key);
-
-  @override
-  _HourglassAnimationState createState() => _HourglassAnimationState();
-}
-
-class _HourglassAnimationState extends State<HourglassAnimation> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _rotationAnimation;
-  late Animation<double> _opacityAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    );
-
-    _rotationAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.linear,
-    ));
-
-    _opacityAnimation = Tween<double>(begin: 1, end: 0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
-
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return RotationTransition(
-          turns: _rotationAnimation,
-          child: FadeTransition(
-            opacity: _opacityAnimation,
-            child: Icon(
-              Icons.hourglass_top,
-              size: 40,
-              color: Colors.yellow[700],
-            ),
-          ),
-        );
-      },
     );
   }
 }
