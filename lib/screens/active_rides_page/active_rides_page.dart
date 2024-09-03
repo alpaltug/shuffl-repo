@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/rating_page/rating_page.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
 class ActiveRidesPage extends StatefulWidget {
   final String rideId;
@@ -24,7 +27,11 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   Set<Marker> _markers = {};
   DocumentSnapshot? _rideData;
   List<DocumentSnapshot> _users = [];
+  List<LatLng> _pickupLocations = [];
+  List<LatLng> _dropoffLocations = [];
   DateTime? _rideTime;
+  LatLng loc = LatLng(0, 0);
+  final LatLng _center = const LatLng(37.8715, -122.2730); // Campus location
 
   @override
   void initState() {
@@ -40,8 +47,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
           .get();
 
       if (rideDoc.exists) {
-        print('Ride document found.');
-        bool isFinished = await _isRideFinished();
+        bool isFinished = false;
 
         if (mounted && isFinished) {
           List<String> participants = List<String>.from(rideDoc['participants']);
@@ -71,6 +77,16 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
           }
         }
 
+        _pickupLocations = await _getLocationsFromAddresses(
+          Map<String, String>.from(rideDoc['pickupLocations']),
+        );
+
+        _dropoffLocations = await _getLocationsFromAddresses(
+          Map<String, String>.from(rideDoc['dropoffLocations']),
+        );
+
+        loc = _pickupLocations.isNotEmpty ? _pickupLocations[0] : _center;
+
         if (mounted) {
           setState(() {
             _rideData = rideDoc;
@@ -92,110 +108,156 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     }
   }
 
+  Future<List<LatLng>> _getLocationsFromAddresses(Map<String, String> locationsMap) async {
+    List<LatLng> locations = [];
+    for (var address in locationsMap.values) {
+      LatLng location = await _getLatLngFromAddress(address);
+      locations.add(location);
+    }
+    return locations;
+  }
 
   Future<void> _loadMarkers() async {
-    if (_rideData == null || _users.isEmpty) return;
+    Set<Marker> markers = {};
 
-    User? user = _auth.currentUser;
-    if (user == null) return;
+    for (LatLng location in _pickupLocations) {
+      markers.add(Marker(
+        markerId: MarkerId("pickup-${location.latitude}-${location.longitude}"),
+        position: location,
+        infoWindow: InfoWindow(
+          title: 'Pickup Location',
+        ),
+      ));
+    }
 
-    String address = _rideData!['pickupLocations'][user.uid];
+    for (LatLng location in _dropoffLocations) {
+      markers.add(Marker(
+        markerId: MarkerId("dropoff-${location.latitude}-${location.longitude}"),
+        position: location,
+        infoWindow: InfoWindow(
+          title: 'Dropoff Location',
+        ),
+      ));
+    }
+
+    setState(() {
+      _markers = markers;
+    });
+  }
+
+  Future<LatLng> _getLatLngFromAddress(String address) async {
+    final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$google_maps_api_key');
+
     try {
-      LatLng location = await _getLatLngFromAddress(address);
+      final response = await http.get(url);
 
-      setState(() {
-        _markers.add(Marker(
-          markerId: MarkerId(address),
-          position: location,
-        ));
-      });
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          final location = data['results'][0]['geometry']['location'];
+          return LatLng(location['lat'], location['lng']);
+        } else {
+          throw Exception('No locations found for the given address: $address');
+        }
+      } else {
+        throw Exception(
+            'Failed to get location from address: ${response.reasonPhrase}');
+      }
     } catch (e) {
-      print('Error loading markers: $e');
+      print('Failed to get location from address: $address, error: $e');
+      throw Exception('Failed to get location from address: $e');
     }
   }
 
-
-    Future<bool> _isRideFinished() async {
-       // Placeholder function to check if the ride is finished - to be updated with prediction/maps API later..
-       // Currently, it returns true after a 1-minute delay
-       await Future.delayed(Duration(minutes: 1));
-       return true;
-     }
-
-  Future<LatLng> _getLatLngFromAddress(String address) async {
-    List<Location> locations = await locationFromAddress(address);
-    if (locations.isNotEmpty) {
-      return LatLng(locations.first.latitude, locations.first.longitude);
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+    if (loc != null) {
+      _mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(loc, 15.0),
+      );
     } else {
-      throw Exception('No locations found for the given address.');
+      _mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
+      );
     }
   }
 
   @override
-Widget build(BuildContext context) {
-  Duration? timeRemaining = _rideTime != null ? _rideTime!.difference(DateTime.now()) : null;
+  Widget build(BuildContext context) {
+    Duration? timeRemaining = _rideTime != null ? _rideTime!.difference(DateTime.now()) : null;
 
-  return Scaffold(
-    backgroundColor: kBackgroundColor, 
-    appBar: AppBar(
-      title: const Text(
-        'Active Ride',
-        style: TextStyle(
-          color: Colors.white, 
-          fontWeight: FontWeight.bold, 
+    return Scaffold(
+      backgroundColor: kBackgroundColor,
+      appBar: AppBar(
+        title: const Text(
+          'Active Ride',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
+        backgroundColor: kBackgroundColor,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupChatScreen(chatId: widget.rideId),
+                ),
+              );
+            },
+          ),
+        ],
       ),
-      backgroundColor: kBackgroundColor, 
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.chat),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => GroupChatScreen(chatId: widget.rideId),
-              ),
-            );
-          },
-        ),
-      ],
-    ),
       body: Column(
         children: [
-          if (_rideData != null)
+          if (_pickupLocations.isNotEmpty || _dropoffLocations.isNotEmpty)
             Container(
               height: 200,
               child: GoogleMap(
+                onMapCreated: _onMapCreated,
                 initialCameraPosition: CameraPosition(
-                  target: _markers.isNotEmpty
-                      ? _markers.first.position
-                      : LatLng(0, 0),
+                  target: loc,
                   zoom: 14,
                 ),
                 markers: _markers,
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                },
               ),
             ),
           if (timeRemaining != null && timeRemaining > Duration.zero)
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.hourglass_top,
-                    size: 30,
-                    color: Colors.redAccent,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Starts in:',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                  const SizedBox(width: 10),
-                  CountdownTimer(duration: timeRemaining),
-                ],
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      spreadRadius: 3,
+                      blurRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    HourglassAnimation(duration: timeRemaining),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Starts in:',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                        ),
+                        CountdownTimer(duration: timeRemaining),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           if (_rideTime != null)
@@ -226,8 +288,7 @@ Widget build(BuildContext context) {
                       leading: CircleAvatar(
                         radius: 30,
                         backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                            ? NetworkImage(imageUrl)
-                            : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                          ? NetworkImage(imageUrl) : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
                       ),
                       title: Text(
                         fullName,
@@ -302,5 +363,67 @@ class CountdownTimer extends StatelessWidget {
     } else {
       return '${duration.inSeconds}s';
     }
+  }
+}
+
+class HourglassAnimation extends StatefulWidget {
+  final Duration duration;
+
+  const HourglassAnimation({Key? key, required this.duration}) : super(key: key);
+
+  @override
+  _HourglassAnimationState createState() => _HourglassAnimationState();
+}
+
+class _HourglassAnimationState extends State<HourglassAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _rotationAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+    );
+
+    _rotationAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.linear,
+    ));
+
+    _opacityAnimation = Tween<double>(begin: 1, end: 0).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return RotationTransition(
+          turns: _rotationAnimation,
+          child: FadeTransition(
+            opacity: _opacityAnimation,
+            child: Icon(
+              Icons.hourglass_top,
+              size: 40,
+              color: Colors.yellow[700],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

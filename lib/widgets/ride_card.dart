@@ -14,7 +14,8 @@ class RideCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     DateTime rideTime = ride['timeOfRide'].toDate();
-    String formattedDate = DateFormat('E, MMM d').format(rideTime);
+    String formattedDay = DateFormat('EEE').format(rideTime).toUpperCase();
+    String formattedDate = DateFormat('MMM d').format(rideTime);
     String formattedTime = DateFormat('h:mm a').format(rideTime);
 
     return Card(
@@ -26,9 +27,9 @@ class RideCard extends StatelessWidget {
           children: [
             Container(
               width: 60,
-              height: 60,
+              height: 70,
               decoration: BoxDecoration(
-                color: Colors.white, // Remove background color for a cleaner look
+                color: Colors.white, // Background color for the calendar
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
@@ -38,46 +39,44 @@ class RideCard extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Stack(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Positioned.fill(
-                    child: Image.asset(
-                      'assets/images/calendar_icon.jpeg',
-                      fit: BoxFit.cover,
-                      color: Colors.grey.withOpacity(0.3), // Slight overlay for blending
-                      colorBlendMode: BlendMode.modulate,
+                  Container(
+                    height: 20,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.red, // Red top part for the calendar
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(10),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      formattedDay,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white, // White text on red background
+                      ),
                     ),
                   ),
-                  Align(
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          DateFormat('EEE').format(rideTime).toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87, // Make the text more prominent
-                          ),
-                        ),
-                        Text(
-                          DateFormat('MMM d').format(rideTime),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          DateFormat('h:mm a').format(rideTime),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 5),
+                  Text(
+                    formattedDate,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    formattedTime,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
                   ),
                 ],
