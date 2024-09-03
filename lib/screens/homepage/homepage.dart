@@ -200,75 +200,78 @@ Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
 
 
   Future<void> _fetchOnlineUsers() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
+  User? currentUser = _auth.currentUser;
+  if (currentUser == null) return;
 
-    _firestore
-        .collection('users')
-        .where('goOnline', isEqualTo: true)
-        .snapshots()
-        .listen((QuerySnapshot userSnapshot) {
-      Set<Marker> markers = {};
-      Map<String, int> locationCount = {};
+  _firestore
+      .collection('users')
+      .where('goOnline', isEqualTo: true)
+      .snapshots()
+      .listen((QuerySnapshot userSnapshot) {
+    Set<Marker> markers = {};
+    Map<String, int> locationCount = {};
 
-      for (var doc in userSnapshot.docs) {
-        var userData = doc.data() as Map<String, dynamic>;
+    for (var doc in userSnapshot.docs) {
+      var userData = doc.data() as Map<String, dynamic>;
 
-        if (userData.containsKey('lastPickupLocation') &&
-            userData.containsKey('lastPickupTime') &&
-            userData['lastPickupTime'].toDate().isAfter(
-                DateTime.now().subtract(const Duration(minutes: 15)))) {
-          GeoPoint location = userData['lastPickupLocation'];
-          String locationKey = '${location.latitude},${location.longitude}';
+      if (userData.containsKey('lastPickupLocation') &&
+          userData.containsKey('lastPickupTime') &&
+          userData['lastPickupTime'].toDate().isAfter(
+              DateTime.now().subtract(const Duration(minutes: 15)))) {
+        GeoPoint location = userData['lastPickupLocation'];
+        String locationKey = '${location.latitude},${location.longitude}';
 
-          // Count how many users are at the same location
-          if (locationCount.containsKey(locationKey)) {
-            locationCount[locationKey] = locationCount[locationKey]! + 1;
-          } else {
-            locationCount[locationKey] = 1;
-          }
-
-          // Offset markers slightly if more than one user is at the same location
-          double offset = 0.0001 * (locationCount[locationKey]! - 1);
-
-          LatLng adjustedPosition = LatLng(
-            location.latitude + offset,
-            location.longitude + offset,
-          );
-
-          // Customize marker color based on user type
-          Color markerColor = Colors.yellow; // Default for others
-          if (doc.id == currentUser.uid) {
-            markerColor = Colors.blue; // Blue for the current user
-          } else if (userData.containsKey('friends') &&
-              userData['friends'].contains(currentUser.uid)) {
-            markerColor = Colors.green; // Green for friends
-          }
-
-          markers.add(
-            Marker(
-              markerId: MarkerId(doc.id),
-              position: adjustedPosition,
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                  markerColor == Colors.blue
-                      ? BitmapDescriptor.hueBlue
-                      : markerColor == Colors.green
-                          ? BitmapDescriptor.hueGreen
-                          : BitmapDescriptor.hueYellow),
-              infoWindow: InfoWindow(
-                title: userData['fullName'] ?? 'Unknown',
-                snippet: userData['username'],
-              ),
-            ),
-          );
+        // Count how many users are at the same location
+        if (locationCount.containsKey(locationKey)) {
+          locationCount[locationKey] = locationCount[locationKey]! + 1;
+        } else {
+          locationCount[locationKey] = 1;
         }
-      }
 
-      setState(() {
-        _markers = markers;
-      });
+        // Offset markers slightly if more than one user is at the same location
+        double offset = 0.0001 * (locationCount[locationKey]! - 1);
+
+        LatLng adjustedPosition = LatLng(
+          location.latitude + offset,
+          location.longitude + offset,
+        );
+
+        
+        Color markerColor = Colors.yellow; 
+        String? displayName;
+
+        if (doc.id == currentUser.uid) {
+          markerColor = Colors.blue; 
+          displayName = userData['fullName']; 
+        } else if (userData.containsKey('friends') &&
+            userData['friends'].contains(currentUser.uid)) {
+          markerColor = Colors.green; 
+          displayName = userData['fullName']; 
+        }
+
+        markers.add(
+          Marker(
+            markerId: MarkerId(doc.id),
+            position: adjustedPosition,
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+                markerColor == Colors.blue
+                    ? BitmapDescriptor.hueBlue
+                    : markerColor == Colors.green
+                        ? BitmapDescriptor.hueGreen
+                        : BitmapDescriptor.hueYellow),
+            infoWindow: InfoWindow(
+              title: displayName, 
+            ),
+          ),
+        );
+      }
+    }
+
+    setState(() {
+      _markers = markers;
     });
-  }
+  });
+}
 
 
   Future<void> _showDateTimePicker() async {
