@@ -17,6 +17,7 @@ import 'package:my_flutter_app/screens/edit_preferences/edit_preferences.dart';
 import 'package:my_flutter_app/screens/filtered_rides_page/filtered_rides_page.dart';
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart';
+import 'package:my_flutter_app/screens/report_screen/report_screen.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
@@ -1067,6 +1068,18 @@ Widget build(BuildContext context) {
               );
             },
           ),
+          ListTile(
+          leading: const Icon(Icons.report),
+          title: const Text('Report'),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ReportPage(),
+              ),
+            );
+          }
+          )
         ],
       ),
     ),
