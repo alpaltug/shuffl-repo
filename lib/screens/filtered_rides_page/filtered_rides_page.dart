@@ -215,9 +215,24 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
 }
 
 
-  Future<List<DocumentSnapshot>> _fetchFilteredRides() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return [];
+ Future<List<DocumentSnapshot>> _fetchFilteredRides() async {
+  User? currentUser = _auth.currentUser;
+  if (currentUser == null) return [];
+
+  try {
+    // Fetch current user document
+    DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    
+    // Explicitly cast the document data to Map<String, dynamic>
+    Map<String, dynamic>? currentUserData = currentUserDoc.data() as Map<String, dynamic>?;
+
+    // Safely get 'blockedUsers' and 'blockedBy' fields with fallback to empty lists if fields don't exist
+    List<String> blockedUsers = currentUserData != null && currentUserData.containsKey('blockedUsers') 
+        ? List<String>.from(currentUserData['blockedUsers']) 
+        : [];
+    List<String> blockedBy = currentUserData != null && currentUserData.containsKey('blockedBy') 
+        ? List<String>.from(currentUserData['blockedBy']) 
+        : [];
 
     DateTime now = DateTime.now();
     QuerySnapshot snapshot = await _firestore.collection('rides').orderBy('timeOfRide').get();
@@ -228,7 +243,10 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       bool isComplete = ride['isComplete'] ?? false;
       List<String> participants = List<String>.from(ride['participants']);
 
-      if (!isComplete && !participants.contains(currentUser.uid)) {
+      // Filter out rides involving blocked users or users who blocked the current user
+      bool containsBlockedUser = participants.any((participant) => blockedUsers.contains(participant) || blockedBy.contains(participant));
+
+      if (!isComplete && !participants.contains(currentUser.uid) && !containsBlockedUser) {
         if (_pickupFilter != null || _dropoffFilter != null) {
           bool pickupMatch = await _matchesLocation(_pickupFilter, ride['pickupLocations']);
           bool dropoffMatch = await _matchesLocation(_dropoffFilter, ride['dropoffLocations']);
@@ -242,6 +260,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       }
     }
 
+    // Optional cleanup of old rides
     for (var ride in snapshot.docs) {
       DateTime timeOfRide = ride['timeOfRide'].toDate();
       if (timeOfRide.isBefore(now.subtract(const Duration(hours: 24)))) {
@@ -250,7 +269,11 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     }
 
     return filteredRides;
+  } catch (e) {
+    print('Error fetching rides: $e');
+    return [];
   }
+}
 
   Future<bool> _matchesLocation(String? filter, Map<String, dynamic> locations) async {
     if (filter == null || filter.isEmpty) {
