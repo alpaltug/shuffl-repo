@@ -47,6 +47,8 @@
 	<string>We need your location to show your current position on the map.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need your location to show your current position on the map.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to show your current position on the map.</string> 
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to upload your profile picture.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
