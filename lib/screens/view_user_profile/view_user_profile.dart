@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
@@ -28,12 +29,14 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
   int _numRides = 0;
   bool isFriendRequestSent = false;
   bool isAlreadyFriend = false;
+  bool isBlocked = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
     _checkFriendStatus();
+    _checkBlockStatus();
   }
 
   void _loadUserProfile() async {
@@ -88,6 +91,17 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
     }
   }
 
+  void _checkBlockStatus() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      List blockedUsers = currentUserDoc['blockedUsers'] ?? [];
+      setState(() {
+        isBlocked = blockedUsers.contains(widget.uid);
+      });
+    }
+  }
+
   void _addFriend() async {
     User? currentUser = _auth.currentUser;
 
@@ -122,6 +136,58 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
       });
     }
   }
+
+  Future<void> _toggleBlockUser() async {
+  User? currentUser = _auth.currentUser;
+  if (currentUser != null) {
+    try {
+      DocumentReference currentUserRef = _firestore.collection('users').doc(currentUser.uid);
+      DocumentReference targetUserRef = _firestore.collection('users').doc(widget.uid);
+      
+      if (isBlocked) {
+        // Unblock user
+        await currentUserRef.update({
+          'blockedUsers': FieldValue.arrayRemove([widget.uid])
+        });
+        await targetUserRef.update({
+          'blockedBy': FieldValue.arrayRemove([currentUser.uid])
+        });
+        if (mounted) {
+          setState(() {
+            isBlocked = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('User unblocked successfully')),
+          );
+        }
+      } else {
+        // Block user
+        await currentUserRef.update({
+          'blockedUsers': FieldValue.arrayUnion([widget.uid])
+        });
+        await targetUserRef.update({
+          'blockedBy': FieldValue.arrayUnion([currentUser.uid])
+        });
+        if (mounted) {
+          setState(() {
+            isBlocked = true;
+          });
+          _unfriend();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('User blocked successfully')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        print('Error toggling block status: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update block status. Please try again.')),
+        );
+      }
+    }
+  }
+}
 
   void _showUnfriendConfirmationDialog() {
     showDialog(
@@ -160,103 +226,103 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
   }
 
   void _showReportDialog(BuildContext context) {
-  final TextEditingController _descriptionController = TextEditingController();
+    final TextEditingController _descriptionController = TextEditingController();
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          padding: const EdgeInsets.all(20.0),
-          decoration: BoxDecoration(
-            color: kBackgroundColor,
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Report User',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _descriptionController,
-                  maxLines: 5,
-                  maxLength: 500,
-                  decoration: InputDecoration(
-                    labelText: 'Description',
-                    alignLabelWithHint: true,
-                    labelStyle: const TextStyle(color: Colors.black),
-                    focusedBorder: const OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black),
-                    ),
-                    enabledBorder: const OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black),
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            padding: const EdgeInsets.all(20.0),
+            decoration: BoxDecoration(
+              color: kBackgroundColor,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Report User',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
                     ),
                   ),
-                  style: const TextStyle(color: Colors.black),
-                ),
-                const SizedBox(height: 20),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      User? currentUser = _auth.currentUser;
-                      if (currentUser != null) {
-                        Map<String, dynamic> reportData = {
-                          'description': _descriptionController.text,
-                          'reportedUsername': _username, // This is now correct - it's the username of the user being viewed/reported
-                          'timestamp': FieldValue.serverTimestamp(),
-                          'userId': currentUser.uid,
-                        };
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _descriptionController,
+                    maxLines: 5,
+                    maxLength: 500,
+                    decoration: InputDecoration(
+                      labelText: 'Description',
+                      alignLabelWithHint: true,
+                      labelStyle: const TextStyle(color: Colors.black),
+                      focusedBorder: const OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black),
+                      ),
+                      enabledBorder: const OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black),
+                      ),
+                    ),
+                    style: const TextStyle(color: Colors.black),
+                  ),
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        User? currentUser = _auth.currentUser;
+                        if (currentUser != null) {
+                          Map<String, dynamic> reportData = {
+                            'description': _descriptionController.text,
+                            'reportedUsername': _username,
+                            'timestamp': FieldValue.serverTimestamp(),
+                            'userId': currentUser.uid,
+                          };
 
-                        try {
-                          await _firestore
-                              .collection('reports')
-                              .doc('user')
-                              .collection('entries')
-                              .add(reportData);
+                          try {
+                            await _firestore
+                                .collection('reports')
+                                .doc('user')
+                                .collection('entries')
+                                .add(reportData);
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('User reported successfully.')),
-                          );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('User reported successfully.')),
+                            );
 
-                          Navigator.pop(context);
-                        } catch (e) {
-                          print('Error reporting user: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Failed to submit report. Please try again.')),
-                          );
+                            Navigator.pop(context);
+                          } catch (e) {
+                            print('Error reporting user: $e');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Failed to submit report. Please try again.')),
+                            );
+                          }
                         }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    ),
-                    child: const Text(
-                      'Report',
-                      style: TextStyle(color: Colors.black),
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[300],
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      ),
+                      child: const Text(
+                        'Report',
+                        style: TextStyle(color: Colors.black),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -370,6 +436,12 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
                             text: 'Report User',
                             color: Colors.red,
                             onPressed: () => _showReportDialog(context),
+                          ),
+                          const SizedBox(height: 10),
+                          GreenActionButton(
+                            text: isBlocked ? 'Unblock User' : 'Block User',
+                            color: Colors.orange,
+                            onPressed: _toggleBlockUser,
                           ),
                         ],
                       ),

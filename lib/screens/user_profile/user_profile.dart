@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/screens/user_friends/user_friends.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
+import 'package:my_flutter_app/screens/blocked_users_screen/blocked_users_screen.dart';
 
 class UserProfile extends StatefulWidget {
   const UserProfile({super.key});
@@ -56,8 +57,8 @@ class _UserProfileState extends State<UserProfile> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: kBackgroundColor, // Set the AppBar color to the same as the rest of the app
-        iconTheme: const IconThemeData(color: Colors.black), // Set AppBar icons to white
+        backgroundColor: kBackgroundColor,
+        iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -141,7 +142,9 @@ class _UserProfileState extends State<UserProfile> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          GestureDetector(
+                          _buildProfileOption(
+                            icon: Icons.edit,
+                            text: 'Edit Profile',
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -150,28 +153,11 @@ class _UserProfileState extends State<UserProfile> {
                                 ),
                               );
                             },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.edit, color: Colors.white),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    'Edit Profile',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                  Spacer(),
-                                  Icon(Icons.arrow_forward_ios, color: Colors.white),
-                                ],
-                              ),
-                            ),
                           ),
                           const SizedBox(height: 10),
-                          GestureDetector(
+                          _buildProfileOption(
+                            icon: Icons.people,
+                            text: 'Friends',
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -180,25 +166,19 @@ class _UserProfileState extends State<UserProfile> {
                                 ),
                               );
                             },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.people, color: Colors.white),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    'Friends',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                  Spacer(),
-                                  Icon(Icons.arrow_forward_ios, color: Colors.white),
-                                ],
-                              ),
-                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildProfileOption(
+                            icon: Icons.block,
+                            text: 'Blocked Users',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const BlockedUsersScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -219,6 +199,35 @@ class _UserProfileState extends State<UserProfile> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileOption({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(
+              text,
+              style: const TextStyle(color: Colors.white),
+            ),
+            const Spacer(),
+            const Icon(Icons.arrow_forward_ios, color: Colors.white),
+          ],
         ),
       ),
     );
