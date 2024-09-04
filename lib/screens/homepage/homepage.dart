@@ -2,9 +2,6 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/main.dart';
-
-
-
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -526,6 +523,24 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
   User? currentUser = _auth.currentUser;
   if (currentUser == null) return false;
 
+  // Retrieve the current user data
+  DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+  if (!currentUserDoc.exists) return false;
+
+  Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+  List<String> blockedUsers = List<String>.from(currentUserData['blockedUsers'] ?? []);
+  List<String> blockedBy = List<String>.from(currentUserData['blockedBy'] ?? []);
+
+  List<String> participants = List<String>.from(rideRequest['participants']);
+  int currentGroupSize = participants.length;
+
+  // Check for blocked users within the ride participants
+  for (String participantId in participants) {
+    if (blockedUsers.contains(participantId) || blockedBy.contains(participantId)) {
+      return false; // If any participant is blocked or has blocked the current user, return false
+    }
+  }
+
   // Retrieve the pickup locations and ensure they are LatLng objects
   List<LatLng> pickupLocationsList = [];
   Map<String, String> pickupLocationsMap = Map<String, String>.from(rideRequest['pickupLocations']);
@@ -560,15 +575,6 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
   if (!isRouteValid) {
     return false;
   }
-
-  // Retrieve the current user data
-  DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-  if (!currentUserDoc.exists) return false;
-
-  Map<String, dynamic> currentUserData = currentUserDoc.data() as Map<String, dynamic>;
-
-  List<String> participants = List<String>.from(rideRequest['participants']);
-  int currentGroupSize = participants.length;
 
   for (String participantId in participants) {
     if (participantId == currentUser.uid) continue;
@@ -1100,15 +1106,15 @@ Widget build(BuildContext context) {
               prefixIcon: const Icon(Icons.location_on),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Default border color
+                borderSide: const BorderSide(color: Colors.black), 
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Black border when focused
+                borderSide: const BorderSide(color: Colors.black), 
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Black border when enabled
+                borderSide: const BorderSide(color: Colors.black), 
               ),
             ),
             style: const TextStyle(color: Colors.black),
@@ -1125,15 +1131,15 @@ Widget build(BuildContext context) {
               prefixIcon: const Icon(Icons.location_on),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Default border color
+                borderSide: const BorderSide(color: Colors.black), 
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Black border when focused
+                borderSide: const BorderSide(color: Colors.black), 
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), // Black border when enabled
+                borderSide: const BorderSide(color: Colors.black), 
               ),
             ),
             style: const TextStyle(color: Colors.black),
@@ -1146,7 +1152,7 @@ Widget build(BuildContext context) {
           child: ElevatedButton(
             onPressed: _findRide,
             style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50), // Make the button full width and tall
+              minimumSize: const Size(double.infinity, 50), 
               backgroundColor: Colors.yellow,
             ),
             child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),
