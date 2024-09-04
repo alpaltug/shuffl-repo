@@ -210,78 +210,84 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Active Ride',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: kBackgroundColor,
+    appBar: AppBar(
+      title: const Text(
+        'Active Ride',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
         ),
-        backgroundColor: kBackgroundColor,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => RideGroupChatScreen(rideId: widget.rideId, isActiveRide: true),
-                ),
-              );
-            },
-          ),
-        ],
       ),
-      body: FutureBuilder<List<LatLng>>(
-        future: _getDropoffLocations(), // Fetch dropoff locations asynchronously
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error loading dropoff locations'));
-          } else {
-            final dropoffLocations = snapshot.data ?? [];
-            return Column(
-              children: [
-                if (_pickupLocation != null)
-                  Expanded(
-                    child: MapWidget(
-                      pickupLocation: _pickupLocation!,
-                      dropoffLocations: dropoffLocations,
-                      showCurrentLocation: true,
-                      showDirections: true,
-                      initialZoom: 14,
-                    ),
-                  ),
-                if (_rideDetailsText != null && _estimatedTime != null)
-                  RideInfoWidget(
-                    rideDetails: _rideDetailsText!,
-                    rideTimeText: _getRideTimeText(),
-                    dropoffAddresses: _dropoffAddresses, // Pass dropoff addresses as a list
-                  ),
-                if (_users.isNotEmpty)
-                  Expanded(
-                    child: ParticipantListWidget(users: _users),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ElevatedButton(
-                    onPressed: _endRide,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red, // Red button for ending the ride
-                    ),
-                    child: const Text('End Ride'),
-                  ),
+      backgroundColor: kBackgroundColor,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.chat),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RideGroupChatScreen(
+                  rideId: widget.rideId,
+                  isActiveRide: true,
                 ),
-              ],
+              ),
             );
-          }
-        },
-      ),
-    );
-  }
+          },
+        ),
+      ],
+    ),
+    body: FutureBuilder<List<LatLng>>(
+      future: _getDropoffLocations(), // Fetch dropoff locations asynchronously
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator()); // Show progress indicator
+        } else if (snapshot.hasError) {
+          return const Center(child: Text('Error loading dropoff locations'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final dropoffLocations = snapshot.data ?? [];
+
+        return Column(
+          children: [
+            if (_pickupLocation != null)
+              Expanded(
+                child: MapWidget(
+                  pickupLocation: _pickupLocation!,
+                  dropoffLocations: dropoffLocations,
+                  showCurrentLocation: true,
+                  showDirections: true,
+                  initialZoom: 14,
+                ),
+              ),
+            if (_rideDetailsText != null && _estimatedTime != null)
+              RideInfoWidget(
+                rideDetails: _rideDetailsText!,
+                rideTimeText: _getRideTimeText(),
+                dropoffAddresses: _dropoffAddresses, // Pass dropoff addresses as a list
+              ),
+            if (_users.isNotEmpty)
+              Expanded(
+                child: ParticipantListWidget(users: _users),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: _endRide,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red, // Red button for ending the ride
+                ),
+                child: const Text('End Ride'),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
 }

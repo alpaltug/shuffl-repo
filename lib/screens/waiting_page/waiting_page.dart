@@ -423,7 +423,7 @@ void _loadRideDetails() {
   }
   }
 
-  @override
+@override
 Widget build(BuildContext context) {
   return Scaffold(
     backgroundColor: kBackgroundColor,
@@ -443,136 +443,149 @@ Widget build(BuildContext context) {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => RideGroupChatScreen(rideId: widget.rideId, isActiveRide: false),
+                builder: (context) => RideGroupChatScreen(
+                  rideId: widget.rideId,
+                  isActiveRide: false,
+                ),
               ),
             );
           },
         ),
       ],
     ),
-    body: Column(
-      children: [
-        if (_pickupLocations.isNotEmpty || _dropoffLocations.isNotEmpty)
-          Container(
-            height: 200,
-            child: GoogleMap(
-              onMapCreated: _onMapCreated,
-              initialCameraPosition: CameraPosition(
-                target: loc,
-                zoom: 14,
-              ),
-              markers: _markers,
-            ),
-          ),
-        if (_rideTime != null)
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              'Ride Time: ${DateFormat('yyyy-MM-dd – kk:mm').format(_rideTime!)}',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-          ),
-        if (_users.isEmpty)
-          const Text('No users found.', style: TextStyle(color: Colors.black))
-        else
-          Expanded(
-            child: ListView.builder(
-              itemCount: _users.length,
-              itemBuilder: (context, index) {
-                var user = _users[index];
-                var username = user['username'] ?? '';
-                var fullName = user['fullName'] ?? '';
-                var imageUrl = user.data().toString().contains('imageUrl')
-                    ? user['imageUrl']
-                    : null;
-                bool isReady = _readyStatus[user.id] ?? false;
+    body: FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('rides').doc(widget.rideId).get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                      vertical: 10, horizontal: 15),
-                  child: ListTile(
-                    onTap: () {
-                      if (user.id == _auth.currentUser?.uid) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => UserProfile(),
+        var rideDoc = snapshot.data!;
+        _pickupLocations = (rideDoc['pickupLocations'] as Map<String, dynamic>)
+            .values.map((loc) => _getLatLngFromAddress(loc)).toList();
+        _dropoffLocations = (rideDoc['dropoffLocations'] as Map<String, dynamic>)
+            .values.map((loc) => _getLatLngFromAddress(loc)).toList();
+        _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
+
+        return Column(
+          children: [
+            if (_pickupLocations.isNotEmpty || _dropoffLocations.isNotEmpty)
+              Container(
+                height: 200,
+                child: GoogleMap(
+                  onMapCreated: _onMapCreated,
+                  initialCameraPosition: CameraPosition(
+                    target: _pickupLocations.isNotEmpty ? _pickupLocations.first : _center,
+                    zoom: 14,
+                  ),
+                  markers: _markers,
+                ),
+              ),
+            if (_rideTime != null)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  'Ride Time: ${DateFormat('yyyy-MM-dd – kk:mm').format(_rideTime!)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            if (_users.isEmpty)
+              const Text('No users found.', style: TextStyle(color: Colors.black))
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _users.length,
+                  itemBuilder: (context, index) {
+                    var user = _users[index];
+                    var username = user['username'] ?? '';
+                    var fullName = user['fullName'] ?? '';
+                    var imageUrl = user.data().toString().contains('imageUrl')
+                        ? user['imageUrl']
+                        : null;
+                    bool isReady = _readyStatus[user.id] ?? false;
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                      child: ListTile(
+                        onTap: () {
+                          if (user.id == _auth.currentUser?.uid) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => UserProfile()),
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => ViewUserProfile(uid: user.id)),
+                            );
+                          }
+                        },
+                        leading: CircleAvatar(
+                          radius: 30,
+                          backgroundImage: imageUrl != null && imageUrl.isNotEmpty
+                              ? NetworkImage(imageUrl)
+                              : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                        ),
+                        title: Text(
+                          fullName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
                           ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ViewUserProfile(uid: user.id),
+                        ),
+                        subtitle: Text(
+                          '@$username',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black,
                           ),
-                        );
-                      }
-                    },
-                    leading: CircleAvatar(
-                      radius: 30,
-                      backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                          ? NetworkImage(imageUrl)
-                          : const AssetImage('assets/icons/ShuffleLogo.jpeg')
-                              as ImageProvider,
-                    ),
-                    title: Text(
-                      fullName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    subtitle: Text(
-                      '@$username',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black,
-                      ),
-                    ),
-                    trailing: ElevatedButton(
-                      onPressed: user.id == _auth.currentUser?.uid
-                          ? () => _toggleReadyStatus(user.id)
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            isReady ? Colors.green : Colors.white,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18.0),
+                        ),
+                        trailing: ElevatedButton(
+                          onPressed: user.id == _auth.currentUser?.uid ? () => _toggleReadyStatus(user.id) : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isReady ? Colors.green : Colors.white,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18.0),
+                            ),
+                          ),
+                          child: Text(isReady ? 'Unready' : 'Ready'),
                         ),
                       ),
-                      child: Text(isReady ? 'Unready' : 'Ready'),
-                    ),
+                    );
+                  },
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: ElevatedButton(
+                onPressed: _leaveGroup,
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 20.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20.0),
                   ),
-                );
-              },
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: ElevatedButton(
-            onPressed: _leaveGroup,
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(
-                  vertical: 12.0, horizontal: 20.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20.0),
+                ),
+                child: const Text(
+                  'Leave Group',
+                  style: TextStyle(fontSize: 18),
+                ),
               ),
             ),
-            child: const Text(
-              'Leave Group',
-              style: TextStyle(fontSize: 18),
-            ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     ),
   );
 }
