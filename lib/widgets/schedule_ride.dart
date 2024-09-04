@@ -25,6 +25,7 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
 
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropoffController = TextEditingController();
+  final TextEditingController _dateTimeController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -104,31 +105,26 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
             setState(() {
               _selectedDate = pickedDate;
               _selectedTime = pickedTime;
+              _dateTimeController.text = "${_selectedDate!.toLocal()}".split(' ')[0] +
+                  ' at ' + _selectedTime!.format(context);
               _dateTimeError = null;
             });
           }
         }
       },
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              _selectedDate != null
-                  ? "${_selectedDate!.toLocal()}".split(' ')[0]
-                  : "Pick a date",
-              style: const TextStyle(fontSize: 16, color: Colors.black),
+      child: AbsorbPointer(
+        child: TextField(
+          controller: _dateTimeController,
+          decoration: InputDecoration(
+            labelText: "Pick Date & Time",
+            prefixIcon: const Icon(Icons.calendar_today, color: Colors.black),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
             ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Text(
-              _selectedTime != null
-                  ? _selectedTime!.format(context)
-                  : "Pick a time",
-              style: const TextStyle(fontSize: 16, color: Colors.black),
-            ),
-          ),
-        ],
+          style: const TextStyle(color: Colors.black),
+          readOnly: true,
+        ),
       ),
     );
   }
@@ -201,7 +197,7 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
         _dropoffLocation!,
       );
 
-      Navigator.pop(context); 
+      Navigator.pop(context);
     }
   }
 }
