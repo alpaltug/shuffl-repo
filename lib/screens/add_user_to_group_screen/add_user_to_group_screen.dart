@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart';
+import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
 
 class AddUsersToGroupScreen extends StatefulWidget {
@@ -155,11 +156,11 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
       print('Updated chat document for user: $uid');
     }
 
-    // Navigate back to the Chats screen
+    // Navigate directly to the homepage
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const ChatsScreen()),
+        MaterialPageRoute(builder: (context) => const HomePage()), // Replace `HomePage` with your actual homepage widget
         (route) => false,
       );
     }
