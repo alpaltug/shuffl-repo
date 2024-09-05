@@ -157,20 +157,38 @@ class _MapWidgetState extends State<MapWidget> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return GoogleMap(
-      onMapCreated: (controller) {
-        _controller = controller;
-      },
-      initialCameraPosition: CameraPosition(
-        target: _currentLocation ?? widget.pickupLocation,
-        zoom: widget.initialZoom,
-      ),
-      markers: _markers.union(widget.participantMarkers),  // Combine markers and participantMarkers
-      polylines: _polylines,
-      myLocationEnabled: widget.showCurrentLocation,
-      myLocationButtonEnabled: false,
+    @override
+    Widget build(BuildContext context) {
+    return Stack(
+        children: [
+        GoogleMap(
+            onMapCreated: (controller) {
+            _controller = controller;
+            },
+            initialCameraPosition: CameraPosition(
+            target: _currentLocation ?? widget.pickupLocation,
+            zoom: widget.initialZoom,
+            ),
+            markers: _markers.union(widget.participantMarkers),  // Combine markers and participantMarkers
+            polylines: _polylines,
+            myLocationEnabled: widget.showCurrentLocation,
+            myLocationButtonEnabled: false, // Disable default Google button to use our custom button
+        ),
+        Positioned(
+            bottom: 16,
+            right: 16,
+            child: FloatingActionButton(
+            onPressed: () {
+                if (_currentLocation != null) {
+                _controller.animateCamera(
+                    CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
+                );
+                }
+            },
+            child: const Icon(Icons.my_location),
+            ),
+        ),
+        ],
     );
-  }
+    }
 }
