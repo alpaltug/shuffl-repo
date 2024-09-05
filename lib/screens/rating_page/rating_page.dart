@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
+import 'package:my_flutter_app/constants.dart'; // Make sure kBackgroundColor is defined in this file
 
 class RatingPage extends StatefulWidget {
   final String rideId;
@@ -25,7 +26,8 @@ class _RatingPageState extends State<RatingPage> {
     String currentUserId = _auth.currentUser!.uid;
     for (String participantId in widget.participants) {
       if (participantId != currentUserId) {
-        _ratings[participantId] = 0.0;
+        // Initialize all ratings to 5 stars
+        _ratings[participantId] = 5.0;
       }
     }
   }
@@ -50,8 +52,16 @@ class _RatingPageState extends State<RatingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBackgroundColor, // Set the whole background color
       appBar: AppBar(
-        title: Text('Rate Participants'),
+        backgroundColor: kBackgroundColor,
+        title: const Text(
+          'Rate Participants',
+          style: TextStyle(
+            color: Colors.white, // Set text color to white
+            fontWeight: FontWeight.bold, // Make text bold
+          ),
+        ),
       ),
       body: ListView.builder(
         itemCount: _ratings.length,
@@ -60,56 +70,68 @@ class _RatingPageState extends State<RatingPage> {
           return FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance.collection('users').doc(participantId).get(),
             builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                Map<String, dynamic> userData = snapshot.data!.data() as Map<String, dynamic>;
-                String username = userData['username'];
-                String imageUrl = userData['imageUrl'];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
-                  ),
-                  title: Text(username),
-                  subtitle: StarRating(
-                    rating: _ratings[participantId]!,
-                    onRatingChanged: (rating) => _updateRating(participantId, rating),
-                  ),
-                );
-              } else {
-                return ListTile(
-                  title: Text('Loading...'),
-                );
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const ListTile(title: Text('Loading...'));
               }
+
+              if (snapshot.hasError) {
+                return const ListTile(title: Text('Error loading user data.'));
+              }
+
+              if (!snapshot.hasData || snapshot.data!.data() == null) {
+                return const ListTile(title: Text('User data not found.'));
+              }
+
+              Map<String, dynamic> userData = snapshot.data!.data() as Map<String, dynamic>;
+
+              // Safely extract values with null checks
+              String username = userData['username'] ?? 'Unknown User';
+              String? imageUrl = userData['imageUrl'] as String?;
+
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: imageUrl != null && imageUrl.isNotEmpty
+                      ? NetworkImage(imageUrl)
+                      : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                ),
+                title: Text(username, style: const TextStyle(color: Colors.white)), // Set username color to white
+                subtitle: StarRating(
+                  rating: _ratings[participantId]!,
+                  onRatingChanged: (rating) => _updateRating(participantId, rating),
+                ),
+              );
             },
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.black, // Set the floating button color
         onPressed: _submitRatings,
-        child: Icon(Icons.check),
+        child: const Icon(Icons.check, color: Colors.white), // Set the icon color to white
       ),
     );
   }
 }
 
-   class StarRating extends StatelessWidget {
-     final double rating;
-     final Function(double) onRatingChanged;
+class StarRating extends StatelessWidget {
+  final double rating;
+  final Function(double) onRatingChanged;
 
-     const StarRating({required this.rating, required this.onRatingChanged});
+  const StarRating({required this.rating, required this.onRatingChanged});
 
-     @override
-     Widget build(BuildContext context) {
-       return Row(
-         mainAxisSize: MainAxisSize.min,
-         children: List.generate(5, (index) {
-           return IconButton(
-             icon: Icon(
-               index < rating ? Icons.star : Icons.star_border,
-               color: Colors.amber,
-             ),
-             onPressed: () => onRatingChanged(index + 1.0),
-           );
-         }),
-       );
-     }
-   }
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (index) {
+        return IconButton(
+          icon: Icon(
+            index < rating ? Icons.star : Icons.star_border, // Fill stars based on rating
+            color: Colors.black,
+          ),
+          onPressed: () => onRatingChanged(index + 1.0), // Update rating when a star is pressed
+        );
+      }),
+    );
+  }
+}
