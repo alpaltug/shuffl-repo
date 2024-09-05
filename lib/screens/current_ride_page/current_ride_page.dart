@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
 
 
 class CurrentRidePage extends StatefulWidget {
