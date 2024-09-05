@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
-
 
 class AddUsersToGroupScreen extends StatefulWidget {
   final String chatId;
@@ -30,34 +30,65 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
   void initState() {
     super.initState();
     _excludedFriends = widget.currentParticipants.map((doc) => doc.id).toList();
+    print('Excluded friends: $_excludedFriends');
   }
 
   Future<List<Map<String, dynamic>>> _getFriends() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return [];
-
-    DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-    List<String> friendUids = List<String>.from(userDoc['friends'] ?? []);
-
-    // Filter out friends who are already in the group
-    friendUids = friendUids.where((uid) => !_excludedFriends.contains(uid)).toList();
-
-    List<Map<String, dynamic>> friends = [];
-    for (String uid in friendUids) {
-      DocumentSnapshot friendDoc = await _firestore.collection('users').doc(uid).get();
-      if (friendDoc.exists) {
-        friends.add({
-          'uid': uid,
-          'username': friendDoc['username'],
-          'imageUrl': friendDoc['imageUrl'],
-        });
+    try {
+      User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        print('No current user found');
+        return [];
       }
-    }
 
-    return friends;
+      print('Fetching user document for ${currentUser.uid}');
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('Failed to fetch user document');
+        },
+      );
+
+      List<String> friendUids = List<String>.from(userDoc['friends'] ?? []);
+      print('All friend UIDs: $friendUids');
+
+      friendUids = friendUids.where((uid) => !_excludedFriends.contains(uid)).toList();
+      print('Filtered friend UIDs: $friendUids');
+
+      List<Map<String, dynamic>> friends = [];
+      for (String uid in friendUids) {
+        try {
+          print('Fetching friend document for $uid');
+          DocumentSnapshot friendDoc = await _firestore.collection('users').doc(uid).get().timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              throw TimeoutException('Failed to fetch friend document');
+            },
+          );
+          if (friendDoc.exists) {
+            friends.add({
+              'uid': uid,
+              'username': friendDoc['username'],
+              'imageUrl': friendDoc['imageUrl'],
+            });
+          } else {
+            print('Friend document for $uid does not exist');
+          }
+        } catch (e) {
+          print('Error fetching friend $uid: $e');
+        }
+      }
+
+      print('Fetched ${friends.length} friends');
+      return friends;
+    } catch (e) {
+      print('Error in _getFriends: $e');
+      rethrow;
+    }
   }
 
-  Future<void> _addSelectedFriendsToGroup() async {
+ Future<void> _addSelectedFriendsToGroup() async {
+  try {
     if (_selectedFriends.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select friends to add to the group.')),
@@ -65,48 +96,82 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
       return;
     }
 
-    // Cast the first participant's data to a Map
-    Map<String, dynamic>? groupData = widget.currentParticipants.first.data() as Map<String, dynamic>?;
+    List<String> allParticipants = [
+      ...widget.currentParticipants.map((doc) => doc.id),
+      ..._selectedFriends,
+    ];
 
-    String groupTitle = groupData?['groupTitle'] ?? 'Unnamed Group'; // Safely retrieve groupTitle
+    print('All participants: $allParticipants');
 
-    for (String uid in _selectedFriends) {
-      // Add the group chat to each selected friend's chat collection
+    String chatId = widget.chatId;
+    bool isExistingGroupChat = false;
+    DocumentSnapshot? groupChatDoc;
+
+    // Check if this is already a group chat
+    try {
+      groupChatDoc = await _firestore.collection('group_chats').doc(chatId).get();
+      isExistingGroupChat = groupChatDoc.exists;
+    } catch (e) {
+      print('Error checking existing group chat: $e');
+      isExistingGroupChat = false;
+    }
+
+    if (isExistingGroupChat) {
+      // Update the existing group chat
+      await _firestore.collection('group_chats').doc(chatId).update({
+        'participants': allParticipants,
+      });
+      print('Updated existing group chat: $chatId');
+
+      // Fetch the updated document
+      groupChatDoc = await _firestore.collection('group_chats').doc(chatId).get();
+    } else {
+      // If the group does not exist, show an error message and stop further execution
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group chat does not exist.')),
+      );
+      return;
+    }
+
+    Map<String, dynamic> groupChatData = groupChatDoc.data() as Map<String, dynamic>;
+    String groupTitle = groupChatData['groupTitle'] ?? 'Group Chat';
+
+    // Update or create chat documents for all participants
+    for (String uid in allParticipants) {
       await _firestore
           .collection('users')
           .doc(uid)
           .collection('chats')
-          .doc(widget.chatId)
+          .doc(chatId)
           .set({
-        'participants': FieldValue.arrayUnion([uid]),
         'isGroupChat': true,
-        'groupTitle': groupTitle, // Use the safely retrieved groupTitle
-        'lastMessage': {
-          'content': '',
+        'groupTitle': groupTitle,
+        'participants': allParticipants,
+        'lastMessage': groupChatData['lastMessage'] ?? {
+          'content': 'Group updated',
           'timestamp': FieldValue.serverTimestamp(),
         },
-      });
-
-      // Update the group chat document for all existing participants
-      for (String participantUid in widget.currentParticipants.map((doc) => doc.id).toList()) {
-        await _firestore
-            .collection('users')
-            .doc(participantUid)
-            .collection('chats')
-            .doc(widget.chatId)
-            .update({
-          'participants': FieldValue.arrayUnion([uid]),
-        });
-      }
+      }, SetOptions(merge: true));
+      print('Updated chat document for user: $uid');
     }
 
-    // Navigate to the Chats screen after adding friends
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const ChatsScreen()),
-      (route) => false, // Remove all routes until ChatsScreen
-    );
+    // Navigate back to the Chats screen
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const ChatsScreen()),
+        (route) => false,
+      );
+    }
+  } catch (e) {
+    print('Error in _addSelectedFriendsToGroup: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred: $e')),
+      );
+    }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +189,14 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
-              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'),
+            );
+          }
+
+          if (snapshot.hasError) {
+            print('Error in FutureBuilder: ${snapshot.error}');
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
             );
           }
 
@@ -152,6 +224,7 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
                       _selectedFriends.remove(friendUid);
                     }
                   });
+                  print('Selected friends: $_selectedFriends');
                 },
                 title: Text(
                   friendUsername,
@@ -174,7 +247,7 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
         child: ElevatedButton(
           onPressed: _addSelectedFriendsToGroup,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey, // Grey background for the button
+            backgroundColor: Colors.grey,
             padding: const EdgeInsets.symmetric(vertical: 16.0),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30.0),

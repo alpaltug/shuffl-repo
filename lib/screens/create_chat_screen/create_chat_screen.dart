@@ -42,114 +42,81 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   }
 
   Future<void> _createChat() async {
-    if (_selectedFriends.isEmpty) {
+  if (_selectedFriends.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please select at least one friend to create a chat.')),
+    );
+    return;
+  }
+
+  User? currentUser = _auth.currentUser;
+  if (currentUser == null) return;
+
+  if (_selectedFriends.length == 1) {
+    // Handle one-on-one chat creation (keep existing logic)
+    String friendUid = _selectedFriends[0];
+    String chatId = _getChatId(currentUser.uid, friendUid);
+
+    DocumentSnapshot chatSnapshot = await _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('chats')
+        .doc(chatId)
+        .get();
+
+    if (chatSnapshot.exists) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => ChatScreen(friendUid: friendUid)),
+      );
+    } else {
+      await _createOneOnOneChat(currentUser.uid, friendUid, chatId);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => ChatScreen(friendUid: friendUid)),
+      );
+    }
+  } else {
+    // Create a new group chat
+    if (_groupTitle == null || _groupTitle!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one friend to create a chat.')),
+        const SnackBar(content: Text('Please enter a group title.')),
       );
       return;
     }
 
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
+    List<String> participants = [currentUser.uid, ..._selectedFriends];
+    String chatId = DateTime.now().millisecondsSinceEpoch.toString(); // Generate a unique chatId
 
-    if (_selectedFriends.length == 1) {
-      String friendUid = _selectedFriends[0];
-      String chatId = _getChatId(currentUser.uid, friendUid);
+    Map<String, dynamic> newChatData = {
+      'participants': participants,
+      'groupTitle': _groupTitle,
+      'isGroupChat': true,
+      'lastMessage': {
+        'content': 'Group created',
+        'timestamp': FieldValue.serverTimestamp(),
+      },
+    };
 
-      DocumentSnapshot chatSnapshot = await _firestore
+    // Create the group chat document in Firestore
+    await _firestore.collection('group_chats').doc(chatId).set(newChatData);
+
+    // Add the chat to each participant's chats collection
+    for (String uid in participants) {
+      await _firestore
           .collection('users')
-          .doc(currentUser.uid)
+          .doc(uid)
           .collection('chats')
           .doc(chatId)
-          .get();
-
-      if (chatSnapshot.exists) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => ChatScreen(friendUid: friendUid)),
-        );
-      } else {
-        await _createOneOnOneChat(currentUser.uid, friendUid, chatId);
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => ChatScreen(friendUid: friendUid)),
-        );
-      }
-    } else {
-      // Check for existing one-on-one chat between selected friends
-      if (_selectedFriends.length == 2) {
-        String chatId = _getChatId(_selectedFriends[0], _selectedFriends[1]);
-        DocumentSnapshot chatSnapshot = await _firestore
-            .collection('users')
-            .doc(currentUser.uid)
-            .collection('chats')
-            .doc(chatId)
-            .get();
-
-        if (chatSnapshot.exists) {
-          // If a one-on-one chat exists, show a message and return
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('A chat already exists between these users.')),
-          );
-          return;
-        }
-      }
-
-      // Ensure group title is provided
-      if (_groupTitle == null || _groupTitle!.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter a group title.')),
-        );
-        return;
-      }
-
-      // Create a group chat
-      List<String> participants = [currentUser.uid, ..._selectedFriends];
-      participants.sort();
-      String chatId = participants.join('_');
-
-      for (String uid in participants) {
-        DocumentSnapshot chatSnapshot = await _firestore
-            .collection('users')
-            .doc(uid)
-            .collection('chats')
-            .doc(chatId)
-            .get();
-
-        if (chatSnapshot.exists) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => GroupChatScreen(chatId: chatId)),
-          );
-          return;
-        }
-      }
-
-      Map<String, dynamic> newChatData = {
-        'participants': participants,
-        'groupTitle': _groupTitle,
-        'isGroupChat': true,
-        'lastMessage': {
-          'content': '',
-          'timestamp': FieldValue.serverTimestamp(),
-        },
-      };
-
-      for (String uid in participants) {
-        await _firestore
-            .collection('users')
-            .doc(uid)
-            .collection('chats')
-            .doc(chatId)
-            .set(newChatData);
-      }
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => GroupChatScreen(chatId: chatId)),
-      );
+          .set(newChatData);
     }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => GroupChatScreen(chatId: chatId)),
+    );
   }
+}
 
   String _getChatId(String uid1, String uid2) {
     return uid1.hashCode <= uid2.hashCode ? '$uid1-$uid2' : '$uid2-$uid1';
