@@ -24,6 +24,8 @@ import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
 
 
 import 'package:my_flutter_app/widgets/schedule_ride.dart'; 
+import 'package:my_flutter_app/widgets/create_custom_marker.dart'; 
+
 
 
 import 'package:http/http.dart' as http;
@@ -198,81 +200,69 @@ Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
 
 
   Future<void> _fetchOnlineUsers() async {
-  User? currentUser = _auth.currentUser;
-  if (currentUser == null) return;
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
 
-  _firestore
-      .collection('users')
-      .where('goOnline', isEqualTo: true)
-      .snapshots()
-      .listen((QuerySnapshot userSnapshot) {
-    Set<Marker> markers = {};
-    Map<String, int> locationCount = {};
+    _firestore
+        .collection('users')
+        .where('goOnline', isEqualTo: true)
+        .snapshots()
+        .listen((QuerySnapshot userSnapshot) async {  // Mark the callback as async
+      Set<Marker> markers = {};
+      Map<String, int> locationCount = {};
 
-    for (var doc in userSnapshot.docs) {
-      var userData = doc.data() as Map<String, dynamic>;
+      for (var doc in userSnapshot.docs) {
+        var userData = doc.data() as Map<String, dynamic>;
 
-      // Check if 'lastPickupTime' is null, if so, set it to current DateTime
-      DateTime lastPickupTime = userData['lastPickupTime'] != null
-          ? userData['lastPickupTime'].toDate()
-          : DateTime.now(); // Assign current time if lastPickupTime is null
+        DateTime lastPickupTime = userData['lastPickupTime'] != null
+            ? userData['lastPickupTime'].toDate()
+            : DateTime.now();
 
-      // Continue only if lastPickupTime is within the last 15 minutes
-      if (userData.containsKey('lastPickupLocation') &&
-          lastPickupTime.isAfter(DateTime.now().subtract(const Duration(minutes: 15)))) {
-        GeoPoint location = userData['lastPickupLocation'];
-        String locationKey = '${location.latitude},${location.longitude}';
+        if (userData.containsKey('lastPickupLocation') &&
+            lastPickupTime.isAfter(DateTime.now().subtract(const Duration(minutes: 15)))) {
+          GeoPoint location = userData['lastPickupLocation'];
+          String locationKey = '${location.latitude},${location.longitude}';
 
-        // Count how many users are at the same location
-        if (locationCount.containsKey(locationKey)) {
-          locationCount[locationKey] = locationCount[locationKey]! + 1;
-        } else {
-          locationCount[locationKey] = 1;
-        }
+          if (locationCount.containsKey(locationKey)) {
+            locationCount[locationKey] = locationCount[locationKey]! + 1;
+          } else {
+            locationCount[locationKey] = 1;
+          }
 
-        // Offset markers slightly if more than one user is at the same location
-        double offset = 0.0001 * (locationCount[locationKey]! - 1);
+          double offset = 0.0001 * (locationCount[locationKey]! - 1);
+          LatLng adjustedPosition = LatLng(
+            location.latitude + offset,
+            location.longitude + offset,
+          );
 
-        LatLng adjustedPosition = LatLng(
-          location.latitude + offset,
-          location.longitude + offset,
-        );
+          String? displayName = userData['fullName'];
+          String? profileImageUrl = userData['imageUrl'];
 
-        Color markerColor = Colors.yellow; 
-        String? displayName;
+          // Use await to create a custom marker with the image
+          BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
 
-        if (doc.id == currentUser.uid) {
-          markerColor = Colors.blue; 
-          displayName = userData['fullName']; 
-        } else if (userData.containsKey('friends') &&
-            userData['friends'].contains(currentUser.uid)) {
-          markerColor = Colors.green; 
-          displayName = userData['fullName']; 
-        }
-
-        markers.add(
-          Marker(
-            markerId: MarkerId(doc.id),
-            position: adjustedPosition,
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-                markerColor == Colors.blue
-                    ? BitmapDescriptor.hueBlue
-                    : markerColor == Colors.green
-                        ? BitmapDescriptor.hueGreen
-                        : BitmapDescriptor.hueYellow),
-            infoWindow: InfoWindow(
-              title: displayName, 
+          markers.add(
+            Marker(
+              markerId: MarkerId(doc.id),
+              position: adjustedPosition,
+              icon: markerIcon,
+              infoWindow: InfoWindow(
+                title: displayName,
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
-    }
 
-    setState(() {
-      _markers = markers;
+      // Update the markers on the map
+      if (mounted) {
+        setState(() {
+          _markers = markers;
+        });
+      }
     });
-  });
-}
+  }
+
 
 
   Future<void> _showDateTimePicker() async {

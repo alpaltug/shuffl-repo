@@ -10,6 +10,7 @@ class MapWidget extends StatefulWidget {
   final bool showCurrentLocation;
   final bool showDirections;
   final double initialZoom;
+  final Set<Marker> participantMarkers;
 
   const MapWidget({
     Key? key,
@@ -18,6 +19,7 @@ class MapWidget extends StatefulWidget {
     this.showCurrentLocation = false,
     this.showDirections = false,
     this.initialZoom = 14.0,
+    required this.participantMarkers,
   }) : super(key: key);
 
   @override
@@ -65,7 +67,7 @@ class _MapWidgetState extends State<MapWidget> {
 
   Future<List<LatLng>> _getDirections(LatLng start, LatLng end) async {
     final url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=YOUR_GOOGLE_MAPS_API_KEY';
 
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
@@ -165,7 +167,7 @@ class _MapWidgetState extends State<MapWidget> {
         target: _currentLocation ?? widget.pickupLocation,
         zoom: widget.initialZoom,
       ),
-      markers: _markers,
+      markers: _markers.union(widget.participantMarkers),  // Combine markers and participantMarkers
       polylines: _polylines,
       myLocationEnabled: widget.showCurrentLocation,
       myLocationButtonEnabled: false,

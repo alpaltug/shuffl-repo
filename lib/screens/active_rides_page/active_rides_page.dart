@@ -9,11 +9,16 @@ import 'package:my_flutter_app/screens/ride_group_chats_screen/ride_group_chats_
 import 'package:my_flutter_app/widgets/map_widget.dart';
 import 'package:my_flutter_app/widgets/ride_info_widget.dart';
 import 'package:my_flutter_app/widgets/participant_list_widget.dart';
+import 'package:my_flutter_app/widgets/create_custom_marker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
+
 
 class ActiveRidesPage extends StatefulWidget {
   final String rideId;
@@ -32,6 +37,10 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   String? _rideDetailsText;
   int? _estimatedTime;
   String? _pickupAddress;
+
+  bool _goOnline = false;
+  Set<Marker> _participantMarkers = {};  // Set for storing participant markers
+
 
   @override
   void initState() {
@@ -90,6 +99,109 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
       }
     }
   }
+
+  Future<void> _toggleGoOnline(bool value) async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'goOnline': value,
+      });
+
+      setState(() {
+        _goOnline = value;
+      });
+
+      if (value) {
+        await _determinePosition();  // Update position if user goes online
+      }
+
+      _fetchOnlineParticipants();  // Fetch online participants
+    }
+  }
+
+  Future<void> _fetchOnlineParticipants() async {
+    FirebaseFirestore.instance
+        .collection('users')
+        .where('goOnline', isEqualTo: true)
+        .where('uid', whereIn: _users.map((user) => user.id).toList()) // Only participants in the current ride
+        .snapshots()
+        .listen((QuerySnapshot userSnapshot) async {
+      Set<Marker> markers = {};
+      
+      for (var doc in userSnapshot.docs) {
+        var userData = doc.data() as Map<String, dynamic>;
+
+        if (userData.containsKey('lastPickupLocation')) {
+          GeoPoint location = userData['lastPickupLocation'];
+          LatLng participantPosition = LatLng(location.latitude, location.longitude);
+
+          String? profileImageUrl = userData['imageUrl'];
+          BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
+
+          markers.add(
+            Marker(
+              markerId: MarkerId(doc.id),
+              position: participantPosition,
+              icon: markerIcon,
+              infoWindow: InfoWindow(
+                title: userData['fullName'],
+              ),
+            ),
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _participantMarkers = markers;
+        });
+      }
+    });
+  }
+
+
+  Future<void> _determinePosition() async {
+    if (!_goOnline) return;
+
+    Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,  // Update every 10 meters
+      ),
+    ).listen((Position position) async {
+      LatLng currentPosition = LatLng(position.latitude, position.longitude);
+
+      // Update user location in Firestore
+      User? user = _auth.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+          'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
+          'lastPickupTime': FieldValue.serverTimestamp(),
+        });
+      }
+
+      _fetchOnlineParticipants();  // Refresh online participants markers
+    });
+  }
+
+
+  void _updateUserMarker(LatLng position) {
+    setState(() {
+      _participantMarkers.removeWhere((marker) => marker.markerId.value == 'current_user');
+      _participantMarkers.add(
+        Marker(
+          markerId: const MarkerId("current_user"),
+          position: position,
+          infoWindow: const InfoWindow(title: "You're here"),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        ),
+      );
+    });
+  }
+
+
+
+
 
   int _calculateEstimatedTime(DateTime rideTime) {
     return rideTime.difference(DateTime.now()).inMinutes;
@@ -262,6 +374,7 @@ Widget build(BuildContext context) {
                   showCurrentLocation: true,
                   showDirections: true,
                   initialZoom: 14,
+                  participantMarkers: _participantMarkers, // Pass the participant markers
                 ),
               ),
             if (_rideDetailsText != null && _estimatedTime != null)
@@ -282,6 +395,22 @@ Widget build(BuildContext context) {
                   backgroundColor: Colors.red, // Red button for ending the ride
                 ),
                 child: const Text('End Ride'),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Go Online', style: TextStyle(color: Colors.black)),
+                  Switch(
+                    value: _goOnline,
+                    onChanged: (value) {
+                      _toggleGoOnline(value); // Toggle online status
+                    },
+                    activeColor: Colors.green,
+                  ),
+                ],
               ),
             ),
           ],
