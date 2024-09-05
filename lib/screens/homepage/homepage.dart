@@ -172,16 +172,16 @@ Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
 
 
   void _onMapCreated(GoogleMapController controller) {
-  mapController = controller;
-  if (_currentPosition != null) {
-    mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
-    );
-  } else {
-    mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
-    );
-  }
+    mapController = controller;
+    if (_currentPosition != null) {
+      mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
+      );
+    } else {
+      mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
+      );
+    }
 }
 
   void _updateCurrentLocationMarker(LatLng position) {
