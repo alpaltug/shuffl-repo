@@ -16,6 +16,7 @@ import 'package:my_flutter_app/screens/location_search_screen/location_search_sc
 import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart';
 import 'package:my_flutter_app/screens/report_screen/report_screen.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
+import 'package:my_flutter_app/screens/tutorial_component_page/tutorial_component_page.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
@@ -1091,7 +1092,20 @@ Widget build(BuildContext context) {
               ),
             );
           }
-          )
+          ),
+           ListTile(
+              leading: const Icon(Icons.school),
+              title: const Text('Tutorial'),
+              onTap: () {
+                Navigator.pop(context); // Close the drawer
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return const TutorialComponent();
+                  },
+                );
+              },
+            ),
         ],
       ),
     ),
@@ -1146,50 +1160,56 @@ Widget build(BuildContext context) {
             readOnly: true,
             onTap: () => _navigateToLocationSearch(false),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: ElevatedButton(
-            onPressed: _findRide,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50), 
-              backgroundColor: Colors.yellow,
-            ),
-            child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),
-          ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            ElevatedButton(
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  builder: (context) => ScheduleRideWidget(
-                    onScheduleRide: _scheduleRideWrapper,
-                    onLocationSearch: _locationSearchWrapper,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.yellow,
+        ),Padding(
+  padding: const EdgeInsets.all(8.0),
+  child: ElevatedButton(
+    onPressed: _findRide,
+    style: ElevatedButton.styleFrom(
+      minimumSize: const Size(double.infinity, 50),
+      backgroundColor: Colors.yellow,
+    ),
+    child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),
+  ),
+),
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 8.0), // Add horizontal padding to match "Find Ride Now" button
+  child: Row(
+    children: [
+      Expanded(
+        child: ElevatedButton(
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              builder: (context) => ScheduleRideWidget(
+                onScheduleRide: _scheduleRideWrapper,
+                onLocationSearch: _locationSearchWrapper,
               ),
-              child: const Text('Schedule Ahead', style: TextStyle(color: Colors.black)),
-            ),
-            Row(
-              children: [
-                const Text('Go Online', style: TextStyle(color: Colors.black)),
-                Switch(
-                  value: _goOnline,
-                  onChanged: (value) {
-                    _toggleGoOnline(value);
-                  },
-                  activeColor: Colors.green,
-                ),
-              ],
-            ),
-          ],
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.yellow,
+            minimumSize: const Size(0, 40), // Set a minimum height to match "Find Ride Now" button
+          ),
+          child: const Text('Schedule Ahead', style: TextStyle(color: Colors.black)),
         ),
+      ),
+      const SizedBox(width: 8), 
+      Row(
+        children: [
+          const Text('Go Online', style: TextStyle(color: Colors.black)),
+          Switch(
+            value: _goOnline,
+            onChanged: (value) {
+              _toggleGoOnline(value);
+            },
+            activeColor: Colors.yellow, 
+            activeTrackColor: Colors.yellowAccent, 
+          ),
+        ],
+      ),
+    ],
+  ),
+),
         Expanded(
           child: Stack(
             children: [
