@@ -10,6 +10,8 @@ import 'dart:convert';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/widgets/ride_card.dart'; 
 import 'package:my_flutter_app/widgets/ride_details_popup.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
@@ -343,7 +345,9 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
               future: _filteredRidesFuture,
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+                  );
                 }
 
                 final filteredRides = snapshot.data!;

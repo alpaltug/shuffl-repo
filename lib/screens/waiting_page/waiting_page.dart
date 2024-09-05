@@ -11,6 +11,8 @@ import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart'
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
@@ -458,13 +460,17 @@ void _loadRideDetails() {
         future: FirebaseFirestore.instance.collection('rides').doc(widget.rideId).get(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+            );
           } else if (snapshot.hasError) {
             return const Center(child: Text('Error loading ride details'));
           } else if (!snapshot.hasData || !snapshot.data!.exists) {
             return const Center(child: Text('Ride details not found'));
           } else if (_users.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+            );
           }
 
           var rideDoc = snapshot.data!;

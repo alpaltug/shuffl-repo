@@ -10,6 +10,7 @@ import 'package:my_flutter_app/widgets/map_widget.dart';
 import 'package:my_flutter_app/widgets/ride_info_widget.dart';
 import 'package:my_flutter_app/widgets/participant_list_widget.dart';
 import 'package:my_flutter_app/widgets/create_custom_marker.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
@@ -100,24 +101,33 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     }
   }
 
-  Future<void> _toggleGoOnline(bool value) async {
+  Future<void> _updateGoOnlineStatus(bool value) async {
     User? user = _auth.currentUser;
     if (user != null) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'goOnline': value,
-      });
-
-      setState(() {
-        _goOnline = value;
-      });
-
-      if (value) {
-        await _determinePosition();  // Update position if user goes online
-      }
-
-      _fetchOnlineParticipants();  // Fetch online participants
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({'goOnline': value});
     }
   }
+
+
+  Future<void> _toggleGoOnline(bool value) async {
+    // Update the online status in Firestore first
+    await _updateGoOnlineStatus(value);
+
+    // Use setState to only update the _goOnline flag
+    setState(() {
+      _goOnline = value;
+    });
+
+    // Fetch participant locations or update position without refreshing the entire page
+    if (value) {
+      await _determinePosition(); // Update position if user goes online
+    }
+    _fetchOnlineParticipants(); // Fetch online participants regardless
+  }
+
 
   Future<void> _fetchOnlineParticipants() async {
     FirebaseFirestore.instance
@@ -355,11 +365,17 @@ Widget build(BuildContext context) {
       future: _getDropoffLocations(), // Fetch dropoff locations asynchronously
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator()); // Show progress indicator
+          return const Center(
+            child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+          );
         } else if (snapshot.hasError) {
-          return const Center(child: Text('Error loading dropoff locations'));
+          return const Center(
+            child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+          );
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+          );
         }
 
         final dropoffLocations = snapshot.data ?? [];
@@ -377,6 +393,22 @@ Widget build(BuildContext context) {
                   participantMarkers: _participantMarkers, // Pass the participant markers
                 ),
               ),
+              Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Go Online', style: TextStyle(color: Colors.black)),
+                  Switch(
+                    value: _goOnline,
+                    onChanged: (value) {
+                      _toggleGoOnline(value); // Toggle online status without full page reload
+                    },
+                    activeColor: Colors.yellow,
+                  ),
+                ],
+              ),
+            ),
             if (_rideDetailsText != null && _estimatedTime != null)
               RideInfoWidget(
                 rideDetails: _rideDetailsText!,
@@ -395,22 +427,6 @@ Widget build(BuildContext context) {
                   backgroundColor: Colors.red, // Red button for ending the ride
                 ),
                 child: const Text('End Ride'),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Go Online', style: TextStyle(color: Colors.black)),
-                  Switch(
-                    value: _goOnline,
-                    onChanged: (value) {
-                      _toggleGoOnline(value); // Toggle online status
-                    },
-                    activeColor: Colors.green,
-                  ),
-                ],
               ),
             ),
           ],
