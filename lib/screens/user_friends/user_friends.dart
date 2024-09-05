@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 
 class UserFriends extends StatefulWidget {
   const UserFriends({super.key});
@@ -56,7 +58,9 @@ class _UserFriendsState extends State<UserFriends> {
         future: _getFriends(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+            );
           }
 
           if (snapshot.hasError) {

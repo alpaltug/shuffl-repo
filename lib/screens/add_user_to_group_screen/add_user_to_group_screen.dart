@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
-import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart'; // Ensure this import points to the correct path for the ChatsScreen
+import 'package:my_flutter_app/screens/chats_screen/chats_screen.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 
 class AddUsersToGroupScreen extends StatefulWidget {
   final String chatId;
@@ -121,7 +123,9 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
         future: _getFriends(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+            );
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {

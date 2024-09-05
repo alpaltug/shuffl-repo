@@ -6,6 +6,8 @@ import 'package:my_flutter_app/screens/create_chat_screen/create_chat_screen.dar
 import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/firestore_service.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({Key? key}) : super(key: key);
@@ -86,7 +88,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+                  );
                 }
 
                 var chats = snapshot.data!.docs;

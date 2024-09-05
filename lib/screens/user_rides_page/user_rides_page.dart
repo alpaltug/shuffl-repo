@@ -5,6 +5,8 @@ import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/screens/active_rides_page/active_rides_page.dart';
 import 'package:my_flutter_app/widgets/ride_card.dart';
 import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 
 class UserRidesPage extends StatefulWidget {
   const UserRidesPage({super.key});
@@ -80,7 +82,9 @@ class _UserRidesPageState extends State<UserRidesPage> with SingleTickerProvider
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+          );
         }
 
         final allRides = snapshot.data!.docs;
@@ -152,7 +156,9 @@ class _UserRidesPageState extends State<UserRidesPage> with SingleTickerProvider
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+          );
         }
 
         final allRides = snapshot.data!.docs;

@@ -5,6 +5,8 @@ import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 
 class ChatScreen extends StatefulWidget {
   final String friendUid;
@@ -131,7 +133,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+                  );
                 }
 
                 var messages = snapshot.data!.docs;

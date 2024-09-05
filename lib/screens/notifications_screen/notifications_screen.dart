@@ -3,7 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/widgets.dart';
-import 'package:my_flutter_app/constants.dart'; // Import for constants
+import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -61,7 +63,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               stream: _firestore.collection('users').doc(currentUser!.uid).collection('notifications').snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+                  );
                 }
 
                 var notifications = snapshot.data!.docs;
