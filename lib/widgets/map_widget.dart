@@ -31,6 +31,7 @@ class _MapWidgetState extends State<MapWidget> {
   LatLng? _currentLocation;
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
+  bool _isMapReady = false;
 
   @override
   void initState() {
@@ -41,6 +42,10 @@ class _MapWidgetState extends State<MapWidget> {
   Future<void> _determinePosition() async {
     Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
     _currentLocation = LatLng(position.latitude, position.longitude);
+
+    setState(() {
+        _currentLocation = _currentLocation;
+    });
 
     _loadMarkers();
 
@@ -67,22 +72,24 @@ class _MapWidgetState extends State<MapWidget> {
 
   Future<List<LatLng>> _getDirections(LatLng start, LatLng end) async {
     final url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=YOUR_GOOGLE_MAPS_API_KEY';
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
-      final jsonResponse = json.decode(response.body);
-      if (jsonResponse['routes'].isNotEmpty) {
-        final route = jsonResponse['routes'][0];
-        final overviewPolyline = route['overview_polyline']['points'];
+        final jsonResponse = json.decode(response.body);
+        print(jsonResponse); // Print the entire response for debugging
+        if (jsonResponse['routes'].isNotEmpty) {
+            final route = jsonResponse['routes'][0];
+            final overviewPolyline = route['overview_polyline']['points'];
         return _decodePolyline(overviewPolyline);
-      } else {
-        throw Exception('No routes found');
-      }
+        } else {
+            throw Exception('No routes found');
+        }
     } else {
-      throw Exception('Failed to fetch directions');
+        throw Exception('Failed to fetch directions');
+        }
     }
-  }
+
 
   List<LatLng> _decodePolyline(String polyline) {
     List<LatLng> coordinates = [];
@@ -147,7 +154,6 @@ class _MapWidgetState extends State<MapWidget> {
         Marker(
           markerId: const MarkerId('current'),
           position: _currentLocation!,
-          infoWindow: const InfoWindow(title: 'Your Location'),
         ),
       );
     }
@@ -163,11 +169,21 @@ class _MapWidgetState extends State<MapWidget> {
         children: [
         GoogleMap(
             onMapCreated: (controller) {
-            _controller = controller;
-            },
+                _controller = controller;
+                _isMapReady = true;  // Set map readiness flag
+                if (_currentLocation != null) {
+                    _controller.animateCamera(
+                        CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
+                    );
+                } else {
+                    _controller.animateCamera(
+                        CameraUpdate.newLatLngZoom(widget.pickupLocation ?? LatLng(37.7749, -122.4194), 15.0),
+                    );
+                }
+                },
             initialCameraPosition: CameraPosition(
-            target: _currentLocation ?? widget.pickupLocation,
-            zoom: widget.initialZoom,
+                target: _currentLocation ?? widget.pickupLocation,
+                zoom: widget.initialZoom,
             ),
             markers: _markers.union(widget.participantMarkers),  // Combine markers and participantMarkers
             polylines: _polylines,

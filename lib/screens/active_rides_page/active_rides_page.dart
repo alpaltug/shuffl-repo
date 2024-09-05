@@ -13,6 +13,8 @@ import 'package:my_flutter_app/widgets/create_custom_marker.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'dart:async';
+
 
 
 import 'package:http/http.dart' as http;
@@ -33,25 +35,32 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   LatLng? _pickupLocation;
   List<String> _dropoffAddresses = [];
+  LatLng? _currentPosition;
   DateTime? _rideTime;
   List<DocumentSnapshot> _users = [];
   String? _rideDetailsText;
   int? _estimatedTime;
   String? _pickupAddress;
 
+  StreamSubscription<Position>? _positionStreamSubscription;
+  StreamSubscription<QuerySnapshot>? _participantsSubscription;
+
+  bool _isMapReady = false; // Track if the map is ready
+
+
+
   bool _goOnline = false;
   Set<Marker> _participantMarkers = {};  // Set for storing participant markers
-  late GoogleMapController _mapController; // Add this line
-
-  
-
+  late GoogleMapController _mapController;
 
   @override
   void initState() {
     super.initState();
+    _determinePosition();
     _loadActiveRideDetails();
     _fetchGoOnlineStatus();
   }
+  
 
   Future<void> _loadActiveRideDetails() async {
     try {
@@ -117,20 +126,25 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
 
   Future<void> _toggleGoOnline(bool value) async {
-    // Update the online status in Firestore first
     await _updateGoOnlineStatus(value);
 
-    // Use setState to only update the _goOnline flag
     setState(() {
       _goOnline = value;
     });
 
-    // Fetch participant locations or update position without refreshing the entire page
     if (value) {
-      await _determinePosition(); // Update position if user goes online
+      if (_isMapReady) {
+        await _determinePosition();  // Start position tracking if map is ready and user goes online
+      } else {
+        print('Cannot go online yet. Map is not ready.');
+      }
+    } else {
+      _positionStreamSubscription?.cancel();  // Stop position tracking when offline
     }
-    _fetchOnlineParticipants(); // Fetch online participants regardless
+
+    _fetchOnlineParticipants();
   }
+
 
   Future<void> _fetchGoOnlineStatus() async {
     User? user = _auth.currentUser;
@@ -150,55 +164,59 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
 
   Future<void> _fetchOnlineParticipants() async {
-    FirebaseFirestore.instance
-        .collection('users')
-        .where('goOnline', isEqualTo: true)
-        .where('uid', whereIn: _users.map((user) => user.id).toList()) // Only participants in the current ride
-        .snapshots()
-        .listen((QuerySnapshot userSnapshot) async {
-      // Clear the existing markers
-      Set<Marker> updatedMarkers = {};
+    // Cancel any existing listener
+    _participantsSubscription?.cancel();
 
-      for (var doc in userSnapshot.docs) {
-        var userData = doc.data() as Map<String, dynamic>;
+    _participantsSubscription = FirebaseFirestore.instance
+      .collection('users')
+      .where('goOnline', isEqualTo: true)
+      .where('uid', whereIn: _users.map((user) => user.id).toList()) // Only participants in the current ride
+      .snapshots()
+      .listen((QuerySnapshot userSnapshot) async {
+        // Clear the existing markers
+        Set<Marker> updatedMarkers = {};
 
-        if (userData.containsKey('lastPickupLocation')) {
-          GeoPoint location = userData['lastPickupLocation'];
-          LatLng participantPosition = LatLng(location.latitude, location.longitude);
+        for (var doc in userSnapshot.docs) {
+          var userData = doc.data() as Map<String, dynamic>;
 
-          // Generate the marker icon only once to avoid unnecessary re-creation
-          String? profileImageUrl = userData['imageUrl'];
-          BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
+          if (userData.containsKey('lastPickupLocation')) {
+            GeoPoint location = userData['lastPickupLocation'];
+            LatLng participantPosition = LatLng(location.latitude, location.longitude);
 
-          // Add the new marker
-          updatedMarkers.add(
-            Marker(
-              markerId: MarkerId(doc.id),
-              position: participantPosition,
-              icon: markerIcon,
-              infoWindow: InfoWindow(
-                title: userData['username'],
+            // Generate the marker icon only once to avoid unnecessary re-creation
+            String? profileImageUrl = userData['imageUrl'];
+
+            BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
+
+            updatedMarkers.add(
+              Marker(
+                markerId: MarkerId(doc.id),
+                position: participantPosition,
+                icon: markerIcon,
+                infoWindow: InfoWindow(
+                  title: userData['username'],
+                ),
               ),
-            ),
-          );
+            );
+          }
         }
-      }
 
-      // Update the markers once, avoiding multiple `setState` calls
-      if (mounted) {
-        setState(() {
-          _participantMarkers = updatedMarkers;
-        });
-      }
-    });
+        // Update the markers once, avoiding multiple `setState` calls
+        if (mounted) {
+          setState(() {
+            _participantMarkers = updatedMarkers;
+          });
+        }
+      });
   }
 
 
   Future<void> _determinePosition() async {
-    if (!_goOnline) return;
+    if (!_goOnline || !_isMapReady) return;  // Ensure map is ready before proceeding
 
-    // Listen to position stream, updating the current user's location in real-time
-    Geolocator.getPositionStream(
+    _positionStreamSubscription?.cancel();
+
+    _positionStreamSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 10, // Update every 10 meters
@@ -206,7 +224,10 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     ).listen((Position position) async {
       LatLng currentPosition = LatLng(position.latitude, position.longitude);
 
-      // Update user location in Firestore only once
+      setState(() {
+        _currentPosition = currentPosition;
+      });
+
       User? user = _auth.currentUser;
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
@@ -214,36 +235,71 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
           'lastPickupTime': FieldValue.serverTimestamp(),
         });
 
-        // Update the user's own marker on the map
-        _updateUserMarker(currentPosition);
+        // Update the user's marker with the profile image asynchronously
+        await _updateUserMarker(currentPosition);
 
-        // Animate the map to the new position
-        _mapController.animateCamera(
-          CameraUpdate.newLatLngZoom(currentPosition, 15.0),
-        );
+        // Only animate camera if the map is ready and controller is initialized
+        if (_isMapReady && _mapController != null) {
+          _mapController.animateCamera(
+            CameraUpdate.newLatLngZoom(currentPosition, 15.0),
+          );
+        }
       }
 
-      // Fetch other online participants' locations
-      _fetchOnlineParticipants(); // Refresh online participants' markers
+      // Fetch other online participants
+      _fetchOnlineParticipants();
     });
   }
+
+
+
+
+
 
 
 
   // Update only the current user's marker without affecting other markers
-  void _updateUserMarker(LatLng position) {
+  // Update only the current user's marker without affecting other markers
+Future<void> _updateUserMarker(LatLng position) async {
+  User? user = _auth.currentUser;
+  if (user == null) return;
+
+  // Fetch the user's profile image URL from Firestore
+  DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+
+  if (!userDoc.exists) return; // Exit if the user document does not exist
+
+  // Extract the profile image URL
+  String? profileImageUrl = userDoc['imageUrl']; // Assuming 'imageUrl' contains the URL
+
+  // Create a custom marker with the user's profile image
+  BitmapDescriptor markerIcon;
+  if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+    markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+  } else {
+    // Fallback to a default marker if no profile image is available
+    markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+  }
+
+  // Update the marker in the map
+  if (mounted) {
     setState(() {
+      // Remove any existing marker for the current user
       _participantMarkers.removeWhere((marker) => marker.markerId.value == 'current_user');
+
+      // Add the new marker with the custom image
       _participantMarkers.add(
         Marker(
           markerId: const MarkerId("current_user"),
           position: position,
+          icon: markerIcon,
           infoWindow: const InfoWindow(title: "You're here"),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
         ),
       );
     });
   }
+}
+
 
   int _calculateEstimatedTime(DateTime rideTime) {
     return rideTime.difference(DateTime.now()).inMinutes;
