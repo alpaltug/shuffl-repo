@@ -33,6 +33,8 @@ class ActiveRidesPage extends StatefulWidget {
 
 class _ActiveRidesPageState extends State<ActiveRidesPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   LatLng? _pickupLocation;
   List<String> _dropoffAddresses = [];
   LatLng? _currentPosition;
@@ -59,6 +61,13 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     _determinePosition();
     _loadActiveRideDetails();
     _fetchGoOnlineStatus();
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();  // <-- Cancel the subscription
+    //routeObserver.unsubscribe(this);
+    super.dispose();
   }
   
 
@@ -134,16 +143,15 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
     if (value) {
       if (_isMapReady) {
-        await _determinePosition();  // Start position tracking if map is ready and user goes online
-      } else {
-        print('Cannot go online yet. Map is not ready.');
+        _determinePosition();  // Start position tracking
       }
     } else {
-      _positionStreamSubscription?.cancel();  // Stop position tracking when offline
+      _positionStreamSubscription?.cancel();  // Stop position tracking
     }
 
-    _fetchOnlineParticipants();
+    _fetchOnlineParticipants();  // Fetch online participants every time toggle changes
   }
+
 
 
   Future<void> _fetchGoOnlineStatus() async {
@@ -164,17 +172,16 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
 
   Future<void> _fetchOnlineParticipants() async {
-    // Cancel any existing listener
-    _participantsSubscription?.cancel();
+  _participantsSubscription?.cancel();
 
-    _participantsSubscription = FirebaseFirestore.instance
+  _participantsSubscription = FirebaseFirestore.instance
       .collection('users')
       .where('goOnline', isEqualTo: true)
-      .where('uid', whereIn: _users.map((user) => user.id).toList()) // Only participants in the current ride
+      .where('uid', whereIn: _users.map((user) => user.id).toList())
       .snapshots()
       .listen((QuerySnapshot userSnapshot) async {
-        // Clear the existing markers
         Set<Marker> updatedMarkers = {};
+        Map<String, int> locationCount = {};
 
         for (var doc in userSnapshot.docs) {
           var userData = doc.data() as Map<String, dynamic>;
@@ -183,15 +190,24 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
             GeoPoint location = userData['lastPickupLocation'];
             LatLng participantPosition = LatLng(location.latitude, location.longitude);
 
-            // Generate the marker icon only once to avoid unnecessary re-creation
-            String? profileImageUrl = userData['imageUrl'];
+            // Adjusting multiple participants at the same location
+            String locationKey = '${location.latitude},${location.longitude}';
+            if (locationCount.containsKey(locationKey)) {
+              locationCount[locationKey] = locationCount[locationKey]! + 1;
+            } else {
+              locationCount[locationKey] = 1;
+            }
 
+            double offset = 0.0001 * (locationCount[locationKey]! - 1);
+            LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
+
+            String? profileImageUrl = userData['imageUrl'];
             BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
 
             updatedMarkers.add(
               Marker(
                 markerId: MarkerId(doc.id),
-                position: participantPosition,
+                position: adjustedPosition,
                 icon: markerIcon,
                 infoWindow: InfoWindow(
                   title: userData['username'],
@@ -201,14 +217,27 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
           }
         }
 
-        // Update the markers once, avoiding multiple `setState` calls
+        // Avoid unnecessary state updates
         if (mounted) {
           setState(() {
             _participantMarkers = updatedMarkers;
           });
         }
       });
+}
+
+
+
+  Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      await _firestore.collection('users').doc(user.uid).update({
+        'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
+        'lastPickupTime': FieldValue.serverTimestamp(),
+      });
+    }
   }
+
 
 
   Future<void> _determinePosition() async {
@@ -224,9 +253,11 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     ).listen((Position position) async {
       LatLng currentPosition = LatLng(position.latitude, position.longitude);
 
-      setState(() {
-        _currentPosition = currentPosition;
-      });
+      if (mounted) {
+        setState(() {
+          _currentPosition = currentPosition;
+        });
+      }
 
       User? user = _auth.currentUser;
       if (user != null) {
@@ -236,6 +267,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
         });
 
         // Update the user's marker with the profile image asynchronously
+        _updateUserLocationInFirestore(currentPosition);
         await _updateUserMarker(currentPosition);
 
         // Only animate camera if the map is ready and controller is initialized
@@ -258,47 +290,32 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
 
 
-  // Update only the current user's marker without affecting other markers
-  // Update only the current user's marker without affecting other markers
-Future<void> _updateUserMarker(LatLng position) async {
-  User? user = _auth.currentUser;
-  if (user == null) return;
+  Future<void> _updateUserMarker(LatLng position) async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
 
-  // Fetch the user's profile image URL from Firestore
-  DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    String? profileImageUrl = userDoc['imageUrl'];
 
-  if (!userDoc.exists) return; // Exit if the user document does not exist
+    BitmapDescriptor markerIcon;
+    if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+      markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+    } else {
+      markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+    }
 
-  // Extract the profile image URL
-  String? profileImageUrl = userDoc['imageUrl']; // Assuming 'imageUrl' contains the URL
-
-  // Create a custom marker with the user's profile image
-  BitmapDescriptor markerIcon;
-  if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
-    markerIcon = await createCustomMarkerWithImage(profileImageUrl);
-  } else {
-    // Fallback to a default marker if no profile image is available
-    markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
-  }
-
-  // Update the marker in the map
-  if (mounted) {
     setState(() {
-      // Remove any existing marker for the current user
       _participantMarkers.removeWhere((marker) => marker.markerId.value == 'current_user');
-
-      // Add the new marker with the custom image
       _participantMarkers.add(
         Marker(
           markerId: const MarkerId("current_user"),
           position: position,
           icon: markerIcon,
-          infoWindow: const InfoWindow(title: "You're here"),
         ),
       );
     });
   }
-}
+
 
 
   int _calculateEstimatedTime(DateTime rideTime) {
@@ -475,10 +492,10 @@ Widget build(BuildContext context) {
                 child: MapWidget(
                   pickupLocation: _pickupLocation!,
                   dropoffLocations: dropoffLocations,
-                  showCurrentLocation: true, // Enable showing current location
-                  showDirections: true,
+                  showCurrentLocation: true,  // Show user's current location
+                  showDirections: true,       // Show directions
                   initialZoom: 14,
-                  participantMarkers: _participantMarkers, // Pass the participant markers
+                  participantMarkers: _participantMarkers,  // Pass updated markers
                 ),
               ),
               Padding(

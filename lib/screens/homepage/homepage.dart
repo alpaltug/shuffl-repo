@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:async';
+
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
@@ -55,6 +58,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
   int _uniqueMessageSenderCount = 0;
   bool _goOnline = false;
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
+  StreamSubscription<Position>? _positionStreamSubscription;
+
 
   Set<Marker> _markers = {}; 
 
@@ -67,17 +72,19 @@ class _HomePageState extends State<HomePage> with RouteAware {
     _fetchOnlineUsers();
   }
 
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute<dynamic>);
-  }
-
-  @override
-  void dispose() {
-    routeObserver.unsubscribe(this);
-    super.dispose();
   }
 
   @override
@@ -135,10 +142,23 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
   }
 
+  Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      await _firestore.collection('users').doc(user.uid).update({
+        'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
+        'lastPickupTime': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
   Future<void> _determinePosition() async {
     if (!_goOnline) return;
 
-    Geolocator.getPositionStream(
+    // Cancel any previous subscription if it exists
+    _positionStreamSubscription?.cancel();
+
+    _positionStreamSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 10, // Update every 10 meters
@@ -147,10 +167,12 @@ class _HomePageState extends State<HomePage> with RouteAware {
       LatLng currentPosition = LatLng(position.latitude, position.longitude);
       String address = await _getAddressFromLatLng(currentPosition);
 
-      setState(() {
-        _currentPosition = currentPosition;
-        _pickupController.text = address;
-      });
+      if (mounted) {
+        setState(() {
+          _currentPosition = currentPosition;
+          _pickupController.text = address;
+        });
+      }
 
       _updateUserLocationInFirestore(currentPosition);
       _updateCurrentLocationMarker(currentPosition);
@@ -160,28 +182,19 @@ class _HomePageState extends State<HomePage> with RouteAware {
     });
   }
 
-Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
-  User? user = _auth.currentUser;
-  if (user != null) {
-    await _firestore.collection('users').doc(user.uid).update({
-      'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
-      'lastPickupTime': FieldValue.serverTimestamp(),
-    });
-  }
-}
 
 
   void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-    if (_currentPosition != null) {
-      mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
-      );
-    } else {
-      mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
-      );
-    }
+  mapController = controller;
+  if (_currentPosition != null) {
+    mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
+    );
+  } else {
+    mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
+    );
+  }
 }
 
   void _updateCurrentLocationMarker(LatLng position) {
@@ -191,7 +204,6 @@ Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
         Marker(
           markerId: const MarkerId("current_location"),
           position: position,
-          infoWindow: const InfoWindow(title: "You're here"),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
         ),
       );

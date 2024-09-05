@@ -12,6 +12,7 @@ class MapWidget extends StatefulWidget {
   final double initialZoom;
   final Set<Marker> participantMarkers;
 
+
   const MapWidget({
     Key? key,
     required this.pickupLocation,
@@ -168,19 +169,6 @@ class _MapWidgetState extends State<MapWidget> {
     return Stack(
         children: [
         GoogleMap(
-            onMapCreated: (controller) {
-                _controller = controller;
-                _isMapReady = true;  // Set map readiness flag
-                if (_currentLocation != null) {
-                    _controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
-                    );
-                } else {
-                    _controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(widget.pickupLocation ?? LatLng(37.7749, -122.4194), 15.0),
-                    );
-                }
-                },
             initialCameraPosition: CameraPosition(
                 target: _currentLocation ?? widget.pickupLocation,
                 zoom: widget.initialZoom,
