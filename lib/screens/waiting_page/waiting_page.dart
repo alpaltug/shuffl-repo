@@ -286,69 +286,74 @@ void _loadRideDetails() {
   }
 
   Future<void> _initRide(DocumentReference rideDocRef) async {
-    await FirebaseFirestore.instance.runTransaction((transaction) async {
-      DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
 
-      if (!rideDoc.exists) {
-        print('Ride document does not exist.');
-        return;
-      }
+        if (!rideDoc.exists) {
+          throw Exception('Ride document does not exist.');
+        }
 
-      Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
+        Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
 
-      if (rideData['isComplete'] == true) {
-        print('Ride already active.');
-        return;
-      }
+        if (rideData['isComplete'] == true) {
+          throw Exception('Ride already active.');
+        }
 
-      transaction.update(rideDocRef, {'isComplete': true});
+        transaction.update(rideDocRef, {'isComplete': true});
 
-      List<LatLng> pickupLocations = [];
-      Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
-      Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideData['dropoffLocations']); // Fetch dropoff locations
+        List<LatLng> pickupLocations = [];
+        Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
+        Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideData['dropoffLocations']);
 
+        for (var location in pickupLocationsMap.values) {
+          pickupLocations.add(await _getLatLngFromAddress(location));
+        }
 
-      for (var location in pickupLocationsMap.values) {
-        pickupLocations.add(await _getLatLngFromAddress(location));
-      }
+        LatLng midpoint = _calculateMidpoint(pickupLocations);
 
-      LatLng midpoint = _calculateMidpoint(pickupLocations);
+        rideData['pickupLocation'] = {
+          'latitude': midpoint.latitude,
+          'longitude': midpoint.longitude,
+        };
 
-      rideData['pickupLocation'] = {
-        'latitude': midpoint.latitude,
-        'longitude': midpoint.longitude,
-      };
+        rideData['dropoffLocations'] = dropoffLocationsMap;
 
-      // Assign dropoffLocationsMap to rideData for saving in the active_rides document
-      rideData['dropoffLocations'] = dropoffLocationsMap;
+        DocumentReference activeRideDocRef = FirebaseFirestore.instance
+            .collection('active_rides')
+            .doc(rideDocRef.id);
 
-      DocumentReference activeRideDocRef = FirebaseFirestore.instance
-          .collection('active_rides')
-          .doc(rideDocRef.id);
+        transaction.set(activeRideDocRef, rideData);
 
-      transaction.set(activeRideDocRef, rideData);
+        QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
 
-    QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
+        for (var messageDoc in messagesSnapshot.docs) {
+          transaction.set(
+            activeRideDocRef.collection('groupChat').doc(messageDoc.id),
+            messageDoc.data(),
+          );
+        }
 
-    for (var messageDoc in messagesSnapshot.docs) {
-      transaction.set(
-        activeRideDocRef.collection('groupChat').doc(messageDoc.id),
-        messageDoc.data(),
-      );
-    }
+        transaction.delete(rideDocRef);
+      });
 
-      transaction.delete(rideDocRef);
-      
-
+      // After the transaction is complete, navigate to the ActiveRidesPage
       if (mounted) {
-        //await Future.delayed(Duration(seconds: 2));  // Delay for 2 seconds
-        Navigator.pushReplacement(
-          context,
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-              builder: (context) => ActiveRidesPage(rideId: activeRideDocRef.id)),
+            builder: (context) => ActiveRidesPage(rideId: rideDocRef.id),
+          ),
         );
       }
-    });
+    } catch (e) {
+      print('Error initializing ride: $e');
+      // Show an error message to the user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start the ride. Please try again.')),
+        );
+      }
+    }
   }
 
   Future<void> _leaveGroup() async {
