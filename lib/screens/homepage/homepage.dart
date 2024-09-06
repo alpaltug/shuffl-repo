@@ -161,21 +161,21 @@ class _HomePageState extends State<HomePage> with RouteAware {
     _positionStreamSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // Update every 10 meters
+        distanceFilter: 100, // Update every 10 meters
       ),
     ).listen((Position position) async {
       LatLng currentPosition = LatLng(position.latitude, position.longitude);
       String address = await _getAddressFromLatLng(currentPosition);
 
-      if (mounted) {
-        setState(() {
-          _currentPosition = currentPosition;
-          _pickupController.text = address;
-        });
-      }
+      // if (mounted) {
+      //   setState(() {
+      //     _currentPosition = currentPosition;
+      //     _pickupController.text = address;
+      //   });
+      // }
 
       _updateUserLocationInFirestore(currentPosition);
-      _updateCurrentLocationMarker(currentPosition);
+      //_updateCurrentLocationMarker(currentPosition);
       mapController.animateCamera(
         CameraUpdate.newLatLngZoom(currentPosition, 15.0),
       );
@@ -185,46 +185,36 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
 
   void _onMapCreated(GoogleMapController controller) {
-  mapController = controller;
-  if (_currentPosition != null) {
-    mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
-    );
-  } else {
-    mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
-    );
-  }
-}
-
-  void _updateCurrentLocationMarker(LatLng position) {
-    setState(() {
-      _markers.removeWhere((marker) => marker.markerId.value == 'current_location');
-      _markers.add(
-        Marker(
-          markerId: const MarkerId("current_location"),
-          position: position,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        ),
+    mapController = controller;
+    if (_currentPosition != null) {
+      mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
       );
-    });
+    } else {
+      mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_center, 15.0), // Default to Berkeley if no location
+      );
+    }
   }
 
 
   Future<void> _fetchOnlineUsers() async {
     User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
+    if (currentUser == null || _currentPosition == null) return;
 
     _firestore
         .collection('users')
         .where('goOnline', isEqualTo: true)
         .snapshots()
-        .listen((QuerySnapshot userSnapshot) async {  // Mark the callback as async
+        .listen((QuerySnapshot userSnapshot) async {
       Set<Marker> markers = {};
       Map<String, int> locationCount = {};
 
       for (var doc in userSnapshot.docs) {
         var userData = doc.data() as Map<String, dynamic>;
+
+        // Skip the current user
+        if (doc.id == currentUser.uid) continue;
 
         DateTime lastPickupTime = userData['lastPickupTime'] != null
             ? userData['lastPickupTime'].toDate()
@@ -233,40 +223,54 @@ class _HomePageState extends State<HomePage> with RouteAware {
         if (userData.containsKey('lastPickupLocation') &&
             lastPickupTime.isAfter(DateTime.now().subtract(const Duration(minutes: 15)))) {
           GeoPoint location = userData['lastPickupLocation'];
-          String locationKey = '${location.latitude},${location.longitude}';
+          LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
 
-          if (locationCount.containsKey(locationKey)) {
-            locationCount[locationKey] = locationCount[locationKey]! + 1;
-          } else {
-            locationCount[locationKey] = 1;
-          }
+          // Calculate the distance from the current user
+          double distance = _calculateDistance(_currentPosition!, otherUserPosition);
 
-          double offset = 0.0001 * (locationCount[locationKey]! - 1);
-          LatLng adjustedPosition = LatLng(
-            location.latitude + offset,
-            location.longitude + offset,
-          );
+          // Check if the distance is more than 5000 miles (8046.72 kilometers)
+          if (distance >= 8046720) { // 8046.72 km in meters
+            String locationKey = '${location.latitude},${location.longitude}';
+            
+            if (locationCount.containsKey(locationKey)) {
+              locationCount[locationKey] = locationCount[locationKey]! + 1;
+            } else {
+              locationCount[locationKey] = 1;
+            }
 
-          String? displayName = userData['fullName'];
-          String? profileImageUrl = userData['imageUrl'];
+            double offset = 0.0001 * (locationCount[locationKey]! - 1);
+            LatLng adjustedPosition = LatLng(
+              location.latitude + offset,
+              location.longitude + offset,
+            );
 
-          // Use await to create a custom marker with the image
-          BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
+            String? displayName = userData['fullName'];
+            String? profileImageUrl = userData['imageUrl'];
 
-          markers.add(
-            Marker(
-              markerId: MarkerId(doc.id),
-              position: adjustedPosition,
-              icon: markerIcon,
-              infoWindow: InfoWindow(
-                title: displayName,
+            MarkerId markerId = MarkerId(doc.id); // Unique MarkerId based on the user's id
+
+            // Remove existing marker if it exists
+            markers.removeWhere((marker) => marker.markerId == markerId);
+
+            // Use await to create a custom marker with the image
+            BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
+
+            // Add new marker
+            markers.add(
+              Marker(
+                markerId: markerId,
+                position: adjustedPosition,
+                icon: markerIcon,
+                infoWindow: InfoWindow(
+                  title: displayName,
+                ),
               ),
-            ),
-          );
+            );
+          }
         }
       }
 
-      // Update the markers on the map
+      // Update the markers on the map if the state is still mounted
       if (mounted) {
         setState(() {
           _markers = markers;
@@ -274,6 +278,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
       }
     });
   }
+
+
 
 
 

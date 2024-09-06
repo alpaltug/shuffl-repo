@@ -58,9 +58,9 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   @override
   void initState() {
     super.initState();
+    _fetchGoOnlineStatus();
     _determinePosition();
     _loadActiveRideDetails();
-    _fetchGoOnlineStatus();
   }
 
   @override
@@ -149,7 +149,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
       _positionStreamSubscription?.cancel();  // Stop position tracking
     }
 
-    _fetchOnlineParticipants();  // Fetch online participants every time toggle changes
+    // _fetchOnlineParticipants();  // Fetch online participants every time toggle changes
   }
 
 
@@ -186,7 +186,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
         for (var doc in userSnapshot.docs) {
           var userData = doc.data() as Map<String, dynamic>;
 
-          if (userData.containsKey('lastPickupLocation')) {
+          if (userData["goOnline"] && userData.containsKey('lastPickupLocation')) {
             GeoPoint location = userData['lastPickupLocation'];
             LatLng participantPosition = LatLng(location.latitude, location.longitude);
 
@@ -248,7 +248,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     _positionStreamSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // Update every 10 meters
+        distanceFilter: 100, // Update every 10 meters
       ),
     ).listen((Position position) async {
       LatLng currentPosition = LatLng(position.latitude, position.longitude);
@@ -301,6 +301,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
       markerIcon = await createCustomMarkerWithImage(profileImageUrl);
     } else {
+      //here
       markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
     }
 
