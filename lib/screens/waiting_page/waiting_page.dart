@@ -510,7 +510,7 @@ void _loadRideDetails() {
               if (_users.isEmpty)
                 const Text('No users found.', style: TextStyle(color: Colors.black))
               else
-                Expanded(
+               Expanded(
                   child: ListView.builder(
                     itemCount: _users.length,
                     itemBuilder: (context, index) {
@@ -521,12 +521,13 @@ void _loadRideDetails() {
                           ? user['imageUrl']
                           : null;
                       bool isReady = _readyStatus[user.id] ?? false;
+                      bool isCurrentUser = user.id == _auth.currentUser?.uid;
 
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
                         child: ListTile(
                           onTap: () {
-                            if (user.id == _auth.currentUser?.uid) {
+                            if (isCurrentUser) {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (context) => UserProfile()),
@@ -560,15 +561,18 @@ void _loadRideDetails() {
                             ),
                           ),
                           trailing: ElevatedButton(
-                            onPressed: user.id == _auth.currentUser?.uid ? () => _toggleReadyStatus(user.id) : null,
+                            onPressed: isCurrentUser ? () => _toggleReadyStatus(user.id) : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isReady ? Colors.green : Colors.white,
-                              foregroundColor: Colors.black,
+                              foregroundColor: isReady ? Colors.white : Colors.black,
+                              disabledBackgroundColor: isReady ? Colors.green : Colors.grey[300],
+                              disabledForegroundColor: isReady ? Colors.white : Colors.grey[600],
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18.0),
                               ),
+                              side: BorderSide(color: isReady ? Colors.green : Colors.grey),
                             ),
-                            child: Text(isReady ? 'Unready' : 'Ready'),
+                            child: Text(isReady ? 'Ready' : 'Unready'),
                           ),
                         ),
                       );
