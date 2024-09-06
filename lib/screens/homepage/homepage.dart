@@ -152,6 +152,20 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
   }
 
+  void _updateCurrentLocationMarker(LatLng position) {
+    setState(() {
+      _markers.removeWhere((marker) => marker.markerId.value == 'current_location');
+      _markers.add(
+        Marker(
+          markerId: const MarkerId("current_location"),
+          position: position,
+          infoWindow: const InfoWindow(title: "You're here"),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        ),
+      );
+    });
+  }
+
   Future<void> _determinePosition() async {
     if (!_goOnline) return;
 
@@ -175,7 +189,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       // }
 
       _updateUserLocationInFirestore(currentPosition);
-      //_updateCurrentLocationMarker(currentPosition);
+      _updateCurrentLocationMarker(currentPosition);
       mapController.animateCamera(
         CameraUpdate.newLatLngZoom(currentPosition, 15.0),
       );

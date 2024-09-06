@@ -172,59 +172,76 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
 
   Future<void> _fetchOnlineParticipants() async {
-  _participantsSubscription?.cancel();
+    _participantsSubscription?.cancel();
 
-  _participantsSubscription = FirebaseFirestore.instance
-      .collection('users')
-      .where('goOnline', isEqualTo: true)
-      .where('uid', whereIn: _users.map((user) => user.id).toList())
-      .snapshots()
-      .listen((QuerySnapshot userSnapshot) async {
-        Set<Marker> updatedMarkers = {};
-        Map<String, int> locationCount = {};
+    _participantsSubscription = FirebaseFirestore.instance
+        .collection('active_rides')
+        .where('isComplete', isEqualTo: false) // Query incomplete rides
+        .snapshots()
+        .listen((QuerySnapshot rideSnapshot) async {
+          Set<Marker> updatedMarkers = {};
+          Map<String, int> locationCount = {};
 
-        for (var doc in userSnapshot.docs) {
-          var userData = doc.data() as Map<String, dynamic>;
+          for (var rideDoc in rideSnapshot.docs) {
+            var rideData = rideDoc.data() as Map<String, dynamic>;
+            List<String> participantIds = List<String>.from(rideData['participants']);
 
-          if (userData["goOnline"] && userData.containsKey('lastPickupLocation')) {
-            GeoPoint location = userData['lastPickupLocation'];
-            LatLng participantPosition = LatLng(location.latitude, location.longitude);
+            // Iterate over each participant in the ride
+            for (String participantId in participantIds) {
+              // Fetch participant's pickup location from the 'pickupLocations' map
+              if (rideData['pickupLocations'] != null && rideData['pickupLocations'][participantId] != null) {
+                GeoPoint? pickupGeoPoint = rideData['pickupLocation'];
 
-            // Adjusting multiple participants at the same location
-            String locationKey = '${location.latitude},${location.longitude}';
-            if (locationCount.containsKey(locationKey)) {
-              locationCount[locationKey] = locationCount[locationKey]! + 1;
-            } else {
-              locationCount[locationKey] = 1;
+                if (pickupGeoPoint != null) {
+                  LatLng participantPosition = LatLng(pickupGeoPoint.latitude, pickupGeoPoint.longitude);
+
+                  // Adjusting multiple participants at the same location
+                  String locationKey = '${pickupGeoPoint.latitude},${pickupGeoPoint.longitude}';
+                  if (locationCount.containsKey(locationKey)) {
+                    locationCount[locationKey] = locationCount[locationKey]! + 1;
+                  } else {
+                    locationCount[locationKey] = 1;
+                  }
+
+                  double offset = 0.0001 * (locationCount[locationKey]! - 1);
+                  LatLng adjustedPosition = LatLng(pickupGeoPoint.latitude + offset, pickupGeoPoint.longitude + offset);
+
+                  // Fetch user details such as profile image from the 'users' collection
+                  DocumentSnapshot userDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(participantId)
+                      .get();
+
+                  if (userDoc.exists) {
+                    var userData = userDoc.data() as Map<String, dynamic>;
+                    String? profileImageUrl = userData['imageUrl'];
+                    BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
+
+                    updatedMarkers.add(
+                      Marker(
+                        markerId: MarkerId(participantId), // Unique MarkerId based on participant ID
+                        position: adjustedPosition,
+                        icon: markerIcon,
+                        infoWindow: InfoWindow(
+                          title: userData['username'],
+                        ),
+                      ),
+                    );
+                  }
+                }
+              }
             }
-
-            double offset = 0.0001 * (locationCount[locationKey]! - 1);
-            LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
-
-            String? profileImageUrl = userData['imageUrl'];
-            BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
-
-            updatedMarkers.add(
-              Marker(
-                markerId: MarkerId(doc.id),
-                position: adjustedPosition,
-                icon: markerIcon,
-                infoWindow: InfoWindow(
-                  title: userData['username'],
-                ),
-              ),
-            );
           }
-        }
 
-        // Avoid unnecessary state updates
-        if (mounted) {
-          setState(() {
-            _participantMarkers = updatedMarkers;
-          });
-        }
-      });
-}
+          // Update the markers on the map if the state is still mounted
+          if (mounted) {
+            setState(() {
+              _participantMarkers = updatedMarkers;
+            });
+          }
+        });
+  }
+
 
 
 
