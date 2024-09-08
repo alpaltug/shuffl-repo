@@ -77,20 +77,22 @@ void _loadRideDetails() {
       .listen((rideDoc) async {
     if (!mounted) return;
     if (rideDoc.exists) {
-      // Check ride status and load details only once
+      // Check ride status and navigate when it becomes active
       if (rideDoc['isComplete'] == true) {
         _navigateToActiveRide(rideDoc);
-        return; // Avoid processing further if ride is already complete
+        return; // Stop further processing once navigated
       }
 
       Set<LatLng> pickupLocations = {};
       Set<LatLng> dropoffLocations = {};
 
+      // Populate pickup locations
       Map<String, String> pickupLocationsMap = Map<String, String>.from(rideDoc['pickupLocations']);
       for (var location in pickupLocationsMap.values) {
         pickupLocations.add(await _getLatLngFromAddress(location));
       }
 
+      // Populate dropoff locations
       Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
       for (var location in dropoffLocationsMap.values) {
         dropoffLocations.add(await _getLatLngFromAddress(location));
@@ -114,8 +116,8 @@ void _loadRideDetails() {
       if (mounted) {
         setState(() {
           _pickupLocations = pickupLocations.toList();
-          _dropoffLocations = dropoffLocations.toList();
-          _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
+          _dropoffLocations = dropoffLocations.toList(); // Set dropoff locations
+          _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate(); // Set ride time
           _readyStatus = readyStatus;
           _participantsCount = participantsCount;
           _users = userDocs;
