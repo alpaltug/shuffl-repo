@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
-import 'package:my_flutter_app/widgets.dart'; 
 
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
