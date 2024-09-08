@@ -70,64 +70,64 @@ Future<void> _createGroupChat() async {
   }
 
 void _loadRideDetails() {
- FirebaseFirestore.instance
-     .collection('rides')
-     .doc(widget.rideId)
-     .snapshots()
-     .listen((rideDoc) async {
-   if (!mounted) return;
-   if (rideDoc.exists) {
-     Set<LatLng> pickupLocations = {};
-     Set<LatLng> dropoffLocations = {};
+  FirebaseFirestore.instance
+      .collection('rides')
+      .doc(widget.rideId)
+      .snapshots()
+      .listen((rideDoc) async {
+    if (!mounted) return;
+    if (rideDoc.exists) {
+      // Check ride status and load details only once
+      if (rideDoc['isComplete'] == true) {
+        _navigateToActiveRide(rideDoc);
+        return; // Avoid processing further if ride is already complete
+      }
 
-     // Populate pickup locations
-     Map<String, String> pickupLocationsMap = Map<String, String>.from(rideDoc['pickupLocations']);
-     for (var location in pickupLocationsMap.values) {
-       pickupLocations.add(await _getLatLngFromAddress(location));
-     }
+      Set<LatLng> pickupLocations = {};
+      Set<LatLng> dropoffLocations = {};
 
-     // Populate dropoff locations
-     Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
-     for (var location in dropoffLocationsMap.values) {
-       dropoffLocations.add(await _getLatLngFromAddress(location));
-     }
+      Map<String, String> pickupLocationsMap = Map<String, String>.from(rideDoc['pickupLocations']);
+      for (var location in pickupLocationsMap.values) {
+        pickupLocations.add(await _getLatLngFromAddress(location));
+      }
 
-     Map<String, bool> readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
-     int participantsCount = (rideDoc['participants'] as List).length;
-     List<String> userIds = List<String>.from(rideDoc['participants']);
-     List<DocumentSnapshot> userDocs = [];
+      Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
+      for (var location in dropoffLocationsMap.values) {
+        dropoffLocations.add(await _getLatLngFromAddress(location));
+      }
 
-     for (String uid in userIds) {
-       DocumentSnapshot userDoc = await FirebaseFirestore.instance
-           .collection('users')
-           .doc(uid)
-           .get();
-       userDocs.add(userDoc);
-     }
+      Map<String, bool> readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
+      int participantsCount = (rideDoc['participants'] as List).length;
+      List<String> userIds = List<String>.from(rideDoc['participants']);
+      List<DocumentSnapshot> userDocs = [];
 
-     loc = pickupLocations.isNotEmpty ? pickupLocations.first : _center;
+      for (String uid in userIds) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
+        userDocs.add(userDoc);
+      }
 
-     if (mounted) {
-       setState(() {
-         _pickupLocations = pickupLocations.toList();
-         _dropoffLocations = dropoffLocations.toList(); // Set dropoff locations
-         _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate(); // Set ride time
-         _readyStatus = readyStatus;
-         _participantsCount = participantsCount;
-         _users = userDocs;
-       });
+      loc = pickupLocations.isNotEmpty ? pickupLocations.first : _center;
 
-       _loadMarkers();
-       _checkMaxCapacity(rideDoc.reference);
+      if (mounted) {
+        setState(() {
+          _pickupLocations = pickupLocations.toList();
+          _dropoffLocations = dropoffLocations.toList();
+          _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
+          _readyStatus = readyStatus;
+          _participantsCount = participantsCount;
+          _users = userDocs;
+        });
 
-       if (rideDoc['isComplete'] == true) {
-         _navigateToActiveRide(rideDoc);
-       }
-     }
-   } else {
-     print('Ride document does not exist.');
-   }
- });
+        _loadMarkers();
+        _checkMaxCapacity(rideDoc.reference);
+      }
+    } else {
+      print('Ride document does not exist.');
+    }
+  });
 }
 
 
@@ -286,75 +286,77 @@ void _loadRideDetails() {
   }
 
   Future<void> _initRide(DocumentReference rideDocRef) async {
-    try {
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
+  try {
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
 
-        if (!rideDoc.exists) {
-          throw Exception('Ride document does not exist.');
-        }
+      if (!rideDoc.exists) {
+        print('Ride document does not exist.');
+        return;
+      }
 
-        Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
+      Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
 
-        if (rideData['isComplete'] == true) {
-          throw Exception('Ride already active.');
-        }
+      if (rideData['isComplete'] == true) {
+        print('Ride already active.');
+        return; // Avoid reprocessing if already active
+      }
 
-        transaction.update(rideDocRef, {'isComplete': true});
+      transaction.update(rideDocRef, {'isComplete': true});
 
-        List<LatLng> pickupLocations = [];
-        Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
-        Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideData['dropoffLocations']);
+      List<LatLng> pickupLocations = [];
+      Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
+      Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideData['dropoffLocations']); 
 
-        for (var location in pickupLocationsMap.values) {
-          pickupLocations.add(await _getLatLngFromAddress(location));
-        }
+      for (var location in pickupLocationsMap.values) {
+        pickupLocations.add(await _getLatLngFromAddress(location));
+      }
 
-        LatLng midpoint = _calculateMidpoint(pickupLocations);
+      LatLng midpoint = _calculateMidpoint(pickupLocations);
 
-        rideData['pickupLocation'] = {
-          'latitude': midpoint.latitude,
-          'longitude': midpoint.longitude,
-        };
+      rideData['pickupLocation'] = {
+        'latitude': midpoint.latitude,
+        'longitude': midpoint.longitude,
+      };
 
-        rideData['dropoffLocations'] = dropoffLocationsMap;
+      rideData['dropoffLocations'] = dropoffLocationsMap;
 
-        DocumentReference activeRideDocRef = FirebaseFirestore.instance
-            .collection('active_rides')
-            .doc(rideDocRef.id);
+      DocumentReference activeRideDocRef = FirebaseFirestore.instance
+          .collection('active_rides')
+          .doc(rideDocRef.id);
 
-        transaction.set(activeRideDocRef, rideData);
+      transaction.set(activeRideDocRef, rideData);
 
-        QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
+      QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
 
-        for (var messageDoc in messagesSnapshot.docs) {
-          transaction.set(
-            activeRideDocRef.collection('groupChat').doc(messageDoc.id),
-            messageDoc.data(),
-          );
-        }
-
-        transaction.delete(rideDocRef);
-      });
-
-      // After the transaction is complete, navigate to the ActiveRidesPage
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => ActiveRidesPage(rideId: rideDocRef.id),
-          ),
+      for (var messageDoc in messagesSnapshot.docs) {
+        transaction.set(
+          activeRideDocRef.collection('groupChat').doc(messageDoc.id),
+          messageDoc.data(),
         );
       }
-    } catch (e) {
-      print('Error initializing ride: $e');
-      // Show an error message to the user
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to start the ride. Please try again.')),
-        );
-      }
+
+      transaction.delete(rideDocRef);
+    });
+
+    // Navigate to ActiveRidesPage after the transaction completes
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ActiveRidesPage(rideId: rideDocRef.id),
+        ),
+      );
+    }
+  } catch (e) {
+    print('Error initializing ride: $e');
+    // Handle error if the transaction fails
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to start the ride. Please try again.')),
+      );
     }
   }
+}
 
   Future<void> _leaveGroup() async {
     User? user = _auth.currentUser;
@@ -432,61 +434,40 @@ void _loadRideDetails() {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Waiting Page',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: kBackgroundColor,
+    appBar: AppBar(
+      title: const Text(
+        'Waiting Page',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
         ),
-        backgroundColor: kBackgroundColor,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => RideGroupChatScreen(
-                    rideId: widget.rideId,
-                    isActiveRide: false,
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
       ),
-      body: FutureBuilder<DocumentSnapshot>(
-        future: FirebaseFirestore.instance.collection('rides').doc(widget.rideId).get(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+      backgroundColor: kBackgroundColor,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.chat),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RideGroupChatScreen(
+                  rideId: widget.rideId,
+                  isActiveRide: false,
+                ),
+              ),
             );
-          } else if (snapshot.hasError) {
-            return const Center(child: Text('Error loading ride details'));
-          } else if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: Text('Ride details not found'));
-          } else if (_users.isEmpty) {
-            return const Center(
-              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
-            );
-          }
-
-          var rideDoc = snapshot.data!;
-
-          // Only load locations once
-          if (!_locationsLoaded) {
-            _loadPickupAndDropoffLocations(rideDoc);
-            _locationsLoaded = true; // Set flag to prevent reloading
-          }
-
-          return Column(
+          },
+        ),
+      ],
+    ),
+    body: _users.isEmpty
+        ? const Center(
+            child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'),
+          )
+        : Column(
             children: [
               if (_pickupLocations.isNotEmpty || _dropoffLocations.isNotEmpty)
                 Container(
@@ -512,78 +493,75 @@ void _loadRideDetails() {
                     ),
                   ),
                 ),
-              if (_users.isEmpty)
-                const Text('No users found.', style: TextStyle(color: Colors.black))
-              else
-               Expanded(
-                  child: ListView.builder(
-                    itemCount: _users.length,
-                    itemBuilder: (context, index) {
-                      var user = _users[index];
-                      var username = user['username'] ?? '';
-                      var fullName = user['fullName'] ?? '';
-                      var imageUrl = user.data().toString().contains('imageUrl')
-                          ? user['imageUrl']
-                          : null;
-                      bool isReady = _readyStatus[user.id] ?? false;
-                      bool isCurrentUser = user.id == _auth.currentUser?.uid;
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _users.length,
+                  itemBuilder: (context, index) {
+                    var user = _users[index];
+                    var username = user['username'] ?? '';
+                    var fullName = user['fullName'] ?? '';
+                    var imageUrl = user.data().toString().contains('imageUrl')
+                        ? user['imageUrl']
+                        : null;
+                    bool isReady = _readyStatus[user.id] ?? false;
+                    bool isCurrentUser = user.id == _auth.currentUser?.uid;
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                        child: ListTile(
-                          onTap: () {
-                            if (isCurrentUser) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => UserProfile()),
-                              );
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => ViewUserProfile(uid: user.id)),
-                              );
-                            }
-                          },
-                          leading: CircleAvatar(
-                            radius: 30,
-                            backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-                                ? NetworkImage(imageUrl)
-                                : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
-                          ),
-                          title: Text(
-                            fullName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '@$username',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.black,
-                            ),
-                          ),
-                          trailing: ElevatedButton(
-                            onPressed: isCurrentUser ? () => _toggleReadyStatus(user.id) : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isReady ? Colors.green : Colors.white,
-                              foregroundColor: isReady ? Colors.white : Colors.black,
-                              disabledBackgroundColor: isReady ? Colors.green : Colors.grey[300],
-                              disabledForegroundColor: isReady ? Colors.white : Colors.grey[600],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18.0),
-                              ),
-                              side: BorderSide(color: isReady ? Colors.green : Colors.grey),
-                            ),
-                            child: Text(isReady ? 'Ready' : 'Unready'),
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                      child: ListTile(
+                        onTap: () {
+                          if (isCurrentUser) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => UserProfile()),
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => ViewUserProfile(uid: user.id)),
+                            );
+                          }
+                        },
+                        leading: CircleAvatar(
+                          radius: 30,
+                          backgroundImage: imageUrl != null && imageUrl.isNotEmpty
+                              ? NetworkImage(imageUrl)
+                              : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                        ),
+                        title: Text(
+                          fullName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                        subtitle: Text(
+                          '@$username',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black,
+                          ),
+                        ),
+                        trailing: ElevatedButton(
+                          onPressed: isCurrentUser ? () => _toggleReadyStatus(user.id) : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isReady ? Colors.green : Colors.white,
+                            foregroundColor: isReady ? Colors.white : Colors.black,
+                            disabledBackgroundColor: isReady ? Colors.green : Colors.grey[300],
+                            disabledForegroundColor: isReady ? Colors.white : Colors.grey[600],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18.0),
+                            ),
+                            side: BorderSide(color: isReady ? Colors.green : Colors.grey),
+                          ),
+                          child: Text(isReady ? 'Ready' : 'Unready'),
+                        ),
+                      ),
+                    );
+                  },
                 ),
+              ),
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: ElevatedButton(
@@ -603,11 +581,9 @@ void _loadRideDetails() {
                 ),
               ),
             ],
-          );
-        },
-      ),
-    );
-  }
+          ),
+  );
+}
 
   // Move async logic outside the build method
   Future<void> _loadPickupAndDropoffLocations(DocumentSnapshot rideDoc) async {
