@@ -13,8 +13,6 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
 
-
-
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
 class WaitingPage extends StatefulWidget {
@@ -36,10 +34,9 @@ class _WaitingPageState extends State<WaitingPage> {
   int _participantsCount = 0;
   LatLng loc = LatLng(0, 0);
   final LatLng _center = const LatLng(37.8715, -122.2730);
-  List<LatLng> _dropoffLocations = []; // Initialize dropoff locations
-  DateTime? _rideTime; // Initialize ride time
+  List<LatLng> _dropoffLocations = [];
+  DateTime? _rideTime;
   bool _locationsLoaded = false;
-
 
   @override
   void initState() {
@@ -48,7 +45,7 @@ class _WaitingPageState extends State<WaitingPage> {
     _createGroupChat();
   }
 
-Future<void> _createGroupChat() async {
+  Future<void> _createGroupChat() async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
@@ -62,77 +59,74 @@ Future<void> _createGroupChat() async {
 
     List<String> participantUids = List<String>.from(rideDoc['participants']);
 
-    // Create a new group chat document within the ride document
     await rideDocRef.collection('groupChat').doc(widget.rideId).set({
       'participants': participantUids,
       'groupTitle': 'Ride Group Chat',
     });
   }
 
-void _loadRideDetails() {
-  FirebaseFirestore.instance
-      .collection('rides')
-      .doc(widget.rideId)
-      .snapshots()
-      .listen((rideDoc) async {
-    if (!mounted) return;
-    if (rideDoc.exists) {
-      // Check ride status and navigate when it becomes active
-      if (rideDoc['isComplete'] == true) {
-        _navigateToActiveRide(rideDoc);
-        return; // Stop further processing once navigated
+  void _loadRideDetails() {
+    FirebaseFirestore.instance
+        .collection('rides')
+        .doc(widget.rideId)
+        .snapshots()
+        .listen((rideDoc) async {
+      if (!mounted) return;
+      if (rideDoc.exists) {
+        // Check ride status and navigate when it becomes active
+        if (rideDoc['isComplete'] == true) {
+          _navigateToActiveRide(rideDoc);
+          return; // Stop further processing once navigated
+        }
+
+        Set<LatLng> pickupLocations = {};
+        Set<LatLng> dropoffLocations = {};
+
+        // Populate pickup locations
+        Map<String, String> pickupLocationsMap = Map<String, String>.from(rideDoc['pickupLocations']);
+        for (var location in pickupLocationsMap.values) {
+          pickupLocations.add(await _getLatLngFromAddress(location));
+        }
+
+        // Populate dropoff locations
+        Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
+        for (var location in dropoffLocationsMap.values) {
+          dropoffLocations.add(await _getLatLngFromAddress(location));
+        }
+
+        Map<String, bool> readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
+        int participantsCount = (rideDoc['participants'] as List).length;
+        List<String> userIds = List<String>.from(rideDoc['participants']);
+        List<DocumentSnapshot> userDocs = [];
+
+        for (String uid in userIds) {
+          DocumentSnapshot userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+          userDocs.add(userDoc);
+        }
+
+        loc = pickupLocations.isNotEmpty ? pickupLocations.first : _center;
+
+        if (mounted) {
+          setState(() {
+            _pickupLocations = pickupLocations.toList();
+            _dropoffLocations = dropoffLocations.toList();
+            _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
+            _readyStatus = readyStatus;
+            _participantsCount = participantsCount;
+            _users = userDocs;
+          });
+
+          _loadMarkers();
+          _checkMaxCapacity(rideDoc.reference);
+        }
+      } else {
+        print('Ride document does not exist.');
       }
-
-      Set<LatLng> pickupLocations = {};
-      Set<LatLng> dropoffLocations = {};
-
-      // Populate pickup locations
-      Map<String, String> pickupLocationsMap = Map<String, String>.from(rideDoc['pickupLocations']);
-      for (var location in pickupLocationsMap.values) {
-        pickupLocations.add(await _getLatLngFromAddress(location));
-      }
-
-      // Populate dropoff locations
-      Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
-      for (var location in dropoffLocationsMap.values) {
-        dropoffLocations.add(await _getLatLngFromAddress(location));
-      }
-
-      Map<String, bool> readyStatus = Map<String, bool>.from(rideDoc['readyStatus'] ?? {});
-      int participantsCount = (rideDoc['participants'] as List).length;
-      List<String> userIds = List<String>.from(rideDoc['participants']);
-      List<DocumentSnapshot> userDocs = [];
-
-      for (String uid in userIds) {
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .get();
-        userDocs.add(userDoc);
-      }
-
-      loc = pickupLocations.isNotEmpty ? pickupLocations.first : _center;
-
-      if (mounted) {
-        setState(() {
-          _pickupLocations = pickupLocations.toList();
-          _dropoffLocations = dropoffLocations.toList(); // Set dropoff locations
-          _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate(); // Set ride time
-          _readyStatus = readyStatus;
-          _participantsCount = participantsCount;
-          _users = userDocs;
-        });
-
-        _loadMarkers();
-        _checkMaxCapacity(rideDoc.reference);
-      }
-    } else {
-      print('Ride document does not exist.');
-    }
-  });
-}
-
-
+    });
+  }
 
   LatLng _calculateMidpoint(List<LatLng> locations) {
     double latitudeSum = 0;
@@ -151,34 +145,55 @@ void _loadRideDetails() {
 
   void _navigateToActiveRide(DocumentSnapshot rideDoc) async {
     if (!mounted) return;
-    await _initRide(rideDoc.reference);
+    
+    DocumentReference activeRideDocRef = FirebaseFirestore.instance
+        .collection('active_rides')
+        .doc(rideDoc.id);
+    
+    DocumentSnapshot activeRideDoc = await activeRideDocRef.get();
+    
+    if (activeRideDoc.exists) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ActiveRidesPage(rideId: rideDoc.id),
+        ),
+      );
+    } else {
+      await _initRide(rideDoc.reference);
+    }
   }
 
   Future<void> _toggleReadyStatus(String userId) async {
     if (userId != _auth.currentUser?.uid) return;
 
     DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
-    DocumentSnapshot rideDoc = await rideDocRef.get();
+    
+    bool shouldInitRide = false;
 
-    if (!rideDoc.exists) {
-      print('Ride document does not exist.');
-      return;
-    }
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
 
-    bool currentStatus = _readyStatus[userId] ?? false;
-    if (mounted) {
-      setState(() {
-        _readyStatus[userId] = !currentStatus;
-      });
-    }
+      if (!rideDoc.exists) {
+        print('Ride document does not exist.');
+        return;
+      }
 
-    await rideDocRef.update({
-      'readyStatus.$userId': !currentStatus,
+      Map<String, dynamic> data = rideDoc.data() as Map<String, dynamic>;
+      Map<String, bool> readyStatus = Map<String, bool>.from(data['readyStatus'] ?? {});
+      List<dynamic> participants = data['participants'];
+
+      bool currentStatus = readyStatus[userId] ?? false;
+      readyStatus[userId] = !currentStatus;
+
+      transaction.update(rideDocRef, {'readyStatus': readyStatus});
+
+      if (readyStatus.values.every((status) => status) && participants.length > 1) {
+        transaction.update(rideDocRef, {'isComplete': true});
+        shouldInitRide = true;
+      }
     });
 
-    List<dynamic> participants = rideDoc['participants'];
-
-    if (_readyStatus.values.every((status) => status) && participants.length > 1) {
+    if (shouldInitRide) {
       await _initRide(rideDocRef);
     }
   }
@@ -239,29 +254,37 @@ void _loadRideDetails() {
   }
 
   Future<void> _checkMaxCapacity(DocumentReference rideDocRef) async {
-    DocumentSnapshot rideDoc = await rideDocRef.get();
+    try {
+      DocumentSnapshot rideDoc = await rideDocRef.get();
 
-    if (!rideDoc.exists) {
-      print('Ride document does not exist.');
-      return;
-    }
-
-    bool isComplete = false;
-
-    for (var userDoc in _users) {
-      int maxCapacity = userDoc['preferences']['maxCarCapacity'];
-      if (_participantsCount >= maxCapacity) {
-        isComplete = true;
-        String username = userDoc['username'];
-        _showMaxCapacityAlert(username);
-        break;
+      if (!rideDoc.exists) {
+        print('Ride document does not exist.');
+        return;
       }
-    }
 
-    if (rideDoc.exists) {
-      await rideDocRef.update({
-        'isComplete': isComplete,
-      });
+      bool isComplete = false;
+
+      for (var userDoc in _users) {
+        int maxCapacity = userDoc['preferences']['maxCarCapacity'];
+        if (_participantsCount >= maxCapacity) {
+          isComplete = true;
+          String username = userDoc['username'];
+          _showMaxCapacityAlert(username);
+          break;
+        }
+      }
+
+      if (rideDoc.exists) {
+        await rideDocRef.update({
+          'isComplete': isComplete,
+        });
+      }
+    } catch (e) {
+      if (e is FirebaseException && e.code == 'not-found') {
+        print('Document not found error: $e');
+      } else {
+        print('Error updating document: $e');
+      }
     }
   }
 
@@ -288,77 +311,81 @@ void _loadRideDetails() {
   }
 
   Future<void> _initRide(DocumentReference rideDocRef) async {
-  try {
-    await FirebaseFirestore.instance.runTransaction((transaction) async {
-      DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
+    try {
+      bool isAlreadyInitialized = false;
 
-      if (!rideDoc.exists) {
-        print('Ride document does not exist.');
-        return;
-      }
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
 
-      Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
+        if (!rideDoc.exists) {
+          print('Ride document does not exist.');
+          return;
+        }
 
-      if (rideData['isComplete'] == true) {
-        print('Ride already active.');
-        return; // Avoid reprocessing if already active
-      }
+        Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
 
-      transaction.update(rideDocRef, {'isComplete': true});
+        if (rideData['isComplete'] != true) {
+          print('Ride is not complete yet.');
+          return;
+        }
 
-      List<LatLng> pickupLocations = [];
-      Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
-      Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideData['dropoffLocations']); 
+        if (rideData['status'] == 'active') {
+          isAlreadyInitialized = true;
+          return;
+        }
 
-      for (var location in pickupLocationsMap.values) {
-        pickupLocations.add(await _getLatLngFromAddress(location));
-      }
+        List<LatLng> pickupLocations = [];
+        Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
+        for (var location in pickupLocationsMap.values) {
+          pickupLocations.add(await _getLatLngFromAddress(location));
+        }
 
-      LatLng midpoint = _calculateMidpoint(pickupLocations);
+        LatLng midpoint = _calculateMidpoint(pickupLocations);
 
-      rideData['pickupLocation'] = {
-        'latitude': midpoint.latitude,
-        'longitude': midpoint.longitude,
-      };
+        rideData['pickupLocation'] = {
+          'latitude': midpoint.latitude,
+          'longitude': midpoint.longitude,
+        };
 
-      rideData['dropoffLocations'] = dropoffLocationsMap;
+        Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideData['dropoffLocations']);
+        rideData['dropoffLocations'] = dropoffLocationsMap;
 
-      DocumentReference activeRideDocRef = FirebaseFirestore.instance
-          .collection('active_rides')
-          .doc(rideDocRef.id);
+        DocumentReference activeRideDocRef = FirebaseFirestore.instance
+            .collection('active_rides')
+            .doc(rideDocRef.id);
 
-      transaction.set(activeRideDocRef, rideData);
+        rideData['startTime'] = FieldValue.serverTimestamp();
+        rideData['status'] = 'active';
 
-      QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
+        transaction.set(activeRideDocRef, rideData);
 
-      for (var messageDoc in messagesSnapshot.docs) {
-        transaction.set(
-          activeRideDocRef.collection('groupChat').doc(messageDoc.id),
-          messageDoc.data(),
+        QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
+        for (var messageDoc in messagesSnapshot.docs) {
+          transaction.set(
+            activeRideDocRef.collection('groupChat').doc(messageDoc.id),
+            messageDoc.data(),
+          );
+        }
+
+        transaction.delete(rideDocRef);
+      });
+
+      if (!isAlreadyInitialized && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ActiveRidesPage(rideId: rideDocRef.id),
+          ),
         );
       }
-
-      transaction.delete(rideDocRef);
-    });
-
-    // Navigate to ActiveRidesPage after the transaction completes
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => ActiveRidesPage(rideId: rideDocRef.id),
-        ),
-      );
-    }
-  } catch (e) {
-    print('Error initializing ride: $e');
-    // Handle error if the transaction fails
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to start the ride. Please try again.')),
-      );
+    } catch (e) {
+      print('Error initializing ride: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start the ride. Please try again.')),
+        );
+      }
     }
   }
-}
 
   Future<void> _leaveGroup() async {
     User? user = _auth.currentUser;
