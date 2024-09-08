@@ -6,8 +6,10 @@ import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
-import 'package:my_flutter_app/screens/verification/verification_screen.dart';  // added the import for verification_screen.dart
-import 'package:my_flutter_app/widgets.dart';
+import 'package:my_flutter_app/screens/verification/verification_screen.dart'; 
+import 'package:my_flutter_app/widgets/green_action_button.dart';
+import 'package:my_flutter_app/widgets/grey_text_field.dart';
+import 'package:my_flutter_app/widgets/logoless_appbar.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});

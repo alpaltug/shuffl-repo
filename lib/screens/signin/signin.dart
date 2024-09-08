@@ -5,10 +5,12 @@ import 'package:my_flutter_app/screens/forgot_password/forgot_password.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/login/login.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
-import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:my_flutter_app/firestore_service.dart';
+import 'package:my_flutter_app/widgets/green_action_button.dart';
+import 'package:my_flutter_app/widgets/grey_text_field.dart';
+import 'package:my_flutter_app/widgets/logoless_appbar.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -148,7 +150,7 @@ class _SignInState extends State<SignIn> {
           _errorMessage = 'Please use a school email address ending with .edu';
         });
       }
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException {
       setState(() {
         _errorMessage = 'Failed to sign in with Google: Try Again.';
       });

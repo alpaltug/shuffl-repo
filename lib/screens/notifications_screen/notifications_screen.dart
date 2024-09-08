@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/firestore_service.dart';
-import 'package:my_flutter_app/widgets.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
+import 'package:my_flutter_app/widgets/logoless_appbar.dart';
 
 
 class NotificationsScreen extends StatefulWidget {

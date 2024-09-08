@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/forgot_password_screen/forgot_password_screen.dart';
-import 'package:my_flutter_app/widgets.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:my_flutter_app/firestore_service.dart';
+import 'package:my_flutter_app/widgets/green_action_button.dart';
+import 'package:my_flutter_app/widgets/grey_text_field.dart';
+import 'package:my_flutter_app/widgets/logoless_appbar.dart';
 
 class ForgotPassword extends StatefulWidget {
   const ForgotPassword({super.key});

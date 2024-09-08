@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:my_flutter_app/widgets.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
+import 'package:my_flutter_app/widgets/logoless_appbar.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -24,7 +24,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      appBar: LogoAppBar(title: 'Forgot Password'),
+      appBar: LogolessAppBar(title: 'Forgot Password'),
       body: Center(
         child: Padding(
           padding: EdgeInsets.all(16.0),

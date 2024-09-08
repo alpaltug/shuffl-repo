@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
-import 'package:my_flutter_app/widgets.dart';
 import 'package:my_flutter_app/screens/user_public_profile/user_public_profile.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/screens/user_friends/user_friends.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/blocked_users_screen/blocked_users_screen.dart';
+import 'package:my_flutter_app/widgets/green_action_button.dart';
 
 class UserProfile extends StatefulWidget {
   const UserProfile({super.key});

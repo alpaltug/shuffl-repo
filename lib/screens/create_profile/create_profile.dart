@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/edit_preferences/edit_preferences.dart';
 import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
-import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:my_flutter_app/widgets/green_action_button.dart';
+import 'package:my_flutter_app/widgets/grey_text_field.dart';
 import 'dart:io';
 import 'package:profanity_filter/profanity_filter.dart';
 import 'package:flutter/gestures.dart';

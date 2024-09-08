@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/constants.dart';
-import 'package:my_flutter_app/screens/homepage/homepage.dart';
-import 'package:my_flutter_app/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/friend_chat_screen/friend_chat_screen.dart';
+import 'package:my_flutter_app/widgets/green_action_button.dart';
 
 class ViewUserProfile extends StatefulWidget {
   final String uid;

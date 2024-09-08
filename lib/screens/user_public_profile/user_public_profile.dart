@@ -4,12 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:my_flutter_app/widgets/green_action_button.dart';
+import 'package:my_flutter_app/widgets/grey_text_field.dart';
 import 'package:profanity_filter/profanity_filter.dart';
-
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
-import 'package:my_flutter_app/widgets.dart';
-import 'package:my_flutter_app/firestore_service.dart';
 
 class UserPublicProfile extends StatefulWidget {
   const UserPublicProfile({super.key});
@@ -23,7 +22,6 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final ProfanityFilter _profanityFilter = ProfanityFilter();
-  final FirestoreService _firestoreService = FirestoreService();
 
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
@@ -31,7 +29,7 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
 
   String? _displayName;
   String? _email;
-  String? _username;
+  // String? _username;
   String? _description;
   String? _imageUrl;
   XFile? _imageFile;
@@ -49,7 +47,7 @@ class _UserPublicProfileState extends State<UserPublicProfile> {
       setState(() {
         _displayName = userProfile['fullName'];
         _email = userProfile['email'];
-        _username = userProfile['username'];
+        // _username = userProfile['username'];
         _description = userProfile['description'];
         _imageUrl = userProfile['imageUrl'];
         _descriptionController.text = _description ?? '';
