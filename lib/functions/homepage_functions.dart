@@ -13,107 +13,156 @@ import 'package:my_flutter_app/widgets/create_custom_marker.dart';
 final googleMapsApiKey = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
 class HomePageFunctions {
-    // Toggle Go Online
-    // Toggle Go Online
-static Future<bool> toggleGoOnline(
-  bool value,
-  LatLng? currentPosition,
-  FirebaseAuth auth,
-  FirebaseFirestore firestore, 
-  Function setState, 
-  Function(LatLng) updatePosition,
-  Function(bool) updateGoOnlineState,
-  Function fetchOnlineUsers,
-  StreamSubscription<Position>? positionStreamSubscription, 
-  Set<Marker> markers
-) async {
-  User? user = auth.currentUser;
-  if (user != null) {
-    // Update user's online status in Firestore
-    await firestore.collection('users').doc(user.uid).update({
-      'goOnline': value,
-    });
 
-    // Update goOnline state in the UI
-    updateGoOnlineState(value);
+    // Toggle Go Online
+    static Future<bool> toggleGoOnline(
+    bool value,
+    LatLng? currentPosition,
+    FirebaseAuth auth,
+    FirebaseFirestore firestore, 
+    Function setState, 
+    Function(LatLng) updatePosition,
+    Function(bool) updateGoOnlineState,
+    Function fetchOnlineUsers,
+    StreamSubscription<Position>? positionStreamSubscription, 
+    Set<Marker> markers,
+    Function(Set<Marker>) updateMarkers,
+    ) async {
+    User? user = auth.currentUser;
+    if (user != null) {
+        // Update user's online status in Firestore
+        await firestore.collection('users').doc(user.uid).update({
+        'goOnline': value,
+        });
 
-    if (value) {
-      // Correctly pass the updatePosition callback here
-      await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
+        // Update goOnline state in the UI
+        updateGoOnlineState(value);
+
+        if (value) {
+        // Correctly pass the updatePosition callback here
+        await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
+        }
+
+        // Fetch online users
+        fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers);
     }
 
-    // Fetch online users
-    fetchOnlineUsers(auth, firestore, setState, markers, currentPosition);
-  }
-
-  return value;
-}
+    return value;
+    }
 
 
 
 
     // Determine Position
-    static Future<void> determinePosition(FirebaseAuth auth, FirebaseFirestore firestore, Function updatePosition, StreamSubscription<Position>? positionStreamSubscription, Set<Marker> markers, Function setState) async {
+    static Future<void> determinePosition(FirebaseAuth auth, FirebaseFirestore firestore, Function updatePosition, StreamSubscription<Position>? positionStreamSubscription,
+    Set<Marker> markers,
+    Function setState
+    ) async {
         positionStreamSubscription?.cancel(); // Cancel any previous subscription
         positionStreamSubscription = Geolocator.getPositionStream(
             locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 100, // Update every 100 meters
+            distanceFilter: 10, // Update every 10 meters
             ),
         ).listen((Position position) async {
             LatLng newPosition = LatLng(position.latitude, position.longitude);
             await updateUserLocationInFirestore(newPosition, auth, firestore);
 
+            // Fetch the profile image URL from Firestore
+            String? profileImageUrl = await _getProfileImageUrl(auth, firestore);
+
+            // If the profileImageUrl is not available, use a default marker
+            BitmapDescriptor markerIcon;
+            if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+                markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+            } else {
+                markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+            }
+
             // Update current position via callback
             updatePosition(newPosition);
 
-            // Update location marker
-            updateCurrentLocationMarker(newPosition, markers, setState);
+            // Update location marker with the user's profile image or default marker
+            updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
         });
-    }
+        }
+
+        // Helper function to fetch profileImageUrl from Firestore
+        static Future<String?> _getProfileImageUrl(FirebaseAuth auth, FirebaseFirestore firestore) async {
+            User? user = auth.currentUser;
+            if (user != null) {
+                DocumentSnapshot userDoc = await firestore.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+                return userData['imageUrl'] as String?;
+                }
+            }
+            return null;
+        }
 
 
     // Update Current Location Marker
-    static void updateCurrentLocationMarker(LatLng position, Set<Marker> markers, Function setState) {
+    static void updateCurrentLocationMarker(LatLng position, Set<Marker> markers, Function setState, BitmapDescriptor markerIcon) {
         setState(() {
             markers.removeWhere((marker) => marker.markerId.value == 'current_location');
+
             markers.add(
-            Marker(
-                markerId: const MarkerId("current_location"),
-                position: position,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-            ),
+                Marker(
+                    markerId: const MarkerId("current_location"),
+                    position: position,
+                    icon: markerIcon,
+                ),
             );
         });
     }
 
-    // Fetch Online Users
-    static Future<void> fetchOnlineUsers(FirebaseAuth auth, FirebaseFirestore firestore, Function setState, Set<Marker> markers, LatLng? currentPosition) async {
+    // Fetch Online Users with a real-time listener
+    static Future<void> fetchOnlineUsers(
+    FirebaseAuth auth,
+    FirebaseFirestore firestore,
+    Function(Set<Marker>) updateMarkers,
+    LatLng? currentPosition,
+    Set<Marker> markers,
+    ) async {
         User? currentUser = auth.currentUser;
         if (currentUser == null || currentPosition == null) return;
 
+        // Listen to users who have goOnline set to true and whose lastPickupTime is within 15 minutes
         firestore.collection('users').where('goOnline', isEqualTo: true).snapshots().listen((QuerySnapshot userSnapshot) async {
             Set<Marker> onlineMarkers = {};
             Map<String, int> locationCount = {};
+            final DateTime now = DateTime.now();
 
             for (var doc in userSnapshot.docs) {
             var userData = doc.data() as Map<String, dynamic>;
 
+            // Skip the current user
             if (doc.id == currentUser.uid) continue;
 
-            GeoPoint location = userData['lastPickupLocation'];
-            LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+            // Check if the user has a valid lastPickupLocation and lastPickupTime
+            if (userData['lastPickupLocation'] != null && userData['lastPickupTime'] != null) {
+                GeoPoint location = userData['lastPickupLocation'];
+                Timestamp lastPickupTime = userData['lastPickupTime'];
 
-            double distance = calculateDistance(currentPosition, otherUserPosition);
+                // Check if the last pickup time is within the last 15 minutes
+                DateTime pickupTime = lastPickupTime.toDate();
+                if (now.difference(pickupTime).inMinutes > 15) {
+                    continue; // Skip users with old pickup times
+                }
 
-            if (distance >= 8046720) { // 5000 miles in meters
-                String locationKey = '${location.latitude},${location.longitude}';
+                LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+
+                // Check proximity (5000 miles in meters)
+                double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition);
+                if (distance >= 8046720) {
+                    String locationKey = '${location.latitude},${location.longitude}';
                 if (locationCount.containsKey(locationKey)) {
                     locationCount[locationKey] = locationCount[locationKey]! + 1;
                 } else {
                     locationCount[locationKey] = 1;
                 }
 
+                // Adjust the position slightly to avoid marker overlap
                 double offset = 0.0001 * (locationCount[locationKey]! - 1);
                 LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
 
@@ -121,24 +170,28 @@ static Future<bool> toggleGoOnline(
                 String? profileImageUrl = userData['imageUrl'];
 
                 MarkerId markerId = MarkerId(doc.id);
+
+                // Wait for custom marker creation and add it to the map
                 BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
 
                 onlineMarkers.add(
-                Marker(
+                    Marker(
                     markerId: markerId,
                     position: adjustedPosition,
                     icon: markerIcon,
                     infoWindow: InfoWindow(title: displayName),
-                ),
+                    ),
                 );
+                }
             }
             }
 
-            setState(() {
-            markers.addAll(onlineMarkers);
-            });
+            // Update the markers in real-time using the callback
+            updateMarkers(onlineMarkers);
         });
     }
+
+
 
     // Update User Location in Firestore
     static Future<void> updateUserLocationInFirestore(LatLng currentPosition, FirebaseAuth auth, FirebaseFirestore firestore) async {
@@ -205,5 +258,80 @@ static Future<bool> toggleGoOnline(
 
         double c = 2 * atan2(sqrt(a), sqrt(1 - a));
         return earthRadius * c;
+    }
+
+    static bool doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<String, dynamic> currentUserData, int currentGroupSize) {
+        Map<String, dynamic> participantPrefs = participantData['preferences'];
+
+        int userAge = currentUserData['age'];
+        int minAge = participantPrefs['ageRange']['min'];
+        int maxAge = participantPrefs['ageRange']['max'];
+
+        if (userAge < minAge || userAge > maxAge) {
+            return false;
+        }
+
+        int participantMinCapacity = participantPrefs['minCarCapacity'];
+        int participantMaxCapacity = participantPrefs['maxCarCapacity'];
+
+        if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
+            return false;
+        }
+
+        String? participantDomain = participantData['domain'];
+        String? userDomain = currentUserData['domain'];
+
+        if (participantPrefs['schoolToggle'] == true && participantDomain != userDomain) {
+            return false;
+        }
+
+        String? participantGender = participantData['sexAssignedAtBirth'];
+        String? userGender = currentUserData['sexAssignedAtBirth'];
+
+        if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
+            return false;
+        }
+        return true;
+    }
+
+    static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
+        Map<String, dynamic> userPrefs = currentUserData['preferences'];
+
+        int userMinAge = userPrefs['ageRange']['min'];
+        int userMaxAge = userPrefs['ageRange']['max'];
+        int targetAge = targetData['age'];
+
+        if (targetAge < userMinAge || targetAge > userMaxAge) {
+            return false;
+        }
+
+        int userMinCapacity = userPrefs['minCarCapacity'];
+        int userMaxCapacity = userPrefs['maxCarCapacity'];
+
+        if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
+            return false;
+        }
+
+        String? userDomain = currentUserData['domain'];
+        String? targetDomain = targetData['domain'];
+
+        if (userPrefs['schoolToggle'] == true && userDomain != targetDomain) {
+            return false;
+        }
+
+        String? userGender = currentUserData['sexAssignedAtBirth'];
+        String? targetGender = targetData['sexAssignedAtBirth'];
+
+        if (userPrefs['sameGenderToggle'] == true && userGender != targetGender) {
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool isWithinProximity(LatLng location1, LatLng location2) {
+        const double maxDistance = 500; // 500 meters (we can change later)
+        double distance = HomePageFunctions.calculateDistance(location1, location2);
+        return distance <= maxDistance;
     }
 }

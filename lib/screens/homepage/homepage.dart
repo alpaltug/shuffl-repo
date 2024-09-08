@@ -68,10 +68,27 @@ class _HomePageState extends State<HomePage> with RouteAware {
   void initState() {
     super.initState();
     _loadUserProfile();
-    HomePageFunctions.determinePosition(_auth, _firestore, updatePosition, _positionStreamSubscription, markers, updateState);
-    _listenToUnreadMessageSenderCount();
-    _fetchOnlineUsers();
 
+    // Listen to the current position and update it
+    HomePageFunctions.determinePosition(
+      _auth,
+      _firestore,
+      updatePosition,
+      _positionStreamSubscription,
+      markers,
+      updateState,
+    );
+
+    // Start listening for online users and update markers in real-time
+    HomePageFunctions.fetchOnlineUsers(
+      _auth,
+      _firestore,
+      updateMarkers, // Pass the updateMarkers callback to update the map
+      currentPosition,
+      markers,
+    );
+
+    _listenToUnreadMessageSenderCount();
   }
 
   @override
@@ -117,6 +134,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   // Callback to update 'markers'
   void updateMarkers(Set<Marker> newMarkers) {
+    //print('Updating markers');
     setState(() {
       markers = newMarkers;
     });
@@ -135,6 +153,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       HomePageFunctions.fetchOnlineUsers,
       _positionStreamSubscription,
       markers,
+      updateMarkers,
     );
   }
 
@@ -143,9 +162,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
     HomePageFunctions.fetchOnlineUsers(
       _auth,
       _firestore,
-      updatePosition,   // Use the callback function for currentPosition
-      markers,
+      updateMarkers,   // Use the callback function for currentPosition
       currentPosition,
+      markers,
     );
   }
 
@@ -448,7 +467,7 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
 
   LatLng currentPickupLocation = await HomePageFunctions.getLatLngFromAddress(_pickupController.text);
   bool pickupProximityMatched = pickupLocationsList.any((location) =>
-      _isWithinProximity(location, currentPickupLocation));
+      HomePageFunctions.isWithinProximity(location, currentPickupLocation));
 
   if (!pickupProximityMatched) {
     return false;
@@ -479,8 +498,8 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
 
     Map<String, dynamic> participantData = participantDoc.data() as Map<String, dynamic>;
 
-    if (!_doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
-        !_doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
+    if (!HomePageFunctions.doesUserMatchPreferences(currentUserData, participantData, currentGroupSize) ||
+        !HomePageFunctions.doesUserDataMatchPreferences(participantData, currentUserData, currentGroupSize)) {
       return false;
     }
   }
@@ -488,134 +507,59 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
   return true;
 }
 
-bool _doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
-  Map<String, dynamic> userPrefs = currentUserData['preferences'];
+Future<void> _showDateTimeAndLocationPicker() async {
+  DateTime? selectedDate = await showDatePicker(
+    context: context,
+    initialDate: DateTime.now(),
+    firstDate: DateTime.now(),
+    lastDate: DateTime.now().add(const Duration(days: 365)),
+  );
 
-  int userMinAge = userPrefs['ageRange']['min'];
-  int userMaxAge = userPrefs['ageRange']['max'];
-  int targetAge = targetData['age'];
-
-  if (targetAge < userMinAge || targetAge > userMaxAge) {
-    return false;
-  }
-
-  int userMinCapacity = userPrefs['minCarCapacity'];
-  int userMaxCapacity = userPrefs['maxCarCapacity'];
-
-  if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
-    return false;
-  }
-
-  String? userDomain = currentUserData['domain'];
-  String? targetDomain = targetData['domain'];
-
-  if (userPrefs['schoolToggle'] == true && userDomain != targetDomain) {
-    return false;
-  }
-
-  String? userGender = currentUserData['sexAssignedAtBirth'];
-  String? targetGender = targetData['sexAssignedAtBirth'];
-
-  if (userPrefs['sameGenderToggle'] == true && userGender != targetGender) {
-    return false;
-  }
-
-  return true;
-}
-
-bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<String, dynamic> currentUserData, int currentGroupSize) {
-  Map<String, dynamic> participantPrefs = participantData['preferences'];
-
-  int userAge = currentUserData['age'];
-  int minAge = participantPrefs['ageRange']['min'];
-  int maxAge = participantPrefs['ageRange']['max'];
-
-  if (userAge < minAge || userAge > maxAge) {
-    return false;
-  }
-
-  int participantMinCapacity = participantPrefs['minCarCapacity'];
-  int participantMaxCapacity = participantPrefs['maxCarCapacity'];
-
-  if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
-    return false;
-  }
-
-  String? participantDomain = participantData['domain'];
-  String? userDomain = currentUserData['domain'];
-
-  if (participantPrefs['schoolToggle'] == true && participantDomain != userDomain) {
-    return false;
-  }
-
-  String? participantGender = participantData['sexAssignedAtBirth'];
-  String? userGender = currentUserData['sexAssignedAtBirth'];
-
-  if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
-    return false;
-  }
-  return true;
-}
-
-  bool _isWithinProximity(LatLng location1, LatLng location2) {
-    const double maxDistance = 500; // 500 meters (we can change later)
-    double distance = HomePageFunctions.calculateDistance(location1, location2);
-    return distance <= maxDistance;
-  }
-
-  Future<void> _showDateTimeAndLocationPicker() async {
-    DateTime? selectedDate = await showDatePicker(
+  if (selectedDate != null) {
+    TimeOfDay? selectedTime = await showTimePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialTime: TimeOfDay.now(),
     );
 
-    if (selectedDate != null) {
-      TimeOfDay? selectedTime = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay.now(),
+    if (selectedTime != null) {
+      DateTime selectedDateTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        selectedTime.hour,
+        selectedTime.minute,
       );
 
-      if (selectedTime != null) {
-        DateTime selectedDateTime = DateTime(
-          selectedDate.year,
-          selectedDate.month,
-          selectedDate.day,
-          selectedTime.hour,
-          selectedTime.minute,
-        );
+      // Initialize variables for pickup and dropoff locations
+      String? pickupLocation;
+      String? dropoffLocation;
 
-        // Initialize variables for pickup and dropoff locations
-        String? pickupLocation;
-        String? dropoffLocation;
+      // Prompt the user to select the pickup location
+      _navigateToLocationSearch(true, onSelectAddressCallback: (pickupAddress) {
+        pickupLocation = pickupAddress;
 
-        // Prompt the user to select the pickup location
-        _navigateToLocationSearch(true, onSelectAddressCallback: (pickupAddress) {
-          pickupLocation = pickupAddress;
+        // After pickup is selected, prompt the user to select the dropoff location
+        _navigateToLocationSearch(false, onSelectAddressCallback: (dropoffAddress) {
+          dropoffLocation = dropoffAddress;
 
-          // After pickup is selected, prompt the user to select the dropoff location
-          _navigateToLocationSearch(false, onSelectAddressCallback: (dropoffAddress) {
-            dropoffLocation = dropoffAddress;
-
-            // Proceed with ride finding logic only after both locations are selected
-            if (pickupLocation != null && dropoffLocation != null) {
-              _findRideAtScheduledTime(
-                timeOfRide: selectedDateTime,
-                pickupLocation: pickupLocation!,
-                dropoffLocation: dropoffLocation!,
-              );
-            } else {
-              // Handle case where user cancels location selection
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please select both pickup and dropoff locations.')),
-              );
-            }
-          });
+          // Proceed with ride finding logic only after both locations are selected
+          if (pickupLocation != null && dropoffLocation != null) {
+            _findRideAtScheduledTime(
+              timeOfRide: selectedDateTime,
+              pickupLocation: pickupLocation!,
+              dropoffLocation: dropoffLocation!,
+            );
+          } else {
+            // Handle case where user cancels location selection
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please select both pickup and dropoff locations.')),
+            );
+          }
         });
-      }
+      });
     }
   }
+}
 
 
 void _navigateToLocationSearch(bool isPickup, {Function(String)? onSelectAddressCallback}) {
@@ -643,85 +587,82 @@ void _navigateToLocationSearch(bool isPickup, {Function(String)? onSelectAddress
   );
 }
 
-  void _scheduleRideWrapper(DateTime timeOfRide, String pickupLocation, String dropoffLocation) {
-    _findRideAtScheduledTime(
-      timeOfRide: timeOfRide,
-      pickupLocation: pickupLocation,
-      dropoffLocation: dropoffLocation,
-    );
-  }
+void _scheduleRideWrapper(DateTime timeOfRide, String pickupLocation, String dropoffLocation) {
+  _findRideAtScheduledTime(
+    timeOfRide: timeOfRide,
+    pickupLocation: pickupLocation,
+    dropoffLocation: dropoffLocation,
+  );
+}
 
-  void _locationSearchWrapper(bool isPickup, Function(String) onSelectAddressCallback) {
-    _navigateToLocationSearch(isPickup, onSelectAddressCallback: onSelectAddressCallback);
-  }
+void _locationSearchWrapper(bool isPickup, Function(String) onSelectAddressCallback) {
+  _navigateToLocationSearch(isPickup, onSelectAddressCallback: onSelectAddressCallback);
+}
 
+void _findRide() async {
+  if (_pickupController.text.isNotEmpty && _dropoffController.text.isNotEmpty) {
+    DateTime rideTime = _selectedRideTime ?? DateTime.now(); // Use selected time or current time
+    String rideId = await _createRideRequest(rideTime);
 
-
-
-  void _findRide() async {
-    if (_pickupController.text.isNotEmpty && _dropoffController.text.isNotEmpty) {
-      DateTime rideTime = _selectedRideTime ?? DateTime.now(); // Use selected time or current time
-      String rideId = await _createRideRequest(rideTime);
-
-      // Push the user to the waiting page for the newly joined or created ride request
-      if (rideId.isNotEmpty) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => WaitingPage(rideId: rideId),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create or join a ride.')),
-        );
-      }
+    // Push the user to the waiting page for the newly joined or created ride request
+    if (rideId.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WaitingPage(rideId: rideId),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select both pickup and dropoff locations.')),
+        const SnackBar(content: Text('Failed to create or join a ride.')),
       );
     }
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please select both pickup and dropoff locations.')),
+    );
   }
+}
 
 
-  Stream<int> _getNotificationCountStream() {
-    User? user = _auth.currentUser;
-    if (user != null) {
-      return _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('notifications')
-          .snapshots()
-          .map((snapshot) => snapshot.docs.length);
-    }
-    return Stream.value(0);
+Stream<int> _getNotificationCountStream() {
+  User? user = _auth.currentUser;
+  if (user != null) {
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('notifications')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
   }
+  return Stream.value(0);
+}
 
 
-  void _listenToUnreadMessageSenderCount() {
-    User? currentUser = _auth.currentUser;
-    if (currentUser != null) {
-      _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('chats')
-          .snapshots()
-          .listen((snapshot) {
-        _getUniqueUnreadMessageSenderCount();
-      });
-    }
+void _listenToUnreadMessageSenderCount() {
+  User? currentUser = _auth.currentUser;
+  if (currentUser != null) {
+    _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('chats')
+        .snapshots()
+        .listen((snapshot) {
+      _getUniqueUnreadMessageSenderCount();
+    });
   }
+}
 
 
-  Future<void> _getUniqueUnreadMessageSenderCount() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser != null) {
-      int count = await _firestoreService.getUnreadMessageSenderCount(currentUser.uid);
-      setState(() {
-        _uniqueMessageSenderCount = count;
-      });
-    }
+Future<void> _getUniqueUnreadMessageSenderCount() async {
+  User? currentUser = _auth.currentUser;
+  if (currentUser != null) {
+    int count = await _firestoreService.getUnreadMessageSenderCount(currentUser.uid);
+    setState(() {
+      _uniqueMessageSenderCount = count;
+    });
   }
+}
 
  @override
 Widget build(BuildContext context) {
