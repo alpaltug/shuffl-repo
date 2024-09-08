@@ -59,11 +59,11 @@ Future<BitmapDescriptor> createCustomMarkerWithImage(String imageUrl) async {
   }
 
   // Fallback: if fetching the image fails, use the local image from assets
-  return await _createCustomMarkerFromAsset();
+  return await createCustomMarkerFromAsset();
 }
 
 // Helper function to create a marker from a local asset image
-Future<BitmapDescriptor> _createCustomMarkerFromAsset() async {
+Future<BitmapDescriptor> createCustomMarkerFromAsset() async {
   final ByteData data = await rootBundle.load('assets/icons/ShuffleLogo.jpeg');
   final Uint8List imageBytes = data.buffer.asUint8List();
   

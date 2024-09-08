@@ -134,56 +134,65 @@ class HomePageFunctions {
             final DateTime now = DateTime.now();
 
             for (var doc in userSnapshot.docs) {
-            var userData = doc.data() as Map<String, dynamic>;
+                var userData = doc.data() as Map<String, dynamic>;
 
-            // Skip the current user
-            if (doc.id == currentUser.uid) continue;
+                // Skip the current user
+                if (doc.id == currentUser.uid) continue;
 
-            // Check if the user has a valid lastPickupLocation and lastPickupTime
-            if (userData['lastPickupLocation'] != null && userData['lastPickupTime'] != null) {
-                GeoPoint location = userData['lastPickupLocation'];
-                Timestamp lastPickupTime = userData['lastPickupTime'];
+                // Check if the user has a valid lastPickupLocation and lastPickupTime
+                if (userData['lastPickupLocation'] != null && userData['lastPickupTime'] != null) {
+                    GeoPoint location = userData['lastPickupLocation'];
+                    Timestamp lastPickupTime = userData['lastPickupTime'];
 
-                // Check if the last pickup time is within the last 15 minutes
-                DateTime pickupTime = lastPickupTime.toDate();
-                if (now.difference(pickupTime).inMinutes > 15) {
-                    continue; // Skip users with old pickup times
+                    // Check if the last pickup time is within the last 15 minutes
+                    DateTime pickupTime = lastPickupTime.toDate();
+                    if (now.difference(pickupTime).inMinutes > 15) {
+                        continue; // Skip users with old pickup times
+                    }
+
+                    LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+
+                    // Check proximity (5000 miles in meters)
+                    double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition);
+                    if (distance < 8046720) {
+                        print('User is within 5 miles, adding marker');
+                        String locationKey = '${location.latitude},${location.longitude}';
+                        if (locationCount.containsKey(locationKey)) {
+                            locationCount[locationKey] = locationCount[locationKey]! + 1;
+                        } else {
+                            locationCount[locationKey] = 1;
+                        }
+
+                        // Adjust the position slightly to avoid marker overlap
+                        double offset = 0.0001 * (locationCount[locationKey]! - 1);
+                        LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
+
+                        String? displayName = userData['fullName'];
+                        String? profileImageUrl = userData['imageUrl'];
+
+                        MarkerId markerId = MarkerId(doc.id);
+
+                        // Check if the profileImageUrl is null or empty, and handle it accordingly
+                        BitmapDescriptor markerIcon;
+                        if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+                            // Use the profile image if available
+                            markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+                        } else {
+                            // Fallback to the default asset if no profile picture is available
+
+                            markerIcon = await createCustomMarkerFromAsset();
+                        }
+
+                        onlineMarkers.add(
+                            Marker(
+                            markerId: markerId,
+                            position: adjustedPosition,
+                            icon: markerIcon,
+                            infoWindow: InfoWindow(title: displayName),
+                            ),
+                        );
+                    }
                 }
-
-                LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
-
-                // Check proximity (5000 miles in meters)
-                double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition);
-                if (distance >= 8046720) {
-                    String locationKey = '${location.latitude},${location.longitude}';
-                if (locationCount.containsKey(locationKey)) {
-                    locationCount[locationKey] = locationCount[locationKey]! + 1;
-                } else {
-                    locationCount[locationKey] = 1;
-                }
-
-                // Adjust the position slightly to avoid marker overlap
-                double offset = 0.0001 * (locationCount[locationKey]! - 1);
-                LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
-
-                String? displayName = userData['fullName'];
-                String? profileImageUrl = userData['imageUrl'];
-
-                MarkerId markerId = MarkerId(doc.id);
-
-                // Wait for custom marker creation and add it to the map
-                BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
-
-                onlineMarkers.add(
-                    Marker(
-                    markerId: markerId,
-                    position: adjustedPosition,
-                    icon: markerIcon,
-                    infoWindow: InfoWindow(title: displayName),
-                    ),
-                );
-                }
-            }
             }
 
             // Update the markers in real-time using the callback
