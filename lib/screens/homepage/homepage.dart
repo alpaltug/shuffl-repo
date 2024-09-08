@@ -25,6 +25,7 @@ import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
 
+import 'package:my_flutter_app/functions/homepage_functions.dart'; 
 
 import 'package:my_flutter_app/widgets/schedule_ride.dart'; 
 import 'package:my_flutter_app/widgets/create_custom_marker.dart'; 
@@ -52,24 +53,25 @@ class _HomePageState extends State<HomePage> with RouteAware {
   String? _profileImageUrl;
   String? _username;
   String? _fullName;
-  LatLng? _currentPosition;
+  LatLng? currentPosition;
   DateTime? _selectedRideTime;
   String? _selectedPickupLocation;
   int _uniqueMessageSenderCount = 0;
-  bool _goOnline = false;
+  bool goOnline = false;
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
   StreamSubscription<Position>? _positionStreamSubscription;
 
 
-  Set<Marker> _markers = {}; 
+  Set<Marker> markers = {}; 
 
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
-    _determinePosition();
+    HomePageFunctions.determinePosition(_auth, _firestore, updatePosition, _positionStreamSubscription, markers, updateState);
     _listenToUnreadMessageSenderCount();
     _fetchOnlineUsers();
+
   }
 
   @override
@@ -93,119 +95,79 @@ class _HomePageState extends State<HomePage> with RouteAware {
     _getUniqueUnreadMessageSenderCount();
   }
 
-  void _loadUserProfile() async {
-  User? user = _auth.currentUser;
-  if (user != null) {
-    DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
-
+  // Callback to update 'goOnline' state
+  void updateGoOnlineState(bool newGoOnline) {
     setState(() {
-      _profileImageUrl = userProfile['imageUrl'];
-      _username = userProfile['username'];
-      _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-      _goOnline = userProfile['goOnline'] ?? false;
+      goOnline = newGoOnline;
     });
   }
-}
 
-  Future<void> _toggleGoOnline(bool value) async {  
+  void updateState(Function updateFn) {
+    setState(() {
+      updateFn();
+    });
+  }
+
+  // Callback to update 'currentPosition'
+  void updatePosition(LatLng newPosition) {
+    setState(() {
+      currentPosition = newPosition;
+    });
+  }
+
+  // Callback to update 'markers'
+  void updateMarkers(Set<Marker> newMarkers) {
+    setState(() {
+      markers = newMarkers;
+    });
+  }
+
+  // Toggle 'goOnline' and update necessary state variables
+  void _toggleGoOnline(bool value) async {
+    await HomePageFunctions.toggleGoOnline(
+      value,
+      currentPosition,
+      _auth,
+      _firestore,
+      updateState,          // Use the callback function for setState
+      updatePosition,        // Use the callback function for currentPosition
+      updateGoOnlineState,   // Use the callback function for goOnline state
+      HomePageFunctions.fetchOnlineUsers,
+      _positionStreamSubscription,
+      markers,
+    );
+  }
+
+  // Fetch online users and update markers
+  void _fetchOnlineUsers() {
+    HomePageFunctions.fetchOnlineUsers(
+      _auth,
+      _firestore,
+      updatePosition,   // Use the callback function for currentPosition
+      markers,
+      currentPosition,
+    );
+  }
+
+  void _loadUserProfile() async {
     User? user = _auth.currentUser;
     if (user != null) {
-      await _firestore.collection('users').doc(user.uid).update({
-        'goOnline': value,
-      });
+      DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-      if (mounted) {
-        setState(() {
-          _goOnline = value;
-        });
-      }
-
-      if (value) {
-        await _determinePosition();  
-      }
-
-      _fetchOnlineUsers();
-    }
-  }
-
-  Future<String> _getAddressFromLatLng(LatLng position) async {
-    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$google_maps_api_key';
-
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final jsonResponse = json.decode(response.body);
-      if (jsonResponse['status'] == 'OK') {
-        return jsonResponse['results'][0]['formatted_address'];
-      } else {
-        return 'Unknown location';
-      }
-    } else {
-      return 'Failed to get address';
-    }
-  }
-
-  Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
-    User? user = _auth.currentUser;
-    if (user != null) {
-      await _firestore.collection('users').doc(user.uid).update({
-        'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
-        'lastPickupTime': FieldValue.serverTimestamp(),
-      });
-    }
-  }
-
-  void _updateCurrentLocationMarker(LatLng position) {
-    if (mounted) {
       setState(() {
-        _markers.removeWhere((marker) => marker.markerId.value == 'current_location');
-        _markers.add(
-          Marker(
-            markerId: const MarkerId("current_location"),
-            position: position,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          ),
-        );
+        _profileImageUrl = userProfile['imageUrl'];
+        _username = userProfile['username'];
+        _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
+        goOnline = userProfile['goOnline'] ?? false;
       });
     }
   }
-
-  Future<void> _determinePosition() async {
-    if (!_goOnline) return;
-
-    // Cancel any previous subscription if it exists
-    _positionStreamSubscription?.cancel();
-
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 100, // Update every 10 meters
-      ),
-    ).listen((Position position) async {
-      LatLng currentPosition = LatLng(position.latitude, position.longitude);
-      String address = await _getAddressFromLatLng(currentPosition);
-
-      // if (mounted) {
-      //   setState(() {
-      //     _currentPosition = currentPosition;
-      //     _pickupController.text = address;
-      //   });
-      // }
-
-      _updateUserLocationInFirestore(currentPosition);
-      _updateCurrentLocationMarker(currentPosition);
-      mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(currentPosition, 15.0),
-      );
-    });
-  }
-
-
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
-    if (_currentPosition != null) {
+    if (currentPosition != null) {
       mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentPosition!, 15.0),
+        CameraUpdate.newLatLngZoom(currentPosition!, 15.0),
       );
     } else {
       mapController.animateCamera(
@@ -213,92 +175,6 @@ class _HomePageState extends State<HomePage> with RouteAware {
       );
     }
   }
-
-
-  Future<void> _fetchOnlineUsers() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null || _currentPosition == null) return;
-
-    _firestore
-        .collection('users')
-        .where('goOnline', isEqualTo: true)
-        .snapshots()
-        .listen((QuerySnapshot userSnapshot) async {
-      Set<Marker> markers = {};
-      Map<String, int> locationCount = {};
-
-      for (var doc in userSnapshot.docs) {
-        var userData = doc.data() as Map<String, dynamic>;
-
-        // Skip the current user
-        if (doc.id == currentUser.uid) continue;
-
-        DateTime lastPickupTime = userData['lastPickupTime'] != null
-            ? userData['lastPickupTime'].toDate()
-            : DateTime.now();
-
-        if (userData.containsKey('lastPickupLocation') &&
-            lastPickupTime.isAfter(DateTime.now().subtract(const Duration(minutes: 15)))) {
-          GeoPoint location = userData['lastPickupLocation'];
-          LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
-
-          // Calculate the distance from the current user
-          double distance = _calculateDistance(_currentPosition!, otherUserPosition);
-
-          // Check if the distance is more than 5000 miles (8046.72 kilometers)
-          if (distance >= 8046720) { // 8046.72 km in meters
-            String locationKey = '${location.latitude},${location.longitude}';
-            
-            if (locationCount.containsKey(locationKey)) {
-              locationCount[locationKey] = locationCount[locationKey]! + 1;
-            } else {
-              locationCount[locationKey] = 1;
-            }
-
-            double offset = 0.0001 * (locationCount[locationKey]! - 1);
-            LatLng adjustedPosition = LatLng(
-              location.latitude + offset,
-              location.longitude + offset,
-            );
-
-            String? displayName = userData['fullName'];
-            String? profileImageUrl = userData['imageUrl'];
-
-            MarkerId markerId = MarkerId(doc.id); // Unique MarkerId based on the user's id
-
-            // Remove existing marker if it exists
-            markers.removeWhere((marker) => marker.markerId == markerId);
-
-            // Use await to create a custom marker with the image
-            BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
-
-            // Add new marker
-            markers.add(
-              Marker(
-                markerId: markerId,
-                position: adjustedPosition,
-                icon: markerIcon,
-                infoWindow: InfoWindow(
-                  title: displayName,
-                ),
-              ),
-            );
-          }
-        }
-      }
-
-      // Update the markers on the map if the state is still mounted
-      if (mounted) {
-        setState(() {
-          _markers = markers;
-        });
-      }
-    });
-  }
-
-
-
-
 
   Future<void> _showDateTimePicker() async {
     DateTime? selectedDate = await showDatePicker(
@@ -382,38 +258,31 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
 
 Future<void> _findRideAtScheduledTime({
-  required DateTime timeOfRide,
-  required String pickupLocation,
-  required String dropoffLocation,
-}) async {
-  String rideId = await _createRideRequest(
-    timeOfRide,
-    pickupLocation: pickupLocation,
-    dropoffLocation: dropoffLocation,
-  );
-
-  // Push the user to the waiting page for the newly joined or created ride request
-  if (rideId.isNotEmpty) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => WaitingPage(rideId: rideId),
-      ),
+    required DateTime timeOfRide,
+    required String pickupLocation,
+    required String dropoffLocation,
+  }) async {
+    String rideId = await _createRideRequest(
+      timeOfRide,
+      pickupLocation: pickupLocation,
+      dropoffLocation: dropoffLocation,
     );
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Failed to create or join a ride.')),
-    );
-  }
-}
 
-
-  String _generatePickupLocationId(LatLng location) {
-    // R latitude and longitude to 3 decimal places (~111 meters precision)
-    String lat = location.latitude.toStringAsFixed(3);
-    String lng = location.longitude.toStringAsFixed(3);
-    return '$lat,$lng';
+    // Push the user to the waiting page for the newly joined or created ride request
+    if (rideId.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WaitingPage(rideId: rideId),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to create or join a ride.')),
+      );
+    }
   }
+
 
   Future<String> _createRideRequest(DateTime timeOfRide, {String? pickupLocation, String? dropoffLocation}) async {
     User? user = _auth.currentUser;
@@ -572,12 +441,12 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
   Map<String, String> pickupLocationsMap = Map<String, String>.from(rideRequest['pickupLocations']);
 
   for (var location in pickupLocationsMap.values) {
-    pickupLocationsList.add(await _getLatLngFromAddress(location));
+    pickupLocationsList.add(await HomePageFunctions.getLatLngFromAddress(location));
   }
 
   if (pickupLocationsList.isEmpty) return false;
 
-  LatLng currentPickupLocation = await _getLatLngFromAddress(_pickupController.text);
+  LatLng currentPickupLocation = await HomePageFunctions.getLatLngFromAddress(_pickupController.text);
   bool pickupProximityMatched = pickupLocationsList.any((location) =>
       _isWithinProximity(location, currentPickupLocation));
 
@@ -589,12 +458,12 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
   List<LatLng> dropoffLocationsList = [];
   Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideRequest['dropoffLocations']);
   for (var location in dropoffLocationsMap.values) {
-    dropoffLocationsList.add(await _getLatLngFromAddress(location));
+    dropoffLocationsList.add(await HomePageFunctions.getLatLngFromAddress(location));
   }
 
   if (dropoffLocationsList.isEmpty) return false;
 
-  LatLng currentDropoffLocation = await _getLatLngFromAddress(_dropoffController.text);
+  LatLng currentDropoffLocation = await HomePageFunctions.getLatLngFromAddress(_dropoffController.text);
 
   bool isRouteValid = await _isValidRoute(currentPickupLocation, currentDropoffLocation, dropoffLocationsList);
 
@@ -688,34 +557,9 @@ bool _doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<Str
   return true;
 }
 
-  Future<LatLng> _getLatLngFromAddress(String address) async {
-    final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$google_maps_api_key');
-
-    try {
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
-          final location = data['results'][0]['geometry']['location'];
-          return LatLng(location['lat'], location['lng']);
-        } else {
-          throw Exception('No locations found for the given address: $address');
-        }
-      } else {
-        throw Exception(
-            'Failed to get location from address: ${response.reasonPhrase}');
-      }
-    } catch (e) {
-      print('Failed to get location from address: $address, error: $e');
-      throw Exception('Failed to get location from address: $e');
-    }
-  }
-
   bool _isWithinProximity(LatLng location1, LatLng location2) {
     const double maxDistance = 500; // 500 meters (we can change later)
-    double distance = _calculateDistance(location1, location2);
+    double distance = HomePageFunctions.calculateDistance(location1, location2);
     return distance <= maxDistance;
   }
 
@@ -780,7 +624,7 @@ void _navigateToLocationSearch(bool isPickup, {Function(String)? onSelectAddress
     MaterialPageRoute(
       builder: (context) => LocationSearchScreen(
         isPickup: isPickup,
-        currentPosition: _currentPosition,
+        currentPosition: currentPosition,
         onSelectAddress: (address) {
           if (onSelectAddressCallback != null) {
             // Use the callback if provided (for the scheduled ride case)
@@ -798,28 +642,6 @@ void _navigateToLocationSearch(bool isPickup, {Function(String)? onSelectAddress
     ),
   );
 }
-
-
-
-  double _calculateDistance(LatLng location1, LatLng location2) {
-    const double earthRadius = 6371000; // meters
-    double lat1 = location1.latitude;
-    double lon1 = location1.longitude;
-    double lat2 = location2.latitude;
-    double lon2 = location2.longitude;
-
-    double dLat = (lat2 - lat1) * (pi / 180.0);
-    double dLon = (lon2 - lon1) * (pi / 180.0);
-
-    double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1 * (pi / 180.0)) * cos(lat2 * (pi / 180.0)) *
-        sin(dLon / 2) * sin(dLon / 2);
-
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    double distance = earthRadius * c;
-
-    return distance;
-  }
 
   void _scheduleRideWrapper(DateTime timeOfRide, String pickupLocation, String dropoffLocation) {
     _findRideAtScheduledTime(
@@ -1223,7 +1045,7 @@ Padding(
         children: [
           const Text('Go Online', style: TextStyle(color: Colors.black)),
           Switch(
-            value: _goOnline,
+            value: goOnline,
             onChanged: (value) {
               _toggleGoOnline(value);
             },
@@ -1241,12 +1063,12 @@ Padding(
               GoogleMap(
                 onMapCreated: _onMapCreated,
                 initialCameraPosition: CameraPosition(
-                  target: _currentPosition ?? _center,
+                  target: currentPosition ?? _center,
                   zoom: 15.0,
                 ),
                 myLocationEnabled: true,
                 myLocationButtonEnabled: true,
-                markers: _markers,
+                markers: markers,
               ),
             ],
           ),
