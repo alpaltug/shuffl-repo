@@ -373,24 +373,26 @@ Widget build(BuildContext context) {
                   initialZoom: 14,
                   participantMarkers: markers,  // Pass updated markers
                   participantIds: _participantIds, // Pass participant
+                  userId: _auth.currentUser?.uid,
                 ),
               ),
-              Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Go Online', style: TextStyle(color: Colors.black)),
-                  Switch(
-                    value: goOnline, // Set the switch's value based on Firestore data
-                    onChanged: (value) {
-                      _toggleGoOnline(value); // Toggle online status without full page reload
-                    },
-                    activeColor: Colors.yellow,
-                  ),
-                ],
-              ),
-            ),
+              // CURRENTLY NOT IMPLEMENTED (TOGGLE ONLINE STATUS) FOR ACTIVE RIDES BUT KEEPING THE STRUCTURE
+            //   Padding(
+            //   padding: const EdgeInsets.all(16.0),
+            //   child: Row(
+            //     mainAxisAlignment: MainAxisAlignment.center,
+            //     children: [
+            //       const Text('Go Online', style: TextStyle(color: Colors.black)),
+            //       Switch(
+            //         value: goOnline, // Set the switch's value based on Firestore data
+            //         onChanged: (value) {
+            //           _toggleGoOnline(value); // Toggle online status without full page reload
+            //         },
+            //         activeColor: Colors.yellow,
+            //       ),
+            //     ],
+            //   ),
+            // ),
             if (_rideDetailsText != null && _estimatedTime != null)
               RideInfoWidget(
                 rideDetails: _rideDetailsText!,
