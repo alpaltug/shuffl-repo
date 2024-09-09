@@ -101,9 +101,11 @@ Future<BitmapDescriptor> createCustomMarkerFromAsset() async {
 
   final ByteData? byteData = await markerAsImage.toByteData(format: ui.ImageByteFormat.png);
   if (byteData != null) {
+    //print('Creating custom marker from asset');
     final Uint8List markerImageBytes = byteData.buffer.asUint8List();
     return BitmapDescriptor.fromBytes(markerImageBytes);
   }
+  //print('Failed to create custom marker from asset');
 
   // Fallback: return the default marker if asset loading fails
   return BitmapDescriptor.defaultMarker;

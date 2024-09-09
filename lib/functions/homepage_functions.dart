@@ -16,19 +16,19 @@ class HomePageFunctions {
 
     // Toggle Go Online
     static Future<bool> toggleGoOnline(
-    bool value,
-    LatLng? currentPosition,
-    FirebaseAuth auth,
-    FirebaseFirestore firestore, 
-    Function setState, 
-    Function(LatLng) updatePosition,
-    Function(bool) updateGoOnlineState,
-    Function fetchOnlineUsers,
-    StreamSubscription<Position>? positionStreamSubscription, 
-    Set<Marker> markers,
-    Function(Set<Marker>) updateMarkers,
-    String rideId,  // Named optional parameter with default value "0"
-    ) async {
+        bool value,
+        LatLng? currentPosition,
+        FirebaseAuth auth,
+        FirebaseFirestore firestore, 
+        Function setState, 
+        Function(LatLng) updatePosition,
+        Function(bool) updateGoOnlineState,
+        Function fetchOnlineUsers,
+        StreamSubscription<Position>? positionStreamSubscription, 
+        Set<Marker> markers,
+        Function(Set<Marker>) updateMarkers,
+        String rideId,  // Named optional parameter with default value "0"
+        ) async {
         User? user = auth.currentUser;
         if (user != null) {
             // Update user's online status in Firestore
@@ -39,21 +39,30 @@ class HomePageFunctions {
             // Update goOnline state in the UI
             updateGoOnlineState(value);
 
-            if (value) {
-            // Correctly pass the updatePosition callback here
-            await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
+            // Stop the existing listeners if toggled off
+            if (!value) {
+                positionStreamSubscription?.cancel(); // Cancel position listener
+                updateMarkers({}); // Clear markers
+                return value; // Stop further execution as the user is offline
             }
 
-            // Fetch online users or paricipants based on the rideId
+            // If toggled on, determine position and fetch online users/participants
+            if (value) {
+                await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
+            }
+
+            // Fetch online users or participants based on rideId
             if (rideId != "0") {
-                print("entering active ride for rideId: $rideId");
+                //print("Entering active ride for rideId: $rideId");
                 fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId);
             } else {
+                //print("Entering normal online users");
                 fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers);
             }
         }
         return value;
     }
+
 
     static Future<void> fetchGoOnlineStatus(
     FirebaseAuth auth,
@@ -109,29 +118,29 @@ class HomePageFunctions {
             if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
                 markerIcon = await createCustomMarkerWithImage(profileImageUrl);
             } else {
-                markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+                markerIcon = await createCustomMarkerFromAsset();
             }
 
             // Update current position via callback
             updatePosition(newPosition);
 
             // Update location marker with the user's profile image or default marker
-            updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
+            //updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
         });
-        }
+    }
 
-        // Helper function to fetch profileImageUrl from Firestore
-        static Future<String?> _getProfileImageUrl(FirebaseAuth auth, FirebaseFirestore firestore) async {
-            User? user = auth.currentUser;
-            if (user != null) {
-                DocumentSnapshot userDoc = await firestore.collection('users').doc(user.uid).get();
-                if (userDoc.exists) {
+    // Helper function to fetch profileImageUrl from Firestore
+    static Future<String?> _getProfileImageUrl(FirebaseAuth auth, FirebaseFirestore firestore) async {
+        User? user = auth.currentUser;
+        if (user != null) {
+            DocumentSnapshot userDoc = await firestore.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
                 Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-                return userData['imageUrl'] as String?;
+                    return userData['imageUrl'] as String?;
                 }
-            }
-            return null;
         }
+        return null;
+    }
 
 
     // Update Current Location Marker
@@ -170,7 +179,7 @@ class HomePageFunctions {
                 var userData = doc.data() as Map<String, dynamic>;
 
                 // Skip the current user
-                if (doc.id == currentUser.uid) continue;
+                //if (doc.id == currentUser.uid) continue;
 
                 // Check if the user has a valid lastPickupLocation and lastPickupTime
                 if (userData['lastPickupLocation'] != null && userData['lastPickupTime'] != null) {
@@ -188,7 +197,7 @@ class HomePageFunctions {
                     // Check proximity (5000 miles in meters)
                     double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition);
                     if (distance < 8046720) {
-                        print('User is within 5 miles, adding marker');
+                        //print('User is within 5 miles, adding marker');
                         String locationKey = '${location.latitude},${location.longitude}';
                         if (locationCount.containsKey(locationKey)) {
                             locationCount[locationKey] = locationCount[locationKey]! + 1;
@@ -197,7 +206,7 @@ class HomePageFunctions {
                         }
 
                         // Adjust the position slightly to avoid marker overlap
-                        double offset = 0.0001 * (locationCount[locationKey]! - 1);
+                        double offset = 0.00001 * (locationCount[locationKey]! - 1);
                         LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
 
                         String? displayName = userData['fullName'];
@@ -259,7 +268,7 @@ class HomePageFunctions {
             // Iterate through the list of participants in the ride
             for (String participantId in participants) {
                 // Skip the current user
-                if (participantId == currentUser.uid) continue;
+                //if (participantId == currentUser.uid) continue;
 
                 // Get the participant's document from the 'users' collection
                 DocumentSnapshot userDoc = await firestore.collection('users').doc(participantId).get();
@@ -269,6 +278,7 @@ class HomePageFunctions {
 
                 // Check if the user has a valid lastPickupLocation and lastPickupTime
                 if (userData['lastPickupLocation'] != null && userData['goOnline'] == true) {
+                    //print('User with the uid: $participantId is online');
                     GeoPoint location = userData['lastPickupLocation'];
                     Timestamp lastPickupTime = userData['lastPickupTime'];
 
@@ -283,7 +293,7 @@ class HomePageFunctions {
                     // Check proximity (5000 miles in meters)
                     double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition);
                     if (true) {  // If within proximity, add the marker (skip this but have the structure)
-                        print('adding marker');
+                        //print('adding marker');
                         String locationKey = '${location.latitude},${location.longitude}';
                         if (locationCount.containsKey(locationKey)) {
                             locationCount[locationKey] = locationCount[locationKey]! + 1;
@@ -292,7 +302,7 @@ class HomePageFunctions {
                         }
 
                         // Adjust the position slightly to avoid marker overlap
-                        double offset = 0.0001 * (locationCount[locationKey]! - 1);
+                        double offset = 0.00001 * (locationCount[locationKey]! - 1);
                         LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
 
                         String? displayName = userData['fullName'];

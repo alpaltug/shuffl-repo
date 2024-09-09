@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-
 class MapWidget extends StatefulWidget {
   final LatLng pickupLocation;
   final List<LatLng> dropoffLocations;
@@ -16,8 +15,6 @@ class MapWidget extends StatefulWidget {
   final List<String> participantIds;
   final String? userId;
 
-
-
   const MapWidget({
     Key? key,
     required this.pickupLocation,
@@ -27,7 +24,7 @@ class MapWidget extends StatefulWidget {
     this.initialZoom = 14.0,
     required this.participantMarkers,
     required this.participantIds,
-    required this.userId
+    required this.userId,
   }) : super(key: key);
 
   @override
@@ -40,11 +37,28 @@ class _MapWidgetState extends State<MapWidget> {
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
   bool _isMapReady = false;
+  
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropoffIcon;
 
   @override
   void initState() {
     super.initState();
+    _loadCustomMarkers();
     _determinePosition();
+  }
+
+  // Load custom marker icons for pickup and dropoff
+  Future<void> _loadCustomMarkers() async {
+    _pickupIcon = await BitmapDescriptor.fromAssetImage(
+      const ImageConfiguration(size: Size(48, 48)),
+      'assets/icons/pickup_icon.png',  // Add your custom pickup icon here
+    );
+
+    _dropoffIcon = await BitmapDescriptor.fromAssetImage(
+      const ImageConfiguration(size: Size(48, 48)),
+      'assets/icons/dropoff_icon.png', // Add your custom dropoff icon here
+    );
   }
 
   Future<void> _determinePosition() async {
@@ -52,7 +66,7 @@ class _MapWidgetState extends State<MapWidget> {
     _currentLocation = LatLng(position.latitude, position.longitude);
 
     setState(() {
-        _currentLocation = _currentLocation;
+      _currentLocation = _currentLocation;
     });
 
     _loadMarkers();
@@ -111,7 +125,7 @@ class _MapWidgetState extends State<MapWidget> {
   // Function to fetch directions from Google Directions API
   Future<List<LatLng>> _getDirections(LatLng start, LatLng end) async {
     final url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude}&key=YOUR_GOOGLE_MAPS_API_KEY';
 
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
@@ -127,7 +141,6 @@ class _MapWidgetState extends State<MapWidget> {
       throw Exception('Failed to fetch directions');
     }
   }
-
 
   List<LatLng> _decodePolyline(String polyline) {
     List<LatLng> coordinates = [];
@@ -166,21 +179,23 @@ class _MapWidgetState extends State<MapWidget> {
   void _loadMarkers() {
     Set<Marker> markers = {};
 
-    // Marker for pickup location
+    // Use the custom pickup icon for pickup location
     markers.add(
       Marker(
         markerId: const MarkerId('pickup'),
         position: widget.pickupLocation,
+        icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         infoWindow: const InfoWindow(title: 'Pickup Location'),
       ),
     );
 
-    // Markers for dropoff locations
+    // Use the custom dropoff icon for dropoff locations
     for (var dropoff in widget.dropoffLocations) {
       markers.add(
         Marker(
           markerId: MarkerId(dropoff.toString()),
           position: dropoff,
+          icon: _dropoffIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: const InfoWindow(title: 'Dropoff Location'),
         ),
       );
@@ -201,35 +216,35 @@ class _MapWidgetState extends State<MapWidget> {
     });
   }
 
-    @override
-    Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     return Stack(
-        children: [
+      children: [
         GoogleMap(
-            initialCameraPosition: CameraPosition(
-                target: _currentLocation ?? widget.pickupLocation,
-                zoom: widget.initialZoom,
-            ),
-            markers: _markers.union(widget.participantMarkers),  // Combine markers and participantMarkers
-            polylines: _polylines,
-            myLocationEnabled: widget.showCurrentLocation,
-            myLocationButtonEnabled: false, // Disable default Google button to use our custom button
+          initialCameraPosition: CameraPosition(
+            target: _currentLocation ?? widget.pickupLocation,
+            zoom: widget.initialZoom,
+          ),
+          markers: _markers.union(widget.participantMarkers), // Combine markers and participantMarkers
+          polylines: _polylines,
+          myLocationEnabled: widget.showCurrentLocation,
+          myLocationButtonEnabled: false, // Disable default Google button to use our custom button
         ),
         Positioned(
-            bottom: 16,
-            right: 16,
-            child: FloatingActionButton(
+          bottom: 16,
+          right: 16,
+          child: FloatingActionButton(
             onPressed: () {
-                if (_currentLocation != null) {
+              if (_currentLocation != null) {
                 _controller.animateCamera(
-                    CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
+                  CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
                 );
-                }
+              }
             },
             child: const Icon(Icons.my_location),
-            ),
+          ),
         ),
-        ],
+      ],
     );
-    }
+  }
 }
