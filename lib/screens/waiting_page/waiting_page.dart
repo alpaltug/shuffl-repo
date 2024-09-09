@@ -341,7 +341,8 @@ class _WaitingPageState extends State<WaitingPage> {
         }
 
         LatLng midpoint = _calculateMidpoint(pickupLocations);
-
+        print('Midpoint: $midpoint');
+        
         rideData['pickupLocation'] = {
           'latitude': midpoint.latitude,
           'longitude': midpoint.longitude,

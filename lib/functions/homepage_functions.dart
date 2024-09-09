@@ -27,27 +27,60 @@ class HomePageFunctions {
     StreamSubscription<Position>? positionStreamSubscription, 
     Set<Marker> markers,
     Function(Set<Marker>) updateMarkers,
+    String rideId,  // Named optional parameter with default value "0"
     ) async {
-    User? user = auth.currentUser;
-    if (user != null) {
-        // Update user's online status in Firestore
-        await firestore.collection('users').doc(user.uid).update({
-        'goOnline': value,
-        });
+        User? user = auth.currentUser;
+        if (user != null) {
+            // Update user's online status in Firestore
+            await firestore.collection('users').doc(user.uid).update({
+            'goOnline': value,
+            });
 
-        // Update goOnline state in the UI
-        updateGoOnlineState(value);
+            // Update goOnline state in the UI
+            updateGoOnlineState(value);
 
-        if (value) {
-        // Correctly pass the updatePosition callback here
-        await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
+            if (value) {
+            // Correctly pass the updatePosition callback here
+            await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
+            }
+
+            // Fetch online users or paricipants based on the rideId
+            if (rideId != "0") {
+                print("entering active ride for rideId: $rideId");
+                fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId);
+            } else {
+                fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers);
+            }
         }
-
-        // Fetch online users
-        fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers);
+        return value;
     }
 
-    return value;
+    static Future<void> fetchGoOnlineStatus(
+    FirebaseAuth auth,
+    FirebaseFirestore firestore,
+    Function(bool) updateGoOnlineState
+    ) async {
+        User? user = auth.currentUser;
+        if (user != null) {
+            DocumentSnapshot userDoc = await firestore
+                .collection('users')
+                .doc(user.uid)
+                .get();
+
+            if (userDoc.exists) {
+                // Get the 'goOnline' value from the user document, defaulting to 'false' if not found
+                bool goOnlineValue = userDoc['goOnline'] ?? false;
+                
+                // Call the callback to update the goOnline state
+                updateGoOnlineState(goOnlineValue);
+            } else {
+                // If the document doesn't exist, set the goOnline state to false
+                updateGoOnlineState(false);
+            }
+        } else {
+            // If no user is logged in, set the goOnline state to false
+            updateGoOnlineState(false);
+        }
     }
 
 
@@ -199,6 +232,101 @@ class HomePageFunctions {
             updateMarkers(onlineMarkers);
         });
     }
+
+    // Fetch Online Participants for a specific ride with a real-time listener
+    static Future<void> fetchOnlineParticipants(
+        FirebaseAuth auth,
+        FirebaseFirestore firestore,
+        Function(Set<Marker>) updateMarkers,
+        LatLng? currentPosition,
+        Set<Marker> markers,
+        String rideId,  // New rideId parameter to fetch participants for the specific ride
+    ) async {
+        User? currentUser = auth.currentUser;
+        if (currentUser == null || currentPosition == null || rideId.isEmpty) return;
+
+        // Query the active_rides collection to get participants for the specified ride
+        firestore.collection('active_rides').doc(rideId).snapshots().listen((DocumentSnapshot rideDoc) async {
+            if (!rideDoc.exists) return;  // If no such ride, exit early
+
+            Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
+            List<dynamic> participants = rideData['participants'] ?? [];
+
+            Set<Marker> onlineMarkers = {};
+            Map<String, int> locationCount = {};
+            final DateTime now = DateTime.now();
+
+            // Iterate through the list of participants in the ride
+            for (String participantId in participants) {
+                // Skip the current user
+                if (participantId == currentUser.uid) continue;
+
+                // Get the participant's document from the 'users' collection
+                DocumentSnapshot userDoc = await firestore.collection('users').doc(participantId).get();
+                if (!userDoc.exists) continue;
+
+                var userData = userDoc.data() as Map<String, dynamic>;
+
+                // Check if the user has a valid lastPickupLocation and lastPickupTime
+                if (userData['lastPickupLocation'] != null && userData['goOnline'] == true) {
+                    GeoPoint location = userData['lastPickupLocation'];
+                    Timestamp lastPickupTime = userData['lastPickupTime'];
+
+                    // Check if the last pickup time is within the last 15 minutes
+                    DateTime pickupTime = lastPickupTime.toDate();
+                    if (false) { //skipping but keeping the structure
+                        continue;  // Skip users with old pickup times
+                    }
+
+                    LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+
+                    // Check proximity (5000 miles in meters)
+                    double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition);
+                    if (true) {  // If within proximity, add the marker (skip this but have the structure)
+                        print('adding marker');
+                        String locationKey = '${location.latitude},${location.longitude}';
+                        if (locationCount.containsKey(locationKey)) {
+                            locationCount[locationKey] = locationCount[locationKey]! + 1;
+                        } else {
+                            locationCount[locationKey] = 1;
+                        }
+
+                        // Adjust the position slightly to avoid marker overlap
+                        double offset = 0.0001 * (locationCount[locationKey]! - 1);
+                        LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
+
+                        String? displayName = userData['fullName'];
+                        String? profileImageUrl = userData['imageUrl'];
+
+                        MarkerId markerId = MarkerId(participantId);
+
+                        // Check if the profileImageUrl is null or empty, and handle it accordingly
+                        BitmapDescriptor markerIcon;
+                        if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+                            // Use the profile image if available
+                            markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+                        } else {
+                            // Fallback to the default asset if no profile picture is available
+                            markerIcon = await createCustomMarkerFromAsset();
+                        }
+                        print('Adding marker for participant: $displayName');
+                        onlineMarkers.add(
+                            Marker(
+                                markerId: markerId,
+                                position: adjustedPosition,
+                                icon: markerIcon,
+                                infoWindow: InfoWindow(title: displayName),
+                            ),
+                        );
+                    }
+                }
+            }
+
+            // Update the markers in real-time using the callback
+            updateMarkers(onlineMarkers);
+        });
+    }
+
 
 
 

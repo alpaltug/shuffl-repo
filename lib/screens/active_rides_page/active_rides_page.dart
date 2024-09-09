@@ -15,7 +15,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 
-
+import 'package:my_flutter_app/functions/homepage_functions.dart'; 
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -37,37 +37,130 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
   LatLng? _pickupLocation;
   List<String> _dropoffAddresses = [];
-  LatLng? _currentPosition;
+  LatLng? currentPosition;
   DateTime? _rideTime;
   List<DocumentSnapshot> _users = [];
   String? _rideDetailsText;
   int? _estimatedTime;
   String? _pickupAddress;
+  List<String> userIds = [];
 
   StreamSubscription<Position>? _positionStreamSubscription;
   StreamSubscription<QuerySnapshot>? _participantsSubscription;
 
-  bool _isMapReady = false; // Track if the map is ready
+  String? _profileImageUrl;
+  String? _username;
+  String? _fullName;
 
+  Set<Marker> markers = {};
+  bool goOnline = false;
 
-
-  bool _goOnline = false;
   Set<Marker> _participantMarkers = {};  // Set for storing participant markers
   late GoogleMapController _mapController;
 
   @override
   void initState() {
     super.initState();
-    _fetchGoOnlineStatus();
-    _determinePosition();
+
+    _loadUserProfile();
+    
+     // Listen to the current position and update it
+    HomePageFunctions.determinePosition(
+      _auth,
+      _firestore,
+      updatePosition,
+      _positionStreamSubscription,
+      markers,
+      updateState,
+    );
+
+    // Start listening for online users and update markers in real-time
+    HomePageFunctions.fetchOnlineParticipants(
+      _auth,
+      _firestore,
+      updateMarkers, // Pass the updateMarkers callback to update the map
+      currentPosition,
+      markers,
+      widget.rideId,
+    );
+
     _loadActiveRideDetails();
   }
 
   @override
   void dispose() {
-    _positionStreamSubscription?.cancel();  // <-- Cancel the subscription
-    //routeObserver.unsubscribe(this);
+    _positionStreamSubscription?.cancel();
     super.dispose();
+  }
+
+
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
+
+  @override
+  void didPopNext() {
+    _loadUserProfile();
+  }
+
+  // Callback to update 'goOnline' state
+  void updateGoOnlineState(bool newGoOnline) {
+    setState(() {
+      goOnline = newGoOnline;
+    });
+  }
+
+  void updateState(Function updateFn) {
+    setState(() {
+      updateFn();
+    });
+  }
+
+  // Callback to update 'currentPosition'
+  void updatePosition(LatLng newPosition) {
+    setState(() {
+      currentPosition = newPosition;
+    });
+  }
+
+  // Callback to update 'markers'
+  void updateMarkers(Set<Marker> newMarkers) {
+    //print('Updating markers');
+    setState(() {
+      markers = newMarkers;
+    });
+  }
+
+  // Toggle 'goOnline' and update necessary state variables
+  void _toggleGoOnline(bool value) async {
+    await HomePageFunctions.toggleGoOnline(
+      value,
+      currentPosition,
+      _auth,
+      _firestore,
+      updateState,          // Use the callback function for setState
+      updatePosition,        // Use the callback function for currentPosition
+      updateGoOnlineState,   // Use the callback function for goOnline state
+      HomePageFunctions.fetchOnlineParticipants,
+      _positionStreamSubscription,
+      markers,
+      updateMarkers,
+      widget.rideId,
+    );
+  }
+
+  // Fetch online users and update markers
+  void _fetchOnlineParticipants() {
+    HomePageFunctions.fetchOnlineParticipants(
+      _auth,
+      _firestore,
+      updateMarkers,   // Use the callback function for currentPosition
+      currentPosition,
+      markers,
+      widget.rideId,
+    );
   }
   
 
@@ -84,7 +177,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
           rideDoc['pickupLocation']['longitude'],
         );
 
-        _pickupAddress = await _getAddressFromLatLng(_pickupLocation!);
+        _pickupAddress = await HomePageFunctions.getAddressFromLatLng(_pickupLocation!);
 
         final dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
         if (dropoffLocationsMap.isNotEmpty) {
@@ -123,218 +216,22 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     }
   }
 
-  Future<void> _updateGoOnlineStatus(bool value) async {
+
+
+  void _loadUserProfile() async {
     User? user = _auth.currentUser;
     if (user != null) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({'goOnline': value});
-    }
-  }
+      DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-
-  Future<void> _toggleGoOnline(bool value) async {
-    await _updateGoOnlineStatus(value);
-
-    setState(() {
-      _goOnline = value;
-    });
-
-    if (value) {
-      if (_isMapReady) {
-        _determinePosition();  // Start position tracking
-      }
-    } else {
-      _positionStreamSubscription?.cancel();  // Stop position tracking
-    }
-
-    // _fetchOnlineParticipants();  // Fetch online participants every time toggle changes
-  }
-
-
-
-  Future<void> _fetchGoOnlineStatus() async {
-    User? user = _auth.currentUser;
-    if (user != null) {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (userDoc.exists && mounted) {
-        setState(() {
-          _goOnline = userDoc['goOnline'] ?? false;  // Set the initial value of goOnline
-        });
-      }
-    }
-  }
-
-
-  Future<void> _fetchOnlineParticipants() async {
-    _participantsSubscription?.cancel();
-
-    _participantsSubscription = FirebaseFirestore.instance
-        .collection('active_rides')
-        .where('isComplete', isEqualTo: false) // Query incomplete rides
-        .snapshots()
-        .listen((QuerySnapshot rideSnapshot) async {
-          Set<Marker> updatedMarkers = {};
-          Map<String, int> locationCount = {};
-
-          for (var rideDoc in rideSnapshot.docs) {
-            var rideData = rideDoc.data() as Map<String, dynamic>;
-            List<String> participantIds = List<String>.from(rideData['participants']);
-
-            // Iterate over each participant in the ride
-            for (String participantId in participantIds) {
-              // Fetch participant's pickup location from the 'pickupLocations' map
-              if (rideData['pickupLocations'] != null && rideData['pickupLocations'][participantId] != null) {
-                GeoPoint? pickupGeoPoint = rideData['pickupLocation'];
-
-                if (pickupGeoPoint != null) {
-                  LatLng participantPosition = LatLng(pickupGeoPoint.latitude, pickupGeoPoint.longitude);
-
-                  // Adjusting multiple participants at the same location
-                  String locationKey = '${pickupGeoPoint.latitude},${pickupGeoPoint.longitude}';
-                  if (locationCount.containsKey(locationKey)) {
-                    locationCount[locationKey] = locationCount[locationKey]! + 1;
-                  } else {
-                    locationCount[locationKey] = 1;
-                  }
-
-                  double offset = 0.0001 * (locationCount[locationKey]! - 1);
-                  LatLng adjustedPosition = LatLng(pickupGeoPoint.latitude + offset, pickupGeoPoint.longitude + offset);
-
-                  // Fetch user details such as profile image from the 'users' collection
-                  DocumentSnapshot userDoc = await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(participantId)
-                      .get();
-
-                  if (userDoc.exists) {
-                    var userData = userDoc.data() as Map<String, dynamic>;
-                    String? profileImageUrl = userData['imageUrl'];
-                    BitmapDescriptor markerIcon = await createCustomMarkerWithImage(profileImageUrl!);
-
-                    updatedMarkers.add(
-                      Marker(
-                        markerId: MarkerId(participantId), // Unique MarkerId based on participant ID
-                        position: adjustedPosition,
-                        icon: markerIcon,
-                        infoWindow: InfoWindow(
-                          title: userData['username'],
-                        ),
-                      ),
-                    );
-                  }
-                }
-              }
-            }
-          }
-
-          // Update the markers on the map if the state is still mounted
-          if (mounted) {
-            setState(() {
-              _participantMarkers = updatedMarkers;
-            });
-          }
-        });
-  }
-
-
-
-
-  Future<void> _updateUserLocationInFirestore(LatLng currentPosition) async {
-    User? user = _auth.currentUser;
-    if (user != null) {
-      await _firestore.collection('users').doc(user.uid).update({
-        'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
-        'lastPickupTime': FieldValue.serverTimestamp(),
+      setState(() {
+        _profileImageUrl = userProfile['imageUrl'];
+        _username = userProfile['username'];
+        _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
+        goOnline = userProfile['goOnline'] ?? false;
       });
+      //await HomePageFunctions.fetchGoOnlineStatus();
     }
   }
-
-
-
-  Future<void> _determinePosition() async {
-    if (!_goOnline || !_isMapReady) return;  // Ensure map is ready before proceeding
-
-    _positionStreamSubscription?.cancel();
-
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 100, // Update every 10 meters
-      ),
-    ).listen((Position position) async {
-      LatLng currentPosition = LatLng(position.latitude, position.longitude);
-
-      if (mounted) {
-        setState(() {
-          _currentPosition = currentPosition;
-        });
-      }
-
-      User? user = _auth.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
-          'lastPickupTime': FieldValue.serverTimestamp(),
-        });
-
-        // Update the user's marker with the profile image asynchronously
-        _updateUserLocationInFirestore(currentPosition);
-        await _updateUserMarker(currentPosition);
-
-        // Only animate camera if the map is ready and controller is initialized
-        if (_isMapReady && _mapController != null) {
-          _mapController.animateCamera(
-            CameraUpdate.newLatLngZoom(currentPosition, 15.0),
-          );
-        }
-      }
-
-      // Fetch other online participants
-      _fetchOnlineParticipants();
-    });
-  }
-
-
-
-
-
-
-
-
-  Future<void> _updateUserMarker(LatLng position) async {
-    User? user = _auth.currentUser;
-    if (user == null) return;
-
-    DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    String? profileImageUrl = userDoc['imageUrl'];
-
-    BitmapDescriptor markerIcon;
-    if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
-      markerIcon = await createCustomMarkerWithImage(profileImageUrl);
-    } else {
-      //here
-      markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
-    }
-
-    setState(() {
-      _participantMarkers.removeWhere((marker) => marker.markerId.value == 'current_user');
-      _participantMarkers.add(
-        Marker(
-          markerId: const MarkerId("current_user"),
-          position: position,
-          icon: markerIcon,
-        ),
-      );
-    });
-  }
-
-
 
   int _calculateEstimatedTime(DateTime rideTime) {
     return rideTime.difference(DateTime.now()).inMinutes;
@@ -355,47 +252,6 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     }
   }
 
-  Future<String> _getAddressFromLatLng(LatLng position) async {
-    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$google_maps_api_key';
-
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final jsonResponse = json.decode(response.body);
-      if (jsonResponse['status'] == 'OK') {
-        return jsonResponse['results'][0]['formatted_address'];
-      } else {
-        return 'Unknown location';
-      }
-    } else {
-      return 'Failed to get address';
-    }
-  }
-
-  Future<LatLng> _getLatLngFromAddress(String address) async {
-    final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$google_maps_api_key');
-
-    try {
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
-          final location = data['results'][0]['geometry']['location'];
-          return LatLng(location['lat'], location['lng']);
-        } else {
-          throw Exception('No locations found for the given address: $address');
-        }
-      } else {
-        throw Exception(
-            'Failed to get location from address: ${response.reasonPhrase}');
-      }
-    } catch (e) {
-      print('Failed to get location from address: $address, error: $e');
-      throw Exception('Failed to get location from address: $e');
-    }
-  }
-
   Future<List<LatLng>> _getDropoffLocations() async {
     if (_dropoffAddresses.isEmpty) {
       return [];
@@ -404,7 +260,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     List<LatLng> latLngList = [];
     for (String address in _dropoffAddresses) {
       try {
-        LatLng latLng = await _getLatLngFromAddress(address);
+        LatLng latLng = await HomePageFunctions.getLatLngFromAddress(address);
         latLngList.add(latLng);
       } catch (e) {
         print('Failed to convert address: $address to LatLng, error: $e');
@@ -510,10 +366,10 @@ Widget build(BuildContext context) {
                 child: MapWidget(
                   pickupLocation: _pickupLocation!,
                   dropoffLocations: dropoffLocations,
-                  showCurrentLocation: true,  // Show user's current location
+                  showCurrentLocation: false,  // Show user's current location
                   showDirections: true,       // Show directions
                   initialZoom: 14,
-                  participantMarkers: _participantMarkers,  // Pass updated markers
+                  participantMarkers: markers,  // Pass updated markers
                 ),
               ),
               Padding(
@@ -523,7 +379,7 @@ Widget build(BuildContext context) {
                 children: [
                   const Text('Go Online', style: TextStyle(color: Colors.black)),
                   Switch(
-                    value: _goOnline, // Set the switch's value based on Firestore data
+                    value: goOnline, // Set the switch's value based on Firestore data
                     onChanged: (value) {
                       _toggleGoOnline(value); // Toggle online status without full page reload
                     },

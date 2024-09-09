@@ -58,6 +58,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   String? _selectedPickupLocation;
   int _uniqueMessageSenderCount = 0;
   bool goOnline = false;
+  String rideId = '0';
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
   StreamSubscription<Position>? _positionStreamSubscription;
 
@@ -154,6 +155,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       _positionStreamSubscription,
       markers,
       updateMarkers,
+      rideId,
     );
   }
 
@@ -179,6 +181,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
         _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
         goOnline = userProfile['goOnline'] ?? false;
       });
+
+      //await HomePageFunctions.fetchGoOnlineStatus();
     }
   }
 
