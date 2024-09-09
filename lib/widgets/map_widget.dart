@@ -11,6 +11,7 @@ class MapWidget extends StatefulWidget {
   final bool showDirections;
   final double initialZoom;
   final Set<Marker> participantMarkers;
+  final List<String> participantIds;
 
 
   const MapWidget({
@@ -21,6 +22,7 @@ class MapWidget extends StatefulWidget {
     this.showDirections = false,
     this.initialZoom = 14.0,
     required this.participantMarkers,
+    required this.participantIds,
   }) : super(key: key);
 
   @override

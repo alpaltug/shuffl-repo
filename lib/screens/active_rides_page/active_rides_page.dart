@@ -56,6 +56,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   bool goOnline = false;
 
   Set<Marker> _participantMarkers = {};  // Set for storing participant markers
+  List<String> _participantIds = [];     // List for storing participant IDs
   late GoogleMapController _mapController;
 
   @override
@@ -185,6 +186,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
         }
 
         List<String> userIds = List<String>.from(rideDoc['participants']);
+        _participantIds = userIds;
         List<DocumentSnapshot> userDocs = [];
         for (String uid in userIds) {
           DocumentSnapshot userDoc = await FirebaseFirestore.instance
@@ -370,6 +372,7 @@ Widget build(BuildContext context) {
                   showDirections: true,       // Show directions
                   initialZoom: 14,
                   participantMarkers: markers,  // Pass updated markers
+                  participantIds: _participantIds, // Pass participant
                 ),
               ),
               Padding(
