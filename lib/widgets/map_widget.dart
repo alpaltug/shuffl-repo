@@ -86,7 +86,7 @@ class _MapWidgetState extends State<MapWidget> {
         Polyline(
           polylineId: const PolylineId('current_user_route'),
           points: currentUserRoute,
-          color: Colors.green, // Different color for the current user's route
+          color: Colors.yellow, // Different color for the current user's route
           width: 5,
         ),
       );
@@ -113,7 +113,7 @@ class _MapWidgetState extends State<MapWidget> {
             Polyline(
               polylineId: PolylineId('route_$participantId'),
               points: participantRoute,
-              color: Colors.blue, // Use blue for participant routes
+              color: Colors.black, // Use blue for participant routes
               width: 5,
             ),
           );
