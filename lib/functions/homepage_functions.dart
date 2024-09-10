@@ -16,19 +16,19 @@ class HomePageFunctions {
 
     // Toggle Go Online
     static Future<bool> toggleGoOnline(
-        bool value,
-        LatLng? currentPosition,
-        FirebaseAuth auth,
-        FirebaseFirestore firestore, 
-        Function setState, 
-        Function(LatLng) updatePosition,
-        Function(bool) updateGoOnlineState,
-        Function fetchOnlineUsers,
-        StreamSubscription<Position>? positionStreamSubscription, 
-        Set<Marker> markers,
-        Function(Set<Marker>) updateMarkers,
-        String rideId,  // Named optional parameter with default value "0"
-        ) async {
+    bool value,
+    LatLng? currentPosition,
+    FirebaseAuth auth,
+    FirebaseFirestore firestore, 
+    Function setState, 
+    Function(LatLng) updatePosition,
+    Function(bool) updateGoOnlineState,
+    Function fetchOnlineUsers,
+    StreamSubscription<Position>? positionStreamSubscription, 
+    Set<Marker> markers,
+    Function(Set<Marker>) updateMarkers,
+    String rideId,  // Named optional parameter with default value "0"
+    ) async {
         User? user = auth.currentUser;
         if (user != null) {
             // Update user's online status in Firestore
@@ -225,7 +225,7 @@ class HomePageFunctions {
 
                             markerIcon = await createCustomMarkerFromAsset();
                         }
-                        print('MarkerId: ${doc.id}');
+                        //print('MarkerId: ${doc.id}');
                         markers.removeWhere((marker) => marker.markerId.value == doc.id);
                         onlineMarkers.add(
                             Marker(
