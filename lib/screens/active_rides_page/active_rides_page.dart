@@ -167,6 +167,8 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
   Future<void> _loadActiveRideDetails() async {
     try {
+      //set the participant markers
+      _fetchOnlineParticipants();
       DocumentSnapshot rideDoc = await FirebaseFirestore.instance
           .collection('active_rides')
           .doc(widget.rideId)

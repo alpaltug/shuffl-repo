@@ -40,15 +40,17 @@ class HomePageFunctions {
             updateGoOnlineState(value);
 
             // Stop the existing listeners if toggled off
-            if (!value) {
-                positionStreamSubscription?.cancel(); // Cancel position listener
-                updateMarkers({}); // Clear markers
-                return value; // Stop further execution as the user is offline
-            }
+            // if (!value) {
+            //     positionStreamSubscription?.cancel(); // Cancel position listener
+            //     updateMarkers({}); // Clear markers
+            //     return value; // Stop further execution as the user is offline
+            // }
 
             // If toggled on, determine position and fetch online users/participants
             if (value) {
                 await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
+            } else {
+                updateMarkers({}); // Clear markers
             }
 
             // Fetch online users or participants based on rideId
@@ -125,7 +127,7 @@ class HomePageFunctions {
             updatePosition(newPosition);
 
             // Update location marker with the user's profile image or default marker
-            //updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
+            updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
         });
     }
 
@@ -147,7 +149,6 @@ class HomePageFunctions {
     static void updateCurrentLocationMarker(LatLng position, Set<Marker> markers, Function setState, BitmapDescriptor markerIcon) {
         setState(() {
             markers.removeWhere((marker) => marker.markerId.value == 'current_location');
-
             markers.add(
                 Marker(
                     markerId: const MarkerId("current_location"),
@@ -224,7 +225,8 @@ class HomePageFunctions {
 
                             markerIcon = await createCustomMarkerFromAsset();
                         }
-
+                        print('MarkerId: ${doc.id}');
+                        markers.removeWhere((marker) => marker.markerId.value == doc.id);
                         onlineMarkers.add(
                             Marker(
                             markerId: markerId,
@@ -319,7 +321,8 @@ class HomePageFunctions {
                             // Fallback to the default asset if no profile picture is available
                             markerIcon = await createCustomMarkerFromAsset();
                         }
-                        print('Adding marker for participant: $displayName');
+                        print('Adding marker for user: $displayName');
+                        markers.removeWhere((marker) => marker.markerId.value == participantId);
                         onlineMarkers.add(
                             Marker(
                                 markerId: markerId,
