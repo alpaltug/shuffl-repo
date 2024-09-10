@@ -26,11 +26,27 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
   Future<void> _loadBlockedUsers() async {
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
-      DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-      setState(() {
-        blockedUserIds = List<String>.from(userDoc['blockedUsers'] ?? []);
-        isLoading = false;
-      });
+      try {
+        DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+          var userData = userDoc.data() as Map<String, dynamic>?;
+          setState(() {
+            blockedUserIds = List<String>.from(userData?['blockedUsers'] ?? []);
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            blockedUserIds = [];
+            isLoading = false;
+          });
+        }
+      } catch (e) {
+        print("Error loading blocked users: $e");
+        setState(() {
+          blockedUserIds = [];
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -50,12 +66,12 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : blockedUserIds.isEmpty
-              ? const Center(child: Text(
+              ? const Center(
+                  child: Text(
                     'No blocked users',
-                    style: TextStyle(
-                      color: Colors.black, // Sets the text color to black
-                    ),
-                  ),)
+                    style: TextStyle(color: Colors.black),
+                  ),
+                )
               : ListView.builder(
                   itemCount: blockedUserIds.length,
                   itemBuilder: (context, index) {
@@ -63,19 +79,13 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                       future: _firestore.collection('users').doc(blockedUserIds[index]).get(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const ListTile(
-                            title: Text('Loading...'),
-                          );
+                          return const ListTile(title: Text('Loading...'));
                         }
                         if (snapshot.hasError) {
-                          return ListTile(
-                            title: Text('Error: ${snapshot.error}'),
-                          );
+                          return ListTile(title: Text('Error: ${snapshot.error}'));
                         }
                         if (!snapshot.hasData || !snapshot.data!.exists) {
-                          return const ListTile(
-                            title: Text('User not found'),
-                          );
+                          return const ListTile(title: Text('User not found'));
                         }
                         var userData = snapshot.data!.data() as Map<String, dynamic>;
                         return ListTile(
@@ -84,10 +94,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                           ),
                           title: Text(
                             userData['fullName'] ?? 'Unknown',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                           ),
                           subtitle: Text(
                             userData['username'] ?? '',
