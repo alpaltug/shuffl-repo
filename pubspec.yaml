@@ -51,6 +51,7 @@ dependencies:
   firebase_messaging: ^15.0.3
   # https://pub.dev/packages/syncfusion_flutter_pdfviewer
   syncfusion_flutter_pdfviewer: ^26.2.11
+  flutter_local_notifications: ^17.2.2
 
 dev_dependencies:
   flutter_test:
