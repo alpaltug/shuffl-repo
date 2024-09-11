@@ -76,14 +76,14 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     );
 
     // Start listening for online users and update markers in real-time
-    HomePageFunctions.fetchOnlineParticipants(
-      _auth,
-      _firestore,
-      updateMarkers, // Pass the updateMarkers callback to update the map
-      currentPosition,
-      markers,
-      widget.rideId,
-    );
+    // HomePageFunctions.fetchOnlineParticipants(
+    //   _auth,
+    //   _firestore,
+    //   updateMarkers, // Pass the updateMarkers callback to update the map
+    //   currentPosition,
+    //   markers,
+    //   widget.rideId,
+    // );
 
     _loadActiveRideDetails();
   }
