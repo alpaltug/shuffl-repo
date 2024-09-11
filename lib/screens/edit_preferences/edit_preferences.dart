@@ -4,7 +4,6 @@ import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/widgets/green_action_button.dart';
 import 'package:my_flutter_app/widgets/logoless_appbar.dart';
 
-
 class EditPreferencesPage extends StatefulWidget {
   final String uid;
 
@@ -18,7 +17,8 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
   double _currentMinAge = 18;
   double _currentMaxAge = 80;
   bool _sameGenderToggle = false;
-  bool _sameSchoolToggle = false;
+  bool _onlyStudentsToggle = false; // Toggle for "Only Students"
+  bool _sameUniversityToggle = false; // Unified toggle for "Same University"
   int _minCarCapacity = 2;
   int _maxCarCapacity = 5;
 
@@ -35,7 +35,8 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
         _currentMinAge = userDoc['preferences']['ageRange']['min'].toDouble();
         _currentMaxAge = userDoc['preferences']['ageRange']['max'].toDouble();
         _sameGenderToggle = userDoc['preferences']['sameGenderToggle'];
-        _sameSchoolToggle = userDoc['preferences']['schoolToggle'];
+        _onlyStudentsToggle = userDoc['preferences']['onlyStudentsToggle'] ?? false;
+        _sameUniversityToggle = userDoc['preferences']['sameUniversityToggle'] ?? false; // Unified preference
         _minCarCapacity = userDoc['preferences']['minCarCapacity'];
         _maxCarCapacity = userDoc['preferences']['maxCarCapacity'];
       });
@@ -47,7 +48,8 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
       'preferences.ageRange.min': _currentMinAge.toInt(),
       'preferences.ageRange.max': _currentMaxAge.toInt(),
       'preferences.sameGenderToggle': _sameGenderToggle,
-      'preferences.schoolToggle': _sameSchoolToggle,
+      'preferences.onlyStudentsToggle': _onlyStudentsToggle,
+      'preferences.sameUniversityToggle': _sameUniversityToggle,
       'preferences.minCarCapacity': _minCarCapacity,
       'preferences.maxCarCapacity': _maxCarCapacity,
     });
@@ -63,7 +65,7 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
     return Scaffold(
       appBar: const LogolessAppBar(
         title: 'Edit Preferences',
-        automaticallyImplyLeading: true, // Remove the back button
+        automaticallyImplyLeading: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -83,8 +85,8 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
                 _currentMinAge.toInt().toString(),
                 _currentMaxAge.toInt().toString(),
               ),
-              activeColor: Colors.black, // Set active color to black
-              inactiveColor: Colors.black.withOpacity(0.3), // Adjust inactive color
+              activeColor: Colors.black,
+              inactiveColor: Colors.black.withOpacity(0.3),
               onChanged: (RangeValues values) {
                 setState(() {
                   _currentMinAge = values.start;
@@ -102,7 +104,7 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
               max: 5,
               divisions: 3,
               label: _minCarCapacity.toString(),
-              activeColor: Colors.black, // Set the slider color to black
+              activeColor: Colors.black,
               inactiveColor: Colors.black.withOpacity(0.3),
               onChanged: (double value) {
                 setState(() {
@@ -120,7 +122,7 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
               max: 5,
               divisions: 3,
               label: _maxCarCapacity.toString(),
-              activeColor: Colors.black, // Set the slider color to black
+              activeColor: Colors.black,
               inactiveColor: Colors.black.withOpacity(0.3),
               onChanged: (double value) {
                 setState(() {
@@ -129,30 +131,42 @@ class _EditPreferencesPageState extends State<EditPreferencesPage> {
               },
             ),
             SwitchListTile(
-              title: const Text('Same Gender', style: TextStyle(color: Colors.black)),
+              title: const Text('Same Gender (Identifying)', style: TextStyle(color: Colors.black)),
               value: _sameGenderToggle,
               onChanged: (bool value) {
                 setState(() {
                   _sameGenderToggle = value;
                 });
               },
-              activeColor: Colors.grey, // Keep this toggle different
+              activeColor: Colors.grey,
               inactiveThumbColor: Colors.grey.withOpacity(0.6),
               activeTrackColor: Colors.black.withOpacity(0.3),
             ),
             SwitchListTile(
-              title: const Text('Same School', style: TextStyle(color: Colors.black)),
-              value: _sameSchoolToggle,
+              title: const Text('Only Students', style: TextStyle(color: Colors.black)),
+              value: _onlyStudentsToggle,
               onChanged: (bool value) {
                 setState(() {
-                  _sameSchoolToggle = value;
+                  _onlyStudentsToggle = value;
                 });
               },
-              activeColor: Colors.black, // Set the toggle color to black
+              activeColor: Colors.black,
               inactiveThumbColor: Colors.black.withOpacity(0.6),
               activeTrackColor: Colors.black.withOpacity(0.3),
             ),
-            const Spacer(), // Push the button to the bottom
+            SwitchListTile(
+              title: const Text('Same University', style: TextStyle(color: Colors.black)),
+              value: _sameUniversityToggle,
+              onChanged: (bool value) {
+                setState(() {
+                  _sameUniversityToggle = value;
+                });
+              },
+              activeColor: Colors.black,
+              inactiveThumbColor: Colors.black.withOpacity(0.6),
+              activeTrackColor: Colors.black.withOpacity(0.3),
+            ),
+            const Spacer(),
             Center(
               child: GreenActionButton(
                 text: 'Save Preferences',

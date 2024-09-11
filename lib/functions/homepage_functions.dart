@@ -270,7 +270,7 @@ class HomePageFunctions {
             // Iterate through the list of participants in the ride
             for (String participantId in participants) {
                 // Skip the current user
-                //if (participantId == currentUser.uid) continue;
+                if (participantId == currentUser.uid) continue;
 
                 // Get the participant's document from the 'users' collection
                 DocumentSnapshot userDoc = await firestore.collection('users').doc(participantId).get();
@@ -411,73 +411,103 @@ class HomePageFunctions {
     }
 
     static bool doesUserDataMatchPreferences(Map<String, dynamic> participantData, Map<String, dynamic> currentUserData, int currentGroupSize) {
-        Map<String, dynamic> participantPrefs = participantData['preferences'];
+  Map<String, dynamic> participantPrefs = participantData['preferences'];
 
-        int userAge = currentUserData['age'];
-        int minAge = participantPrefs['ageRange']['min'];
-        int maxAge = participantPrefs['ageRange']['max'];
+  int userAge = currentUserData['age'];
+  int minAge = participantPrefs['ageRange']['min'];
+  int maxAge = participantPrefs['ageRange']['max'];
 
-        if (userAge < minAge || userAge > maxAge) {
-            return false;
-        }
+  if (userAge < minAge || userAge > maxAge) {
+      return false;
+  }
 
-        int participantMinCapacity = participantPrefs['minCarCapacity'];
-        int participantMaxCapacity = participantPrefs['maxCarCapacity'];
+  int participantMinCapacity = participantPrefs['minCarCapacity'];
+  int participantMaxCapacity = participantPrefs['maxCarCapacity'];
 
-        if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
-            return false;
-        }
+  if (currentGroupSize + 1 < participantMinCapacity || currentGroupSize + 1 > participantMaxCapacity) {
+      return false;
+  }
 
-        String? participantDomain = participantData['domain'];
-        String? userDomain = currentUserData['domain'];
+  String? participantDomain = participantData['domain'];
+  String? userDomain = currentUserData['domain'];
 
-        if (participantPrefs['schoolToggle'] == true && participantDomain != userDomain) {
-            return false;
-        }
+  // Check "Same University" preference (includes domain and student status check)
+  if (participantPrefs['sameUniversityToggle'] == true) {
+      bool participantIsStudent = participantData['isStudent'] ?? false;
+      bool userIsStudent = currentUserData['isStudent'] ?? false;
+      if (!participantIsStudent || !userIsStudent || participantDomain != userDomain) {
+          return false;
+      }
+  }
 
-        String? participantGender = participantData['sexAssignedAtBirth'];
-        String? userGender = currentUserData['sexAssignedAtBirth'];
+  // Check "Only Students" preference
+  if (participantPrefs['onlyStudentsToggle'] == true) {
+      bool userIsStudent = currentUserData['isStudent'] ?? false;
+      if (!userIsStudent) {
+          return false;
+      }
+  }
 
-        if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
-            return false;
-        }
-        return true;
-    }
+  String? participantGender = participantData['sexAssignedAtBirth'];
+  String? userGender = currentUserData['sexAssignedAtBirth'];
+
+  if (participantPrefs['sameGenderToggle'] == true && participantGender != userGender) {
+      return false;
+  }
+
+  return true;
+}
 
     static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
-        Map<String, dynamic> userPrefs = currentUserData['preferences'];
+  Map<String, dynamic> userPrefs = currentUserData['preferences'];
 
-        int userMinAge = userPrefs['ageRange']['min'];
-        int userMaxAge = userPrefs['ageRange']['max'];
-        int targetAge = targetData['age'];
+  int userMinAge = userPrefs['ageRange']['min'];
+  int userMaxAge = userPrefs['ageRange']['max'];
+  int targetAge = targetData['age'];
 
-        if (targetAge < userMinAge || targetAge > userMaxAge) {
-            return false;
-        }
+  // Check age range preference
+  if (targetAge < userMinAge || targetAge > userMaxAge) {
+    return false;
+  }
 
-        int userMinCapacity = userPrefs['minCarCapacity'];
-        int userMaxCapacity = userPrefs['maxCarCapacity'];
+  int userMinCapacity = userPrefs['minCarCapacity'];
+  int userMaxCapacity = userPrefs['maxCarCapacity'];
 
-        if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
-            return false;
-        }
+  // Check car capacity preference
+  if (currentGroupSize + 1 < userMinCapacity || currentGroupSize + 1 > userMaxCapacity) {
+    return false;
+  }
 
-        String? userDomain = currentUserData['domain'];
-        String? targetDomain = targetData['domain'];
+  String? userDomain = currentUserData['domain'];
+  String? targetDomain = targetData['domain'];
 
-        if (userPrefs['schoolToggle'] == true && userDomain != targetDomain) {
-            return false;
-        }
-
-        String? userGender = currentUserData['sexAssignedAtBirth'];
-        String? targetGender = targetData['sexAssignedAtBirth'];
-
-        if (userPrefs['sameGenderToggle'] == true && userGender != targetGender) {
-            return false;
-        }
-
-        return true;
+  // Check "Same University" preference (includes student status and domain check)
+  if (userPrefs['sameUniversityToggle'] == true) {
+    bool userIsStudent = currentUserData['isStudent'] ?? false;
+    bool targetIsStudent = targetData['isStudent'] ?? false;
+    if (!userIsStudent || !targetIsStudent || userDomain != targetDomain) {
+      return false;
     }
+  }
+
+  // Check "Only Students" preference
+  if (userPrefs['onlyStudentsToggle'] == true) {
+    bool targetIsStudent = targetData['isStudent'] ?? false;
+    if (!targetIsStudent) {
+      return false;
+    }
+  }
+
+  String? userGender = currentUserData['sexAssignedAtBirth'];
+  String? targetGender = targetData['sexAssignedAtBirth'];
+
+  // Check same gender preference
+  if (userPrefs['sameGenderToggle'] == true && userGender != targetGender) {
+    return false;
+  }
+
+  return true; // All checks passed, preferences match
+}
 
     static bool isWithinProximity(LatLng location1, LatLng location2) {
         const double maxDistance = 500; // 500 meters (we can change later)

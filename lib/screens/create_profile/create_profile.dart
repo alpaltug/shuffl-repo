@@ -231,33 +231,33 @@ Widget build(BuildContext context) {
                     controller: _ageController,
                     keyboardType: TextInputType.number,
                   ),
-                  const SizedBox(height: 15), // Reduced spacing
+                  const SizedBox(height: 15), 
                   DropdownButtonFormField<String>(
-                    value: _sexAssignedAtBirth,
-                    items: ['Male', 'Female']
-                        .map((label) => DropdownMenuItem(
-                              child: Text(label),
-                              value: label,
-                            ))
-                        .toList(),
-                    decoration: InputDecoration(
-                      labelText: 'Select Sex Assigned at Birth',
-                      labelStyle: const TextStyle(color: Colors.white),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
+                  value: _sexAssignedAtBirth,
+                  items: ['Male', 'Female', 'Non-Binary', 'Prefer Not To Say']
+                      .map((label) => DropdownMenuItem(
+                            child: Text(label),
+                            value: label,
+                          ))
+                      .toList(),
+                  decoration: InputDecoration(
+                    labelText: 'Select Gender',
+                    labelStyle: const TextStyle(color: Colors.white),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
                     ),
-                    onChanged: (value) {
-                      setState(() {
-                        _sexAssignedAtBirth = value;
-                      });
-                    },
-                    dropdownColor: Colors.grey[800],
-                    style: const TextStyle(color: Colors.white),
                   ),
+                  onChanged: (value) {
+                    setState(() {
+                      _sexAssignedAtBirth = value; // Consider renaming this variable to _gender for clarity
+                    });
+                  },
+                  dropdownColor: Colors.grey[800],
+                  style: const TextStyle(color: Colors.white),
+                ),
                   const SizedBox(height: 15), // Reduced spacing
                   if (_errorMessage != null)
                     Text(

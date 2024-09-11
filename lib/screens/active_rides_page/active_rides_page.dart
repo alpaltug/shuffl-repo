@@ -57,7 +57,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   Set<Marker> markers = {};
   bool goOnline = true;
 
-  Set<Marker> _participantMarkers = {};  // Set for storing participant markers
+  //Set<Marker> participantMarkers = {};  // Set for storing participant markers
   List<String> _participantIds = [];     // List for storing participant IDs
   late GoogleMapController _mapController;
 
@@ -97,6 +97,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   @override
   void dispose() {
     _positionStreamSubscription?.cancel();
+    _participantsSubscription?.cancel();
     super.dispose();
   }
 
@@ -112,33 +113,33 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     _loadUserProfile();
   }
 
-  // Callback to update 'goOnline' state
-  void updateGoOnlineState(bool newGoOnline) {
-    setState(() {
-      goOnline = newGoOnline;
-    });
-  }
-
-  void updateState(Function updateFn) {
-    setState(() {
-      updateFn();
-    });
-  }
-
   // Callback to update 'currentPosition'
-  void updatePosition(LatLng newPosition) {
-    setState(() {
-      currentPosition = newPosition;
-    });
-  }
+void updatePosition(LatLng newPosition) {
+  setState(() {
+    currentPosition = newPosition;
+  });
+}
 
-  // Callback to update 'markers'
-  void updateMarkers(Set<Marker> newMarkers) {
-    //print('Updating markers');
-    setState(() {
-      markers = newMarkers;
-    });
-  }
+// Callback to update 'goOnline' state
+void updateGoOnlineState(bool newGoOnline) {
+  setState(() {
+      goOnline = newGoOnline;
+  });
+}
+
+// Update state with a function, only if mounted
+void updateState(Function updateFn) {
+  setState(() {
+    updateFn();
+  });
+}
+
+// Callback to update 'markers'
+void updateMarkers(Set<Marker> newMarkers) {
+  setState(() {
+    markers = newMarkers;
+  });
+}
 
   // Toggle 'goOnline' and update necessary state variables
   void _toggleGoOnline(bool value) async {
@@ -172,59 +173,60 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   
 
   Future<void> _loadActiveRideDetails() async {
-    try {
-      //set the participant markers
-      _fetchOnlineParticipants();
-      DocumentSnapshot rideDoc = await FirebaseFirestore.instance
-          .collection('active_rides')
-          .doc(widget.rideId)
-          .get();
+  try {
+    _fetchOnlineParticipants();
+    DocumentSnapshot rideDoc = await FirebaseFirestore.instance
+        .collection('active_rides')
+        .doc(widget.rideId)
+        .get();
 
-      if (rideDoc.exists) {
-        _pickupLocation = LatLng(
-          rideDoc['pickupLocation']['latitude'],
-          rideDoc['pickupLocation']['longitude'],
-        );
+    if (rideDoc.exists) {
+      _pickupLocation = LatLng(
+        rideDoc['pickupLocation']['latitude'],
+        rideDoc['pickupLocation']['longitude'],
+      );
 
-        _pickupAddress = await HomePageFunctions.getAddressFromLatLng(_pickupLocation!);
+      _pickupAddress = await HomePageFunctions.getAddressFromLatLng(_pickupLocation!);
 
-        final dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
-        if (dropoffLocationsMap.isNotEmpty) {
-          _dropoffAddresses = dropoffLocationsMap.values.toList();
-        }
-
-        List<String> userIds = List<String>.from(rideDoc['participants']);
-        _participantIds = userIds;
-        List<DocumentSnapshot> userDocs = [];
-        for (String uid in userIds) {
-          DocumentSnapshot userDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .get();
-          if (userDoc.exists) {
-            userDocs.add(userDoc);
-          } else {
-            print('User with UID $uid not found.');
-          }
-        }
-
-        if (mounted) {
-          setState(() {
-            _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
-            _users = userDocs;
-            _rideDetailsText = "Pickup: $_pickupAddress";
-            _estimatedTime = _calculateEstimatedTime(_rideTime!);
-          });
-        }
-      } else {
-        print('Ride document does not exist.');
+      final dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
+      if (dropoffLocationsMap.isNotEmpty) {
+        _dropoffAddresses = dropoffLocationsMap.values.toList();
       }
-    } catch (e) {
+
+      List<String> userIds = List<String>.from(rideDoc['participants']);
+      _participantIds = userIds;
+      List<DocumentSnapshot> userDocs = [];
+      for (String uid in userIds) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
+        if (userDoc.exists) {
+          userDocs.add(userDoc);
+        } else {
+          print('User with UID $uid not found.');
+        }
+      }
+
+      // Check if the widget is still mounted before calling setState
       if (mounted) {
-        print('Error loading ride details: $e');
+        setState(() {
+          _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
+          _users = userDocs;
+          _rideDetailsText = "Pickup: $_pickupAddress";
+          _estimatedTime = _calculateEstimatedTime(_rideTime!);
+        });
       }
+    } else {
+      print('Ride document does not exist.');
+    }
+  } catch (e) {
+    if (mounted) {
+      print('Error loading ride details: $e');
     }
   }
+}
+
 
 
 
@@ -317,7 +319,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
             Polyline(
               polylineId: PolylineId('route_$participantId'),
               points: participantRoute,
-              color: Colors.black, // Use blue for participant routes
+              color: Colors.black, // Use black for participant routes
               width: 5,
             ),
           );
@@ -329,7 +331,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   // Function to fetch directions from Google Directions API
   Future<List<LatLng>> _getDirections(LatLng start, LatLng end) async {
     final url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude}&key=$google_maps_api_key';
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude}},${end.longitude}&key=$google_maps_api_key';
 
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
@@ -503,27 +505,13 @@ Widget build(BuildContext context) {
                     target: currentPosition ?? _pickupLocation!,
                     zoom: 14,
                   ),
-                  markers: markers.union(_participantMarkers), // Combine markers and participantMarkers
+                  markers: markers, // Combine markers and participantMarkers
                   polylines: _polylines,
                   myLocationEnabled: true,
-                  myLocationButtonEnabled: false, // Custom button used below
+                  myLocationButtonEnabled: true, // Custom button used below
                   onMapCreated: (GoogleMapController controller) {
                     _mapController = controller;
                   },
-                ),
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: FloatingActionButton(
-                    onPressed: () {
-                      if (currentPosition != null) {
-                        _mapController.animateCamera(
-                          CameraUpdate.newLatLngZoom(currentPosition!, 15.0),
-                        );
-                      }
-                    },
-                    child: const Icon(Icons.my_location),
-                  ),
                 ),
               ],
             ),

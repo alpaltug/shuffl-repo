@@ -4,10 +4,13 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   Future<void> addUser(String uid, String email) async {
+  String domain = _extractDomainFromEmail(email);
+  bool isStudent = domain.endsWith('.edu');
     await _db.collection('users').doc(uid).set({
       'email': email,
       'createdAt': FieldValue.serverTimestamp(),
-      'domain': _extractDomainFromEmail(email),
+      'domain': domain,
+      'isStudent': isStudent,
       'rating': null,
       'numRides': 0,
       'preferences': {
@@ -246,7 +249,7 @@ class FirestoreService {
   }
 
   String _extractDomainFromEmail(String email) {
-    final RegExp regExp = RegExp(r'@([a-zA-Z0-9]+)\.edu$');
+    final RegExp regExp = RegExp(r'@([a-zA-Z0-9]+)\.$');
     final match = regExp.firstMatch(email);
     final domain = match != null ? match.group(1) ?? '' : '';
     return domain;
