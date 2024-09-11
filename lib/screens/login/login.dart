@@ -45,12 +45,12 @@ class _LoginState extends State<Login> {
     // String phoneNumber = _phoneNumberController.text.trim();
     // String name = firstName + " " + lastName;
 
-    if (!email.endsWith('.edu')) {
-      setState(() {
-        _errorMessage = 'Please use a school email address ending with .edu';
-      });
-      return;
-    }
+    // if (!email.endsWith('.edu')) {
+    //   setState(() {
+    //     _errorMessage = 'Please use a school email address ending with .edu';
+    //   });
+    //   return;
+    // }
 
     if (password != confirmPassword) {
       setState(() {
@@ -111,7 +111,7 @@ class _LoginState extends State<Login> {
 
       User? user = userCredential.user;
 
-      if (user != null && user.email != null && user.email!.endsWith('.edu')) {
+      if (user != null && user.email != null) {
         final userExists = await _firestoreService.checkIfUserExists(user.uid);
         if (userExists) {
           Navigator.pushReplacement(
@@ -133,7 +133,7 @@ class _LoginState extends State<Login> {
         await _deleteUser(user);
         await _auth.signOut();
         setState(() {
-          _errorMessage = 'Please use a school email address ending with .edu';
+          _errorMessage = 'There was an error signing you in. Please try again.';
         });
       }
     } on FirebaseAuthException catch (e) {

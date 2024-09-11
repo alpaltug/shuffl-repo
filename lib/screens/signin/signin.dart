@@ -67,13 +67,13 @@ class _SignInState extends State<SignIn> {
       );
 
       User user = userCredential.user!;
-      if (!user.email!.endsWith('.edu')) {
-        setState(() {
-          _errorMessage = 'Please use a school email address ending with .edu';
-        });
-        await _auth.signOut();
-        return;
-      }
+      // if (!user.email!.endsWith('.edu')) {
+      //   setState(() {
+      //     _errorMessage = 'Please use a school email address ending with .edu';
+      //   });
+      //   await _auth.signOut();
+      //   return;
+      // }
 
       if (!user.emailVerified) {
         setState(() {
@@ -125,7 +125,7 @@ class _SignInState extends State<SignIn> {
 
       User? user = userCredential.user;
 
-      if (user != null && user.email != null && user.email!.endsWith('.edu')) {
+      if (user != null && user.email != null) {
         final userExists = await _firestoreService.checkIfUserExists(user.uid);
         if (userExists) {
           Navigator.pushReplacement(
@@ -147,7 +147,7 @@ class _SignInState extends State<SignIn> {
         await _deleteUser(user);
         await _auth.signOut();
         setState(() {
-          _errorMessage = 'Please use a school email address ending with .edu';
+          _errorMessage = 'There was an error signing you in. Please try again.';
         });
       }
     } on FirebaseAuthException {
