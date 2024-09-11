@@ -53,7 +53,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   String? _fullName;
 
   Set<Marker> markers = {};
-  bool goOnline = true;
+  bool goOnline = false;
 
   Set<Marker> _participantMarkers = {};  // Set for storing participant markers
   List<String> _participantIds = [];     // List for storing participant IDs
@@ -234,7 +234,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
         _profileImageUrl = userProfile['imageUrl'];
         _username = userProfile['username'];
         _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-        goOnline = true; //changed this line
+        goOnline = false; //changed this line
       });
       //await HomePageFunctions.fetchGoOnlineStatus();
     }
