@@ -59,6 +59,8 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   List<String> _participantIds = [];     // List for storing participant IDs
   late GoogleMapController _mapController;
 
+  Future<List<LatLng>>? _dropoffLocationsFuture;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +88,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     // );
 
     _loadActiveRideDetails();
+    _dropoffLocationsFuture = _getDropoffLocations(); // Call this once in initState
   }
 
   @override
@@ -345,7 +348,7 @@ Widget build(BuildContext context) {
       ],
     ),
     body: FutureBuilder<List<LatLng>>(
-      future: _getDropoffLocations(), // Fetch dropoff locations asynchronously
+      future: _dropoffLocationsFuture, // Fetch dropoff locations asynchronously but from the stored variable to avoid reloading  
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
