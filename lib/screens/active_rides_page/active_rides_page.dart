@@ -48,6 +48,8 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   StreamSubscription<Position>? _positionStreamSubscription;
   StreamSubscription<QuerySnapshot>? _participantsSubscription;
 
+  Set<Polyline> _polylines = {};
+
   String? _profileImageUrl;
   String? _username;
   String? _fullName;
@@ -59,15 +61,14 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   List<String> _participantIds = [];     // List for storing participant IDs
   late GoogleMapController _mapController;
 
-  Future<List<LatLng>>? _dropoffLocationsFuture;
+  //Future<List<LatLng>>? _dropoffLocationsFuture;
 
   @override
   void initState() {
     super.initState();
-
     _loadUserProfile();
-    
-     // Listen to the current position and update it
+    _loadActiveRideDetails().then((_) {
+    // Listen to the current position and update it
     HomePageFunctions.determinePosition(
       _auth,
       _firestore,
@@ -76,6 +77,9 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
       markers,
       updateState,
     );
+    _loadMarkers();
+    _updateDirections();
+  });
 
     // Start listening for online users and update markers in real-time
     // HomePageFunctions.fetchOnlineParticipants(
@@ -87,8 +91,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     //   widget.rideId,
     // );
 
-    _loadActiveRideDetails();
-    _dropoffLocationsFuture = _getDropoffLocations(); // Call this once in initState
+    //_dropoffLocationsFuture = _getDropoffLocations(); // Call this once in initState
   }
 
   @override
@@ -277,6 +280,146 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     return latLngList;
   }
 
+  Future<void> _updateDirections() async {
+    if (currentPosition == null) return;
+
+    // Draw route for the current user using their current location
+    final currentUserRoute = await _getDirections(currentPosition!, _pickupLocation!);
+    setState(() {
+      _polylines.add(
+        Polyline(
+          polylineId: const PolylineId('current_user_route'),
+          points: currentUserRoute,
+          color: Colors.yellow, // Different color for the current user's route
+          width: 5,
+        ),
+      );
+    });
+
+    // Iterate over each participantId to fetch their lastPickupLocation from Firestore
+    for (String participantId in _participantIds) {
+      if (participantId == _auth.currentUser?.uid) continue; // Skip the current user
+
+      // Fetch the lastPickupLocation for each participant from Firestore
+      DocumentSnapshot participantSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(participantId)
+          .get();
+
+      if (participantSnapshot.exists && participantSnapshot['lastPickupLocation'] != null) {
+        GeoPoint lastPickupLocation = participantSnapshot['lastPickupLocation'];
+        LatLng participantLocation = LatLng(lastPickupLocation.latitude, lastPickupLocation.longitude);
+
+        // Fetch and draw the route for the participant from their lastPickupLocation to the ride's pickup location
+        final participantRoute = await _getDirections(participantLocation, _pickupLocation!);
+        setState(() {
+          _polylines.add(
+            Polyline(
+              polylineId: PolylineId('route_$participantId'),
+              points: participantRoute,
+              color: Colors.black, // Use blue for participant routes
+              width: 5,
+            ),
+          );
+        });
+      }
+    }
+  }
+
+  // Function to fetch directions from Google Directions API
+  Future<List<LatLng>> _getDirections(LatLng start, LatLng end) async {
+    final url =
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude}&key=$google_maps_api_key';
+
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      if (jsonResponse['routes'].isNotEmpty) {
+        final route = jsonResponse['routes'][0];
+        final overviewPolyline = route['overview_polyline']['points'];
+        return _decodePolyline(overviewPolyline);
+      } else {
+        throw Exception('No routes found');
+      }
+    } else {
+      throw Exception('Failed to fetch directions');
+    }
+  }
+
+  List<LatLng> _decodePolyline(String polyline) {
+    List<LatLng> coordinates = [];
+    int index = 0, len = polyline.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = polyline.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = polyline.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      lng += dlng;
+
+      coordinates.add(LatLng(
+        (lat / 1E5).toDouble(),
+        (lng / 1E5).toDouble(),
+      ));
+    }
+
+    return coordinates;
+  }
+
+  void _loadMarkers() {
+    Set<Marker> markers = {};
+
+    // Use the custom pickup icon for pickup location
+    markers.add(
+      Marker(
+        markerId: const MarkerId('pickup'),
+        position: _pickupLocation!,
+        //icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: const InfoWindow(title: 'Pickup Location'),
+      ),
+    );
+
+    // Use the custom dropoff icon for dropoff locations
+    // for (var dropoff in widget.dropoffLocations) {
+    //   markers.add(
+    //     Marker(
+    //       markerId: MarkerId(dropoff.toString()),
+    //       position: dropoff,
+    //       //icon: _dropoffIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+    //       infoWindow: const InfoWindow(title: 'Dropoff Location'),
+    //     ),
+    //   );
+    // }
+
+    // Marker for current location
+    // if (widget.showCurrentLocation && _currentLocation != null) {
+    //   markers.add(
+    //     Marker(
+    //       markerId: const MarkerId('current'),
+    //       position: _currentLocation!,
+    //     ),
+    //   );
+    // }
+
+    setState(() {
+      markers = markers;
+    });
+  }
+
   void _endRide() async {
     bool? confirmEnd = await showDialog(
       context: context,
@@ -319,6 +462,8 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
   @override
 Widget build(BuildContext context) {
+  //final dropoffLocations = _dropoffLocations ?? []; // Assuming _dropoffLocations is initialized elsewhere
+
   return Scaffold(
     backgroundColor: kBackgroundColor,
     appBar: AppBar(
@@ -347,80 +492,63 @@ Widget build(BuildContext context) {
         ),
       ],
     ),
-    body: FutureBuilder<List<LatLng>>(
-      future: _dropoffLocationsFuture, // Fetch dropoff locations asynchronously but from the stored variable to avoid reloading  
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
-          );
-        } else if (snapshot.hasError) {
-          return const Center(
-            child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
-          );
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(
-            child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
-          );
-        }
-
-        final dropoffLocations = snapshot.data ?? [];
-
-        return Column(
-          children: [
-            if (_pickupLocation != null)
-              Expanded(
-                child: MapWidget(
-                  pickupLocation: _pickupLocation!,
-                  dropoffLocations: dropoffLocations,
-                  showCurrentLocation: false,  // Show user's current location
-                  showDirections: true,       // Show directions
-                  initialZoom: 14,
-                  participantMarkers: markers,  // Pass updated markers
-                  participantIds: _participantIds, // Pass participant
-                  userId: _auth.currentUser?.uid,
+    body: Column(
+      children: [
+        if (_pickupLocation != null)
+          Expanded(
+            child: Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: currentPosition ?? _pickupLocation!,
+                    zoom: 14,
+                  ),
+                  markers: markers.union(_participantMarkers), // Combine markers and participantMarkers
+                  polylines: _polylines,
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: false, // Custom button used below
+                  onMapCreated: (GoogleMapController controller) {
+                    _mapController = controller;
+                  },
                 ),
-              ),
-              // CURRENTLY NOT IMPLEMENTED (TOGGLE ONLINE STATUS) FOR ACTIVE RIDES BUT KEEPING THE STRUCTURE
-            //   Padding(
-            //   padding: const EdgeInsets.all(16.0),
-            //   child: Row(
-            //     mainAxisAlignment: MainAxisAlignment.center,
-            //     children: [
-            //       const Text('Go Online', style: TextStyle(color: Colors.black)),
-            //       Switch(
-            //         value: goOnline, // Set the switch's value based on Firestore data
-            //         onChanged: (value) {
-            //           _toggleGoOnline(value); // Toggle online status without full page reload
-            //         },
-            //         activeColor: Colors.yellow,
-            //       ),
-            //     ],
-            //   ),
-            // ),
-            if (_rideDetailsText != null && _estimatedTime != null)
-              RideInfoWidget(
-                rideDetails: _rideDetailsText!,
-                rideTimeText: _getRideTimeText(),
-                dropoffAddresses: _dropoffAddresses, // Pass dropoff addresses as a list
-              ),
-            if (_users.isNotEmpty)
-              Expanded(
-                child: ParticipantListWidget(users: _users),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(
-                onPressed: _endRide,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red, // Red button for ending the ride
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: FloatingActionButton(
+                    onPressed: () {
+                      if (currentPosition != null) {
+                        _mapController.animateCamera(
+                          CameraUpdate.newLatLngZoom(currentPosition!, 15.0),
+                        );
+                      }
+                    },
+                    child: const Icon(Icons.my_location),
+                  ),
                 ),
-                child: const Text('End Ride'),
-              ),
+              ],
             ),
-          ],
-        );
-      },
+          ),
+        if (_rideDetailsText != null && _estimatedTime != null)
+          RideInfoWidget(
+            rideDetails: _rideDetailsText!,
+            rideTimeText: _getRideTimeText(),
+            dropoffAddresses: _dropoffAddresses, // Pass dropoff addresses as a list
+          ),
+        if (_users.isNotEmpty)
+          Expanded(
+            child: ParticipantListWidget(users: _users),
+          ),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: ElevatedButton(
+            onPressed: _endRide,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red, // Red button for ending the ride
+            ),
+            child: const Text('End Ride'),
+          ),
+        ),
+      ],
     ),
   );
 }

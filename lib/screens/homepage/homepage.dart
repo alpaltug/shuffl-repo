@@ -952,74 +952,75 @@ Widget build(BuildContext context) {
             readOnly: true,
             onTap: () => _navigateToLocationSearch(false),
           ),
-        ),Padding(
-  padding: const EdgeInsets.all(8.0),
-  child: ElevatedButton(
-    onPressed: _findRide,
-    style: ElevatedButton.styleFrom(
-      minimumSize: const Size(double.infinity, 50),
-      backgroundColor: Colors.yellow,
-    ),
-    child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),
-  ),
-),
-Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 8.0), // Add horizontal padding to match "Find Ride Now" button
-  child: Row(
-    children: [
-      Expanded(
-        child: ElevatedButton(
-          onPressed: () {
-            showModalBottomSheet(
-              context: context,
-              builder: (context) => ScheduleRideWidget(
-                onScheduleRide: _scheduleRideWrapper,
-                onLocationSearch: _locationSearchWrapper,
-              ),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.yellow,
-            minimumSize: const Size(0, 40), // Set a minimum height to match "Find Ride Now" button
-          ),
-          child: const Text('Schedule Ahead', style: TextStyle(color: Colors.black)),
         ),
-      ),
-      const SizedBox(width: 8), 
-      Row(
-        children: [
-          const Text('Go Online', style: TextStyle(color: Colors.black)),
-          Switch(
-            value: goOnline,
-            onChanged: (value) {
-              _toggleGoOnline(value);
-            },
-            activeColor: Colors.yellow, 
-            activeTrackColor: Colors.yellowAccent, 
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ElevatedButton(
+            onPressed: _findRide,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: Colors.yellow,
+            ),
+            child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0), // Add horizontal padding to match "Find Ride Now" button
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      builder: (context) => ScheduleRideWidget(
+                        onScheduleRide: _scheduleRideWrapper,
+                        onLocationSearch: _locationSearchWrapper,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow,
+                    minimumSize: const Size(0, 40), // Set a minimum height to match "Find Ride Now" button
+                  ),
+                  child: const Text('Schedule Ahead', style: TextStyle(color: Colors.black)),
+                ),
+              ),
+              const SizedBox(width: 8), 
+                Row(
+                  children: [
+                    const Text('Go Online', style: TextStyle(color: Colors.black)),
+                    Switch(
+                      value: goOnline,
+                      onChanged: (value) {
+                        _toggleGoOnline(value);
+                      },
+                      activeColor: Colors.yellow, 
+                      activeTrackColor: Colors.yellowAccent, 
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                GoogleMap(
+                  onMapCreated: _onMapCreated,
+                  initialCameraPosition: CameraPosition(
+                    target: currentPosition ?? _center,
+                    zoom: 15.0,
+                  ),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  markers: markers,
+                ),
+              ],
+            ),
           ),
         ],
       ),
-    ],
-  ),
-),
-        Expanded(
-          child: Stack(
-            children: [
-              GoogleMap(
-                onMapCreated: _onMapCreated,
-                initialCameraPosition: CameraPosition(
-                  target: currentPosition ?? _center,
-                  zoom: 15.0,
-                ),
-                myLocationEnabled: true,
-                myLocationButtonEnabled: true,
-                markers: markers,
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 }
