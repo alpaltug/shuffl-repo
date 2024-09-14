@@ -28,6 +28,7 @@ class _LoginState extends State<Login> {
   // final TextEditingController _phoneNumberController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
+  bool _rememberMe = false;
 
   String? _errorMessage;
 

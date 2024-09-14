@@ -7,6 +7,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:my_flutter_app/screens/homepage/homepage.dart'; // Import the homepage
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -29,11 +31,39 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _isRemembered = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkRememberMe();
+  }
+
+  Future<void> _checkRememberMe() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool isRemembered = prefs.getBool('remember_me') ?? false;
+
+    setState(() {
+      _isRemembered = isRemembered;
+      _isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const CircularProgressIndicator();
+    }
+
     return MaterialApp(
       navigatorObservers: [routeObserver],
       debugShowCheckedModeBanner: false,
@@ -44,7 +74,7 @@ class MyApp extends StatelessWidget {
         textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const Login(),
+      home: _isRemembered ? const HomePage() : const Login(), // Direct to homepage if remembered
     );
   }
 }

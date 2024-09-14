@@ -11,6 +11,7 @@ import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/widgets/green_action_button.dart';
 import 'package:my_flutter_app/widgets/grey_text_field.dart';
 import 'package:my_flutter_app/widgets/logoless_appbar.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Add shared_preferences
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -24,9 +25,11 @@ class _SignInState extends State<SignIn> {
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
-
+  
+  bool _rememberMe = false; // Add remember me state
   String? _errorMessage;
 
+  // Method to get email from username
   Future<String?> _getEmailFromUsername(String username) async {
     try {
       QuerySnapshot snapshot = await _firestoreService.getUserByUsername(username);
@@ -39,6 +42,7 @@ class _SignInState extends State<SignIn> {
     return null;
   }
 
+  // Normal sign-in method
   void _signIn() async {
     setState(() {
       _errorMessage = null;
@@ -67,20 +71,17 @@ class _SignInState extends State<SignIn> {
       );
 
       User user = userCredential.user!;
-      // if (!user.email!.endsWith('.edu')) {
-      //   setState(() {
-      //     _errorMessage = 'Please use a school email address ending with .edu';
-      //   });
-      //   await _auth.signOut();
-      //   return;
-      // }
-
       if (!user.emailVerified) {
         setState(() {
           _errorMessage = 'Please verify your email before logging in.';
         });
         return;
       }
+
+      // Save Remember Me preference
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('remember_me', _rememberMe);
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -110,6 +111,7 @@ class _SignInState extends State<SignIn> {
     }
   }
 
+  // Sign-in with Google method
   void _signInWithGoogle() async {
     setState(() {
       _errorMessage = null;
@@ -128,6 +130,10 @@ class _SignInState extends State<SignIn> {
       if (user != null && user.email != null) {
         final userExists = await _firestoreService.checkIfUserExists(user.uid);
         if (userExists) {
+          // Save Remember Me preference for Google sign-in
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('remember_me', _rememberMe);
+
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -216,6 +222,23 @@ class _SignInState extends State<SignIn> {
                       controller: _passwordController,
                     ),
                     const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _rememberMe,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              _rememberMe = value ?? false;
+                            });
+                          },
+                          activeColor: kPrimaryColor,
+                        ),
+                        const Text(
+                          'Remember Me',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
                     if (_errorMessage != null)
                       Text(
                         _errorMessage!,
@@ -256,9 +279,11 @@ class _SignInState extends State<SignIn> {
                     Center(
                       child: TextButton(
                         onPressed: () {
-                          Navigator.push(context,
-                            MaterialPageRoute(builder: (context) => const Login()));
-                        }, 
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const Login()),
+                          );
+                        },
                         child: const Text(
                           "Don't have an account? Create Account",
                           style: TextStyle(color: Colors.green),
@@ -269,9 +294,11 @@ class _SignInState extends State<SignIn> {
                     Center(
                       child: TextButton(
                         onPressed: () {
-                          Navigator.push(context,
-                            MaterialPageRoute(builder: (context) => const ForgotPassword()));
-                        }, 
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ForgotPassword()),
+                          );
+                        },
                         child: const Text(
                           'Forgot password?',
                           style: TextStyle(color: Colors.white),
