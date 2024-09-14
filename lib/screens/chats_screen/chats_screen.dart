@@ -8,7 +8,6 @@ import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
 
-
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({Key? key}) : super(key: key);
 
@@ -89,7 +88,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(
-                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'),
                   );
                 }
 
@@ -100,7 +99,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   itemBuilder: (context, index) {
                     var chat = chats[index];
                     var participants = List<String>.from(chat['participants']);
-                    var isGroupChat = chat['isGroupChat'] ?? false; // Check the isGroupChat field
+                    // Add fallback for isGroupChat
+                    bool isGroupChat = false;
+                    try {
+                      isGroupChat = chat['isGroupChat'] ?? false;
+                    } catch (e) {
+                      _firestore.collection('users').doc(_auth.currentUser!.uid)
+                          .collection('chats').doc(chat.id).update({'isGroupChat': false});
+                    }
                     String currentUserUid = _auth.currentUser!.uid;
 
                     return FutureBuilder<Map<String, dynamic>>(
@@ -112,14 +118,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
                         var chatInfo = chatInfoSnapshot.data!;
                         var chatName = isGroupChat
-                            ? chat['groupTitle'] ?? 'Group Chat' // Use group title for group chats
+                            ? chat['groupTitle'] ?? 'Group Chat'
                             : chatInfo['name'];
                         var profileImageUrl = chatInfo['imageUrl'];
 
-                        // Apply search filter based on chat name
                         if (_searchQuery.isNotEmpty &&
                             !chatName.toLowerCase().contains(_searchQuery)) {
-                          return const SizedBox.shrink(); // Hide items not matching the search query
+                          return const SizedBox.shrink();
                         }
 
                         return ListTile(
@@ -197,7 +202,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Future<Map<String, dynamic>> _getChatInfo(
       DocumentSnapshot chat, List<String> participants, String currentUserUid, bool isGroupChat) async {
     if (isGroupChat) {
-      // Fetch the last message's sender UID for group chats only
       String? lastMessageSenderUid;
 
       try {
@@ -218,7 +222,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
         lastMessageSenderUid = null;
       }
 
-      // Fetch the sender's profile image URL for group chats
       String? imageUrl;
       if (lastMessageSenderUid != null) {
         try {
@@ -232,7 +235,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
       return {'name': chat['groupTitle'] ?? 'Group Chat', 'imageUrl': imageUrl};
     } else {
-      // For private messages, use the existing logic
       String friendUid = participants.firstWhere((uid) => uid != currentUserUid);
       DocumentSnapshot friendProfile = await _firestore.collection('users').doc(friendUid).get();
       String name = friendProfile['username'] ?? 'Unknown User';
