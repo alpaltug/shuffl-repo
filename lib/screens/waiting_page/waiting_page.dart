@@ -576,16 +576,18 @@ Widget build(BuildContext context) {
                         trailing: ElevatedButton(
                           onPressed: isCurrentUser ? () => _toggleReadyStatus(user.id) : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isReady ? Colors.green : Colors.white,
+                            backgroundColor: isReady ? Colors.green : Colors.grey[300],
                             foregroundColor: isReady ? Colors.white : Colors.black,
                             disabledBackgroundColor: isReady ? Colors.green : Colors.grey[300],
-                            disabledForegroundColor: isReady ? Colors.white : Colors.grey[600],
+                            disabledForegroundColor: isReady ? Colors.white : Colors.black,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(18.0),
                             ),
                             side: BorderSide(color: isReady ? Colors.green : Colors.grey),
                           ),
-                          child: Text(isReady ? 'Ready' : 'Unready'),
+                          child: Text(isCurrentUser
+                            ? (isReady ? 'Unready' : 'Ready Up')
+                            : (isReady ? 'Ready' : 'Unready')),
                         ),
                       ),
                     );
