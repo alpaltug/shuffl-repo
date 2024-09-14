@@ -4,6 +4,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:my_flutter_app/widgets/create_custom_marker.dart'; 
+
 
 class MapWidget extends StatefulWidget {
   final LatLng pickupLocation;
@@ -44,22 +46,21 @@ class _MapWidgetState extends State<MapWidget> {
   @override
   void initState() {
     super.initState();
-    _loadCustomMarkers();
     _determinePosition();
   }
 
   // Load custom marker icons for pickup and dropoff
-  Future<void> _loadCustomMarkers() async {
-    _pickupIcon = await BitmapDescriptor.fromAssetImage(
-      const ImageConfiguration(size: Size(48, 48)),
-      'assets/icons/pickup_icon.png',  // Add your custom pickup icon here
-    );
-
-    _dropoffIcon = await BitmapDescriptor.fromAssetImage(
-      const ImageConfiguration(size: Size(48, 48)),
-      'assets/icons/dropoff_icon.png', // Add your custom dropoff icon here
-    );
-  }
+  // Future<void> _loadCustomMarkers() async {
+  //   _pickupIcon = await BitmapDescriptor.fromAssetImage(
+  //     const ImageConfiguration(size: Size(48, 48)),
+  //     'assets/icons/pickup_icon.png',  // Add your custom pickup icon here
+  //   );
+    
+  //   _dropoffIcon = await BitmapDescriptor.fromAssetImage(
+  //     const ImageConfiguration(size: Size(48, 48)),
+  //     'assets/icons/dropoff_icon.png', // Add your custom dropoff icon here
+  //   );
+  // }
 
   Future<void> _determinePosition() async {
     Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
@@ -125,7 +126,7 @@ class _MapWidgetState extends State<MapWidget> {
   // Function to fetch directions from Google Directions API
   Future<List<LatLng>> _getDirections(LatLng start, LatLng end) async {
     final url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude}&key=YOUR_GOOGLE_MAPS_API_KEY';
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
@@ -184,7 +185,7 @@ class _MapWidgetState extends State<MapWidget> {
       Marker(
         markerId: const MarkerId('pickup'),
         position: widget.pickupLocation,
-        icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        //icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         infoWindow: const InfoWindow(title: 'Pickup Location'),
       ),
     );
@@ -195,7 +196,7 @@ class _MapWidgetState extends State<MapWidget> {
         Marker(
           markerId: MarkerId(dropoff.toString()),
           position: dropoff,
-          icon: _dropoffIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          //icon: _dropoffIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: const InfoWindow(title: 'Dropoff Location'),
         ),
       );

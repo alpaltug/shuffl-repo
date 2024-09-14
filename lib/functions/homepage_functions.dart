@@ -50,7 +50,7 @@ class HomePageFunctions {
             if (value) {
                 await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
             } else {
-                updateMarkers({}); // Clear markers
+                //updateMarkers({}); // Clear markers
             }
 
             // Fetch online users or participants based on rideId
@@ -116,18 +116,18 @@ class HomePageFunctions {
             String? profileImageUrl = await _getProfileImageUrl(auth, firestore);
 
             // If the profileImageUrl is not available, use a default marker
-            BitmapDescriptor markerIcon;
-            if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
-                markerIcon = await createCustomMarkerWithImage(profileImageUrl);
-            } else {
-                markerIcon = await createCustomMarkerFromAsset();
-            }
+            // BitmapDescriptor markerIcon;
+            // if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+            //     markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+            // } else {
+            //     markerIcon = await createCustomMarkerFromAsset();
+            // }
 
             // Update current position via callback
             updatePosition(newPosition);
 
             // Update location marker with the user's profile image or default marker
-            updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
+            //updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
         });
     }
 
@@ -254,11 +254,15 @@ class HomePageFunctions {
         String rideId,  // New rideId parameter to fetch participants for the specific ride
     ) async {
         User? currentUser = auth.currentUser;
-        if (currentUser == null || currentPosition == null || rideId.isEmpty) return;
+        // if (currentUser == null || currentPosition == null || rideId.isEmpty) return;
+        if (currentUser == null || rideId.isEmpty) return;
+
+        //print('Fetching online participants for ride: $rideId');
 
         // Query the active_rides collection to get participants for the specified ride
         firestore.collection('active_rides').doc(rideId).snapshots().listen((DocumentSnapshot rideDoc) async {
             if (!rideDoc.exists) return;  // If no such ride, exit early
+            //print('Ride document exists for rideId: $rideId');
 
             Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
             List<dynamic> participants = rideData['participants'] ?? [];
@@ -269,8 +273,9 @@ class HomePageFunctions {
 
             // Iterate through the list of participants in the ride
             for (String participantId in participants) {
+                //print('Checking participant with the uid: $participantId');
                 // Skip the current user
-                if (participantId == currentUser.uid) continue;
+                //if (participantId == currentUser.uid) continue;
 
                 // Get the participant's document from the 'users' collection
                 DocumentSnapshot userDoc = await firestore.collection('users').doc(participantId).get();
@@ -282,20 +287,11 @@ class HomePageFunctions {
                 if (userData['lastPickupLocation'] != null && userData['goOnline'] == true) {
                     //print('User with the uid: $participantId is online');
                     GeoPoint location = userData['lastPickupLocation'];
-                    Timestamp lastPickupTime = userData['lastPickupTime'];
-
-                    // Check if the last pickup time is within the last 15 minutes
-                    DateTime pickupTime = lastPickupTime.toDate();
-                    if (false) { //skipping but keeping the structure
-                        continue;  // Skip users with old pickup times
-                    }
 
                     LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
 
-                    // Check proximity (5000 miles in meters)
-                    double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition);
                     if (true) {  // If within proximity, add the marker (skip this but have the structure)
-                        //print('adding marker');
+                        print('adding marker for user: $participantId');
                         String locationKey = '${location.latitude},${location.longitude}';
                         if (locationCount.containsKey(locationKey)) {
                             locationCount[locationKey] = locationCount[locationKey]! + 1;

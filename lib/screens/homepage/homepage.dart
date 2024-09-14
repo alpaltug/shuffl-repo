@@ -987,40 +987,40 @@ Widget build(BuildContext context) {
                 ),
               ),
               const SizedBox(width: 8), 
-                Row(
-                  children: [
-                    const Text('Go Online', style: TextStyle(color: Colors.black)),
-                    Switch(
-                      value: goOnline,
-                      onChanged: (value) {
-                        _toggleGoOnline(value);
-                      },
-                      activeColor: Colors.yellow, 
-                      activeTrackColor: Colors.yellowAccent, 
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Stack(
-              children: [
-                GoogleMap(
-                  onMapCreated: _onMapCreated,
-                  initialCameraPosition: CameraPosition(
-                    target: currentPosition ?? _center,
-                    zoom: 15.0,
+              Row(
+                children: [
+                  const Text('Go Online', style: TextStyle(color: Colors.black)),
+                  Switch(
+                    value: goOnline,
+                    onChanged: (value) {
+                      _toggleGoOnline(value);
+                    },
+                    activeColor: Colors.yellow, 
+                    activeTrackColor: Colors.yellowAccent, 
                   ),
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  markers: markers,
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              GoogleMap(
+                onMapCreated: _onMapCreated,
+                initialCameraPosition: CameraPosition(
+                  target: currentPosition ?? _center,
+                  zoom: 15.0,
+                ),
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true,
+                markers: markers,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
 }

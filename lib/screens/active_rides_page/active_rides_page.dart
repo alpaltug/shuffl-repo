@@ -11,6 +11,8 @@ import 'package:my_flutter_app/widgets/ride_info_widget.dart';
 import 'package:my_flutter_app/widgets/participant_list_widget.dart';
 import 'package:my_flutter_app/widgets/create_custom_marker.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
@@ -55,7 +57,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   String? _fullName;
 
   Set<Marker> markers = {};
-  bool goOnline = true;
+  bool goOnline = false;
 
   //Set<Marker> participantMarkers = {};  // Set for storing participant markers
   List<String> _participantIds = [];     // List for storing participant IDs
@@ -68,17 +70,26 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     super.initState();
     _loadUserProfile();
     _loadActiveRideDetails().then((_) {
-    // Listen to the current position and update it
-    HomePageFunctions.determinePosition(
-      _auth,
-      _firestore,
-      updatePosition,
-      _positionStreamSubscription,
-      markers,
-      updateState,
-    );
-    _loadMarkers();
-    _updateDirections();
+      // Listen to the current position and update it
+      //print('Listening to position updates...');
+      HomePageFunctions.determinePosition(
+        _auth,
+        _firestore,
+        updatePosition,
+        _positionStreamSubscription,
+        markers,
+        updateState,
+      );
+      // print('Listened to position updates. here are the current position: $currentPosition');
+      // print('Listening to online participants...');
+      _fetchOnlineParticipants();
+      // print('Listened to online participants. here are the markers: $markers');
+      // print('Loading markers...');
+      //_loadMarkers();
+      // print('Loaded markers. here are the markers: $markers');
+      // print('Updating directions...');
+      _updateDirections();
+      // print('Updated directions. here are the polylines: $_polylines');
   });
 
     // Start listening for online users and update markers in real-time
@@ -115,6 +126,7 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
 
   // Callback to update 'currentPosition'
 void updatePosition(LatLng newPosition) {
+  //print('Updating position with new position: $newPosition');
   setState(() {
     currentPosition = newPosition;
   });
@@ -134,12 +146,32 @@ void updateState(Function updateFn) {
   });
 }
 
-// Callback to update 'markers'
-void updateMarkers(Set<Marker> newMarkers) {
+Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
+  return BitmapDescriptor.fromAssetImage(
+    const ImageConfiguration(size: Size(48, 48)), // Adjust size as needed
+    'assets/icons/marker.png', 
+  );
+}
+
+
+void updateMarkers(Set<Marker> newMarkers) async {
+  // Create a custom marker icon using the image
+  //BitmapDescriptor customIcon = await _createCustomMarkerIcon(context);
+
+  newMarkers.add(
+    Marker(
+      markerId: const MarkerId('pickup'),
+      position: _pickupLocation!,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      infoWindow: const InfoWindow(title: 'Pickup Location'),
+    ),
+  );
+
   setState(() {
     markers = newMarkers;
   });
 }
+
 
   // Toggle 'goOnline' and update necessary state variables
   void _toggleGoOnline(bool value) async {
@@ -207,7 +239,7 @@ void updateMarkers(Set<Marker> newMarkers) {
           print('User with UID $uid not found.');
         }
       }
-
+      print('Ride details loaded successfully.');
       // Check if the widget is still mounted before calling setState
       if (mounted) {
         setState(() {
@@ -239,7 +271,7 @@ void updateMarkers(Set<Marker> newMarkers) {
         _profileImageUrl = userProfile['imageUrl'];
         _username = userProfile['username'];
         _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-        goOnline = true; //changed this line
+        goOnline = userProfile['goOnline'] ?? false;; //changed this line
       });
       //await HomePageFunctions.fetchGoOnlineStatus();
     }
@@ -283,7 +315,20 @@ void updateMarkers(Set<Marker> newMarkers) {
   }
 
   Future<void> _updateDirections() async {
-    if (currentPosition == null) return;
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+    if (currentPosition == null) {
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      if (!userDoc.exists) return;
+
+      var userData = userDoc.data() as Map<String, dynamic>;
+      if (userData['lastPickupLocation'] == null) {
+        return;
+      } else {
+        currentPosition = LatLng(userData['lastPickupLocation'].latitude, userData['lastPickupLocation'].longitude);
+        //print('Current position updated to: $currentPosition');
+      }
+    }
 
     // Draw route for the current user using their current location
     final currentUserRoute = await _getDirections(currentPosition!, _pickupLocation!);
@@ -313,6 +358,7 @@ void updateMarkers(Set<Marker> newMarkers) {
         LatLng participantLocation = LatLng(lastPickupLocation.latitude, lastPickupLocation.longitude);
 
         // Fetch and draw the route for the participant from their lastPickupLocation to the ride's pickup location
+        //print('fetching directions for start and end: $participantLocation, $_pickupLocation');
         final participantRoute = await _getDirections(participantLocation, _pickupLocation!);
         setState(() {
           _polylines.add(
@@ -330,23 +376,37 @@ void updateMarkers(Set<Marker> newMarkers) {
 
   // Function to fetch directions from Google Directions API
   Future<List<LatLng>> _getDirections(LatLng start, LatLng end) async {
+    //print('Fetching directions from $start to $end');
+    
     final url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude}},${end.longitude}&key=$google_maps_api_key';
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=$google_maps_api_key';
 
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final jsonResponse = json.decode(response.body);
-      if (jsonResponse['routes'].isNotEmpty) {
-        final route = jsonResponse['routes'][0];
-        final overviewPolyline = route['overview_polyline']['points'];
-        return _decodePolyline(overviewPolyline);
+    try {
+      final response = await http.get(Uri.parse(url));
+      //print('Response status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body);
+        //print('Response body: $jsonResponse');
+        
+        if (jsonResponse['routes'].isNotEmpty) {
+          final route = jsonResponse['routes'][0];
+          final overviewPolyline = route['overview_polyline']['points'];
+          return _decodePolyline(overviewPolyline);
+        } else {
+          //print('No routes found in the response');
+          throw Exception('No routes found');
+        }
       } else {
-        throw Exception('No routes found');
+        //print('Failed to fetch directions. Status code: ${response.statusCode}');
+        throw Exception('Failed to fetch directions');
       }
-    } else {
-      throw Exception('Failed to fetch directions');
+    } catch (e) {
+      //print('Exception occurred while fetching directions: $e');
+      throw Exception('Error fetching directions: $e');
     }
   }
+
 
   List<LatLng> _decodePolyline(String polyline) {
     List<LatLng> coordinates = [];
@@ -383,7 +443,6 @@ void updateMarkers(Set<Marker> newMarkers) {
   }
 
   void _loadMarkers() {
-    Set<Marker> markers = {};
 
     // Use the custom pickup icon for pickup location
     markers.add(
@@ -516,6 +575,20 @@ Widget build(BuildContext context) {
               ],
             ),
           ),
+          const SizedBox(width: 8), 
+              Row(
+                children: [
+                  const Text('Go Online', style: TextStyle(color: Colors.black)),
+                  Switch(
+                    value: goOnline,
+                    onChanged: (value) {
+                      _toggleGoOnline(value);
+                    },
+                    activeColor: Colors.yellow, 
+                    activeTrackColor: Colors.yellowAccent, 
+                  ),
+                ],
+              ),
         if (_rideDetailsText != null && _estimatedTime != null)
           RideInfoWidget(
             rideDetails: _rideDetailsText!,
