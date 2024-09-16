@@ -53,6 +53,8 @@ dependencies:
   # https://pub.dev/packages/syncfusion_flutter_pdfviewer
   syncfusion_flutter_pdfviewer: ^26.2.11
   flutter_local_notifications: ^17.2.2
+  cloud_functions: ^5.1.1
+  share_plus: ^10.0.2
 
 dev_dependencies:
   flutter_test:

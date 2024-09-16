@@ -207,7 +207,7 @@ class HomePageFunctions {
                         }
 
                         // Adjust the position slightly to avoid marker overlap
-                        double offset = 0.00001 * (locationCount[locationKey]! - 1);
+                        double offset = 0.00002 * (locationCount[locationKey]! - 1);
                         LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
 
                         String? displayName = userData['fullName'];

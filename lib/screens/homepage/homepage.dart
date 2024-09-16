@@ -17,6 +17,7 @@ import 'package:my_flutter_app/screens/edit_preferences/edit_preferences.dart';
 import 'package:my_flutter_app/screens/filtered_rides_page/filtered_rides_page.dart';
 import 'package:my_flutter_app/screens/location_search_screen/location_search_screen.dart';
 import 'package:my_flutter_app/screens/notifications_screen/notifications_screen.dart';
+import 'package:my_flutter_app/screens/refer_friend_screen/refer_friend_screen.dart';
 import 'package:my_flutter_app/screens/report_screen/report_screen.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/tutorial_component_page/tutorial_component_page.dart';
@@ -842,6 +843,17 @@ Widget build(BuildContext context) {
               }
             },
           ),
+                      ListTile(
+              leading: const Icon(Icons.card_giftcard),
+              title: const Text('Refer a Friend'),
+              onTap: () {
+                Navigator.pop(context); // Close the drawer
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ReferFriendScreen()),
+                );
+              },
+            ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.privacy_tip),

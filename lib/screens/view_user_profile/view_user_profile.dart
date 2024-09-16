@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/friend_chat_screen/friend_chat_screen.dart';
 import 'package:my_flutter_app/widgets/green_action_button.dart';
+import 'package:my_flutter_app/services/notification_service.dart'; 
 
 class ViewUserProfile extends StatefulWidget {
   final String uid;
@@ -18,6 +19,7 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
+  final _notificationService = NotificationService();
   DocumentSnapshot? userProfile;
   bool isLoading = true;
   String? _displayName;
@@ -105,13 +107,24 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
     User? currentUser = _auth.currentUser;
 
     if (currentUser != null) {
-      await _firestoreService.sendFriendRequest(currentUser.uid, widget.uid);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Friend request sent')),
-      );
-      setState(() {
-        isFriendRequestSent = true;
-      });
+      try {
+        // Send friend request notification using the Cloud Function
+        await _notificationService.sendFriendRequestNotification(widget.uid);
+
+        // Update local state
+        setState(() {
+          isFriendRequestSent = true;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Friend request sent')),
+        );
+      } catch (e) {
+        print('Error sending friend request: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to send friend request. Please try again.')),
+        );
+      }
     }
   }
 

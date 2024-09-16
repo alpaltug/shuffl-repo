@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -13,6 +14,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   Future<void> init() async {
     await _fcm.requestPermission(
@@ -46,9 +48,9 @@ class NotificationService {
   }
 
   Future<void> _saveTokenToFirestore(String token) async {
-    User? user = FirebaseAuth.instance.currentUser;
+    User? user = _auth.currentUser;
     if (user != null) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+      await _firestore.collection('users').doc(user.uid).update({
         'fcmTokens': FieldValue.arrayUnion([token]),
       });
     }
@@ -89,18 +91,39 @@ class NotificationService {
       platformChannelSpecifics,
     );
   }
+
   Future<void> sendFriendRequestNotification(String toUserId) async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
+    // Get the current user's username
     DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
     String username = userDoc['username'] ?? 'A user';
 
-    await _firestore.collection('users').doc(toUserId).collection('notifications').add({
-      'type': 'friend_request',
-      'fromUid': currentUser.uid,
-      'fromUsername': username,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-}
+    try {
+      await _functions.httpsCallable('sendFriendRequestNotification').call({
+        'toUserId': toUserId,
+        'fromUserId': currentUser.uid,
+        'fromUsername': username,
+      });
+    } catch (e) {
+      print('Error sending friend request notification: $e');
+      throw e; // Rethrow the error so it can be caught in the _addFriend method
+    }
+  }
+
+  Future<void> sendNewParticipantNotification(String toUserId, String newUsername, String rideId) async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      await _functions.httpsCallable('sendNewParticipantNotification').call({
+        'toUserId': toUserId,
+        'newUsername': newUsername,
+        'rideId': rideId,
+      });
+    } catch (e) {
+      print('Error sending new participant notification: $e');
+    }
+  }
 }
