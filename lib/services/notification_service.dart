@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,7 +16,7 @@ class NotificationService {
   late FirebaseFirestore _firestore;
   late FirebaseAuth _auth;
 
-  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor( app: Firebase.app(), region: 'us-west2');
+  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(app: Firebase.app(), region: 'us-west2');
 
   Future<void> init() async {
     _fcm = FirebaseMessaging.instance;
@@ -23,36 +24,64 @@ class NotificationService {
     _firestore = FirebaseFirestore.instance;
     _auth = FirebaseAuth.instance;
 
-    await _fcm.requestPermission(
+    await _requestPermissions();
+    await _initializeLocalNotifications();
+    await _configureFCM();
+    await _saveInitialToken();
+  }
+
+  Future<void> _requestPermissions() async {
+    NotificationSettings settings = await _fcm.requestPermission(
       alert: true,
       badge: true,
       sound: true,
+      provisional: false,
     );
+    print('User granted permission: ${settings.authorizationStatus}');
 
-    await _initializeLocalNotifications();
-
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
-
-    String? token = await _fcm.getToken();
-    if (token != null) {
-      await _saveTokenToFirestore(token);
+    if (Platform.isIOS) {
+      await _fcm.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
     }
-
-    _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
   }
 
   Future<void> _initializeLocalNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings();
-    const InitializationSettings initializationSettings = InitializationSettings(
+    final DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    final InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
     );
 
-    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    await _flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: _onNotificationTap,
+    );
+  }
+
+  Future<void> _configureFCM() async {
+    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
+  }
+
+  Future<void> _saveInitialToken() async {
+    String? token = await _fcm.getToken();
+    if (token != null) {
+      print('Initial FCM Token: $token');
+      await _saveTokenToFirestore(token);
+    }
   }
 
   Future<void> _saveTokenToFirestore(String token) async {
@@ -61,41 +90,53 @@ class NotificationService {
       await _firestore.collection('users').doc(user.uid).update({
         'fcmTokens': FieldValue.arrayUnion([token]),
       });
+      print('FCM Token saved to Firestore for user ${user.uid}');
     }
   }
 
-  void _handleForegroundMessage(RemoteMessage message) {
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
     print('Received a message in the foreground: ${message.messageId}');
     print('Message data: ${message.data}');
 
     if (message.notification != null) {
-      _showLocalNotification(message.notification!);
+      await _showLocalNotification(message.notification!);
     }
   }
 
-  void _handleBackgroundMessage(RemoteMessage message) {
-    print('Handling a background message: ${message.messageId}');
-  }
-
   Future<void> _showLocalNotification(RemoteNotification notification) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'your_channel_id', // Replace with channel ID FOR ANDROID
-      'your_channel_name', // Replace with channel name FOR ANDROID
+    AndroidNotificationDetails androidDetails = const AndroidNotificationDetails(
+      'high_importance_channel',
+      'High Importance Notifications',
       importance: Importance.max,
       priority: Priority.high,
     );
-    const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails();
-    const NotificationDetails platformDetails = NotificationDetails(
+    DarwinNotificationDetails iOSDetails = const DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
       iOS: iOSDetails,
     );
 
     await _flutterLocalNotificationsPlugin.show(
-      0,
+      notification.hashCode,
       notification.title,
       notification.body,
       platformDetails,
+      payload: 'Default_Sound',
     );
+  }
+
+  void _handleBackgroundMessage(RemoteMessage message) {
+    print('Handling a background message: ${message.messageId}');
+    // Implement any specific background message handling here
+  }
+
+  void _onNotificationTap(NotificationResponse response) {
+    // Handle notification tap here
+    print('Notification tapped: ${response.payload}');
   }
 
   Future<void> sendFriendRequestNotification(String toUserId) async {
@@ -106,19 +147,11 @@ class NotificationService {
     }
 
     try {
-      print('Current user UID: ${currentUser.uid}');
-      print('Current user email: ${currentUser.email}');
-      
-      String? token = await currentUser.getIdToken(true);
-      print('Updated ID token: ${token?.substring(0, 10)}...');
-
       String username = await _getUsernameById(currentUser.uid);
-      print('Username: $username');
-
-      print('Calling Cloud Function with parameters:');
-      print('toUserId: $toUserId');
-      print('fromUserId: ${currentUser.uid}');
-      print('fromUsername: $username');
+      
+      print('Sending friend request notification:');
+      print('From: ${currentUser.uid} ($username)');
+      print('To: $toUserId');
 
       HttpsCallable callable = _functions.httpsCallable('sendFriendRequestNotification');
       final result = await callable.call({
@@ -127,14 +160,14 @@ class NotificationService {
         'fromUsername': username,
       });
 
-      print('Cloud Function result: $result');
+      print('Cloud Function result: ${result.data}');
     } catch (e) {
       print('Error in sendFriendRequestNotification: $e');
       if (e is FirebaseFunctionsException) {
         print('Firebase Functions Error Code: ${e.code}');
         print('Firebase Functions Error Details: ${e.details}');
       }
-      throw e;
+      rethrow;
     }
   }
 
@@ -143,20 +176,31 @@ class NotificationService {
     return userDoc['username'] ?? 'Unknown User';
   }
 
-  Future<void> sendNewParticipantNotification(
-      String toUserId, String newUsername, String rideId) async {
+  Future<void> sendNewParticipantNotification(String toUserId, String newUsername, String rideId) async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
     try {
       HttpsCallable callable = _functions.httpsCallable('sendNewParticipantNotification');
-      await callable.call({
+      final result = await callable.call({
         'toUserId': toUserId,
         'newUsername': newUsername,
         'rideId': rideId,
       });
+      print('New participant notification sent: ${result.data}');
     } catch (e) {
       print('Error sending new participant notification: $e');
+      if (e is FirebaseFunctionsException) {
+        print('Firebase Functions Error Code: ${e.code}');
+        print('Firebase Functions Error Details: ${e.details}');
+      }
     }
   }
+}
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("Handling a background message: ${message.messageId}");
+  // Implement any specific background message handling here
 }

@@ -104,46 +104,46 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
   }
 
   void _addFriend() async {
-  User? currentUser = _auth.currentUser;
+    User? currentUser = _auth.currentUser;
 
-  if (currentUser == null) {
-    print('Current user is null in _addFriend');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('You need to be logged in to send a friend request.')),
-    );
-    return;
-  }
-
-  try {
-    print('Current user UID in _addFriend: ${currentUser.uid}');
-    print('Current user email in _addFriend: ${currentUser.email}');
-
-    String? token = await currentUser.getIdToken(true);
-    print('Updated ID token in _addFriend: ${token?.substring(0, 10)}...'); 
-    await _notificationService.sendFriendRequestNotification(widget.uid);
-    
-    setState(() {
-      isFriendRequestSent = true;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Friend request sent')),
-    );
-  } catch (e) {
-    print('Error sending friend request in _addFriend: $e');
-    String errorMessage = 'Failed to send friend request. Please try again.';
-    if (e is FirebaseException) {
-      print('Firebase Error Code: ${e.code}');
-      print('Firebase Error Message: ${e.message}');
-      if (e.code == 'unauthenticated') {
-        errorMessage = 'You need to be logged in to send a friend request. Please log out and log back in.';
-      }
+    if (currentUser == null) {
+      print('Current user is null in _addFriend');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You need to be logged in to send a friend request.')),
+      );
+      return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(errorMessage)),
-    );
+
+    try {
+      print('Current user UID in _addFriend: ${currentUser.uid}');
+      print('Current user email in _addFriend: ${currentUser.email}');
+
+      String? token = await currentUser.getIdToken(true);
+      print('Updated ID token in _addFriend: ${token?.substring(0, 10)}...'); 
+      await _notificationService.sendFriendRequestNotification(widget.uid);
+      
+      setState(() {
+        isFriendRequestSent = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Friend request sent')),
+      );
+    } catch (e) {
+      print('Error sending friend request in _addFriend: $e');
+      String errorMessage = 'Failed to send friend request. Please try again.';
+      if (e is FirebaseException) {
+        print('Firebase Error Code: ${e.code}');
+        print('Firebase Error Message: ${e.message}');
+        if (e.code == 'unauthenticated') {
+          errorMessage = 'You need to be logged in to send a friend request. Please log out and log back in.';
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    }
   }
-}
 
   Future<void> _unfriend() async {
     User? currentUser = _auth.currentUser;
