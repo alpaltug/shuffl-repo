@@ -8,7 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:my_flutter_app/screens/homepage/homepage.dart'; // Import the homepage
+import 'package:my_flutter_app/screens/homepage/homepage.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -24,9 +24,19 @@ void main() async {
   );
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
   final notificationService = NotificationService();
   await notificationService.init();
+
+  // Debug current user
+  User? currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser != null) {
+    print('Current user UID at app start: ${currentUser.uid}');
+    print('Current user email at app start: ${currentUser.email}');
+    String? token = await currentUser.getIdToken(true);
+    print('Current user token at app start: ${token?.substring(0, 10)}...'); 
+  } else {
+    print('No user is currently signed in at app start');
+  }
 
   runApp(const MyApp());
 }
@@ -41,11 +51,22 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   bool _isRemembered = false;
   bool _isLoading = true;
+  User? _user;
 
   @override
   void initState() {
     super.initState();
-    _checkRememberMe();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await _checkRememberMe();
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      setState(() {
+        _user = user;
+        _isLoading = false;
+      });
+    });
   }
 
   Future<void> _checkRememberMe() async {
@@ -54,14 +75,19 @@ class _MyAppState extends State<MyApp> {
 
     setState(() {
       _isRemembered = isRemembered;
-      _isLoading = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const CircularProgressIndicator();
+      return MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
     }
 
     return MaterialApp(
@@ -74,7 +100,7 @@ class _MyAppState extends State<MyApp> {
         textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: _isRemembered ? const HomePage() : const Login(), // Direct to homepage if remembered
+      home: _user != null ? const HomePage() : const Login(),
     );
   }
 }

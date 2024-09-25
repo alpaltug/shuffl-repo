@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,16 +8,21 @@ import 'package:cloud_functions/cloud_functions.dart';
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
-
   NotificationService._internal();
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  late FirebaseMessaging _fcm;
+  late FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
+  late FirebaseFirestore _firestore;
+  late FirebaseAuth _auth;
+
+  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor( app: Firebase.app(), region: 'us-west2');
 
   Future<void> init() async {
+    _fcm = FirebaseMessaging.instance;
+    _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    _firestore = FirebaseFirestore.instance;
+    _auth = FirebaseAuth.instance;
+
     await _fcm.requestPermission(
       alert: true,
       badge: true,
@@ -37,8 +43,10 @@ class NotificationService {
   }
 
   Future<void> _initializeLocalNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings initializationSettingsIOS = DarwinInitializationSettings();
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings();
     const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
@@ -57,67 +65,92 @@ class NotificationService {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
-    print('Got a message whilst in the foreground!');
+    print('Received a message in the foreground: ${message.messageId}');
     print('Message data: ${message.data}');
 
     if (message.notification != null) {
-      print('Message also contained a notification: ${message.notification}');
       _showLocalNotification(message.notification!);
     }
   }
 
   void _handleBackgroundMessage(RemoteMessage message) {
     print('Handling a background message: ${message.messageId}');
-    // Handle the background message, e.g., navigate to a specific screen
   }
 
   Future<void> _showLocalNotification(RemoteNotification notification) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'your_channel_id',
-      'your_channel_name',
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'your_channel_id', // Replace with channel ID FOR ANDROID
+      'your_channel_name', // Replace with channel name FOR ANDROID
       importance: Importance.max,
       priority: Priority.high,
     );
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics = DarwinNotificationDetails();
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
+    const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails();
+    const NotificationDetails platformDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iOSDetails,
     );
 
     await _flutterLocalNotificationsPlugin.show(
       0,
       notification.title,
       notification.body,
-      platformChannelSpecifics,
+      platformDetails,
     );
   }
 
   Future<void> sendFriendRequestNotification(String toUserId) async {
     User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
-    // Get the current user's username
-    DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-    String username = userDoc['username'] ?? 'A user';
+    if (currentUser == null) {
+      print('Current user is null');
+      throw Exception('User not authenticated');
+    }
 
     try {
-      await _functions.httpsCallable('sendFriendRequestNotification').call({
+      print('Current user UID: ${currentUser.uid}');
+      print('Current user email: ${currentUser.email}');
+      
+      String? token = await currentUser.getIdToken(true);
+      print('Updated ID token: ${token?.substring(0, 10)}...');
+
+      String username = await _getUsernameById(currentUser.uid);
+      print('Username: $username');
+
+      print('Calling Cloud Function with parameters:');
+      print('toUserId: $toUserId');
+      print('fromUserId: ${currentUser.uid}');
+      print('fromUsername: $username');
+
+      HttpsCallable callable = _functions.httpsCallable('sendFriendRequestNotification');
+      final result = await callable.call({
         'toUserId': toUserId,
         'fromUserId': currentUser.uid,
         'fromUsername': username,
       });
+
+      print('Cloud Function result: $result');
     } catch (e) {
-      print('Error sending friend request notification: $e');
-      throw e; // Rethrow the error so it can be caught in the _addFriend method
+      print('Error in sendFriendRequestNotification: $e');
+      if (e is FirebaseFunctionsException) {
+        print('Firebase Functions Error Code: ${e.code}');
+        print('Firebase Functions Error Details: ${e.details}');
+      }
+      throw e;
     }
   }
 
-  Future<void> sendNewParticipantNotification(String toUserId, String newUsername, String rideId) async {
+  Future<String> _getUsernameById(String userId) async {
+    DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
+    return userDoc['username'] ?? 'Unknown User';
+  }
+
+  Future<void> sendNewParticipantNotification(
+      String toUserId, String newUsername, String rideId) async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
     try {
-      await _functions.httpsCallable('sendNewParticipantNotification').call({
+      HttpsCallable callable = _functions.httpsCallable('sendNewParticipantNotification');
+      await callable.call({
         'toUserId': toUserId,
         'newUsername': newUsername,
         'rideId': rideId,
