@@ -41,7 +41,7 @@ exports.sendNotification = regionalFunctions.firestore
 
     if (payload && tokens.length > 0) {
       try {
-        const response = await admin.messaging().sendMulticast({ tokens, ...payload });
+        const response = await admin.messaging().sendEachForMulticast({ tokens, ...payload });
         console.log('Notification sent successfully:', response);
       } catch (error) {
         console.error('Error sending notification:', error);
@@ -49,45 +49,48 @@ exports.sendNotification = regionalFunctions.firestore
     }
   });
 
-exports.sendFriendRequestNotification = regionalFunctions.https.onCall(async (data, context) => {
-  // Check if the user is authenticated
-  if (!context.auth) {
-    console.log('Unauthenticated user attempted to call function');
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to send a friend request.');
-  }
-
-  const { toUserId, fromUserId, fromUsername } = data;
-
-  await admin.firestore().collection('users').doc(toUserId).collection('notifications').add({
-    type: 'friend_request',
-    fromUid: fromUserId,
-    fromUsername: fromUsername,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  exports.sendFriendRequestNotification = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to send a friend request.');
+    }
+  
+    const { toUserId, fromUserId, fromUsername } = data;
+  
+    const userDoc = await admin.firestore().collection('users').doc(toUserId).get();
+    const fcmTokens = userDoc.data().fcmTokens || [];
+  
+    const message = {
+      notification: {
+        title: 'New Friend Request',
+        body: `${fromUsername} sent you a friend request`,
+      },
+      data: {
+        type: 'friend_request',
+        fromUserId: fromUserId,
+      },
+      tokens: fcmTokens,
+      apns: {
+        payload: {
+          aps: {
+            alert: {
+              title: 'New Friend Request',
+              body: `${fromUsername} sent you a friend request`,
+            },
+            sound: 'default',
+          },
+        },
+      },
+    };
+  
+    try {
+      const response = await admin.messaging().sendMulticast(message);
+      console.log('Successfully sent message:', response);
+      return { success: true };
+    } catch (error) {
+      console.log('Error sending message:', error);
+      throw new functions.https.HttpsError('internal', 'Error sending notification');
+    }
   });
-
-  const userDoc = await admin.firestore().collection('users').doc(toUserId).get();
-  const fcmTokens = userDoc.data().fcmTokens || [];
-  const message = {
-    notification: {
-      title: 'New Friend Request',
-      body: `${fromUsername} sent you a friend request`,
-    },
-    data: {
-      type: 'friend_request',
-      fromUserId: fromUserId,
-    },
-    tokens: fcmTokens,
-  };
-
-  try {
-    const response = await admin.messaging().sendMulticast(message);
-    console.log('Successfully sent message:', response);
-    return { success: true };
-  } catch (error) {
-    console.log('Error sending message:', error);
-    throw new functions.https.HttpsError('internal', 'Error sending notification');
-  }
-});
 
 
 exports.sendNewParticipantNotification = regionalFunctions.https.onCall(async (data, context) => {
@@ -121,7 +124,7 @@ exports.sendNewParticipantNotification = regionalFunctions.https.onCall(async (d
   };
 
   try {
-    const response = await admin.messaging().sendMulticast(message);
+    const response = await admin.messaging().sendEachForMulticast(message);
     console.log('Successfully sent message:', response);
     return { success: true };
   } catch (error) {
