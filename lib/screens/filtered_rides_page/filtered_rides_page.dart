@@ -72,23 +72,28 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       ),
       builder: (context) {
         return RideDetailsPopup(
-          ride: ride,
           participants: participants,
-          onJoinRide: () => _joinRide(ride.id, List<String>.from(ride['participants'])),
+          onJoinRide: (pickupLocation, dropoffLocation) {
+            _joinRide(ride.id, pickupLocation, dropoffLocation, List<String>.from(ride['participants']));
+          },
         );
       },
     );
   }
 
-  Future<void> _joinRide(String rideId, List<String> participants) async {
+
+  Future<void> _joinRide(String rideId, String pickupLocation, String dropoffLocation, List<String> participants) async {
     User? user = _auth.currentUser;
     if (user == null) return;
 
     if (!participants.contains(user.uid)) {
       participants.add(user.uid);
 
+      // Update the ride document with optional pickup and dropoff locations
       await _firestore.collection('rides').doc(rideId).update({
         'participants': participants,
+        if (pickupLocation.isNotEmpty) 'pickupLocations.${user.uid}': pickupLocation,
+        if (dropoffLocation.isNotEmpty) 'dropoffLocations.${user.uid}': dropoffLocation,
         'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
       });
 
@@ -102,6 +107,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       MaterialPageRoute(builder: (context) => WaitingPage(rideId: rideId)),
     );
   }
+
 
   void _navigateToLocationSearch(bool isPickup) {
     Navigator.push(

@@ -336,6 +336,91 @@ class HomePageFunctions {
         });
     }
 
+    static Future<void> fetchWaitingParticipants(
+    FirebaseAuth auth,
+    FirebaseFirestore firestore,
+    Function(Set<Marker>) updateMarkers,
+    LatLng? currentPosition,
+    Set<Marker> markers,
+    String rideId,  // New rideId parameter to fetch participants for the specific ride
+) async {
+    User? currentUser = auth.currentUser;
+    if (currentUser == null || rideId.isEmpty) return;
+
+    // Query the rides collection to get participants for the specified ride
+    firestore.collection('rides').doc(rideId).snapshots().listen((DocumentSnapshot rideDoc) async {
+        if (!rideDoc.exists) return;  // If no such ride, exit early
+
+        Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
+        List<dynamic> participants = rideData['participants'] ?? [];
+
+        Set<Marker> waitingMarkers = {};
+        Map<String, int> locationCount = {};
+        final DateTime now = DateTime.now();
+
+        // Iterate through the list of participants in the ride
+        for (String participantId in participants) {
+            // Skip the current user
+            //if (participantId == currentUser.uid) continue;
+
+            // Get the participant's document from the 'users' collection
+            DocumentSnapshot userDoc = await firestore.collection('users').doc(participantId).get();
+            if (!userDoc.exists) continue;
+
+            var userData = userDoc.data() as Map<String, dynamic>;
+
+            // Check if the user has a valid lastPickupLocation and is marked as 'ready' in readyStatus
+            if (userData['lastPickupLocation'] != null && rideData['readyStatus'][participantId] == false) {
+                GeoPoint location = userData['lastPickupLocation'];
+
+                LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+
+                // Add the marker (without proximity check as per your note)
+                print('Adding marker for user: $participantId');
+                String locationKey = '${location.latitude},${location.longitude}';
+                if (locationCount.containsKey(locationKey)) {
+                    locationCount[locationKey] = locationCount[locationKey]! + 1;
+                } else {
+                    locationCount[locationKey] = 1;
+                }
+
+                // Adjust the position slightly to avoid marker overlap
+                double offset = 0.00001 * (locationCount[locationKey]! - 1);
+                LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
+
+                String? displayName = userData['fullName'];
+                String? profileImageUrl = userData['imageUrl'];
+
+                MarkerId markerId = MarkerId(participantId);
+
+                // Check if the profileImageUrl is null or empty, and handle it accordingly
+                BitmapDescriptor markerIcon;
+                if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+                    // Use the profile image if available
+                    markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+                } else {
+                    // Fallback to the default asset if no profile picture is available
+                    markerIcon = await createCustomMarkerFromAsset();
+                }
+                print('Adding marker for user: $displayName');
+                markers.removeWhere((marker) => marker.markerId.value == participantId);
+                waitingMarkers.add(
+                    Marker(
+                        markerId: markerId,
+                        position: adjustedPosition,
+                        icon: markerIcon,
+                        infoWindow: InfoWindow(title: displayName),
+                    ),
+                );
+            }
+        }
+
+        // Update the markers in real-time using the callback
+        updateMarkers(waitingMarkers);
+    });
+}
+
+
 
 
 

@@ -35,6 +35,7 @@ target 'Runner' do
   pod 'Firebase/Analytics'
   pod 'Firebase/Auth', '~> 11.0.0'
   pod 'Firebase/Firestore', '~> 11.0.0'
+  pod 'Firebase/Messaging'
   pod 'GoogleSignIn', '~> 7.1.0'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))

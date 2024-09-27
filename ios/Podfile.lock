@@ -1498,6 +1498,7 @@ DEPENDENCIES:
   - Firebase/Analytics
   - Firebase/Auth (~> 11.0.0)
   - Firebase/Firestore (~> 11.0.0)
+  - Firebase/Messaging
   - firebase_auth (from `.symlinks/plugins/firebase_auth/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
@@ -1646,6 +1647,6 @@ SPEC CHECKSUMS:
   syncfusion_flutter_pdfviewer: bb9998884b864cfedf72628df3503bdf57e397c0
   url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
 
-PODFILE CHECKSUM: 7a1811d08dd03e2f68953dfeed5945460b79ac3c
+PODFILE CHECKSUM: b049b49c68acd13f2374af4c73daf29a3516e77b
 
 COCOAPODS: 1.15.2
