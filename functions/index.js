@@ -49,46 +49,73 @@ exports.sendNotification = regionalFunctions.firestore
     }
   });
 
-  exports.sendFriendRequestNotification = functions.https.onCall(async (data, context) => {
+  exports.sendFriendRequestNotification = regionalFunctions.https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to send a friend request.');
     }
   
     const { toUserId, fromUserId, fromUsername } = data;
   
-    const userDoc = await admin.firestore().collection('users').doc(toUserId).get();
-    const fcmTokens = userDoc.data().fcmTokens || [];
+    try {
+      const userDoc = await admin.firestore().collection('users').doc(toUserId).get();
+      if (!userDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Recipient user does not exist');
+      }
   
-    const message = {
-      notification: {
-        title: 'New Friend Request',
-        body: `${fromUsername} sent you a friend request`,
-      },
-      data: {
-        type: 'friend_request',
-        fromUserId: fromUserId,
-      },
-      tokens: fcmTokens,
-      apns: {
-        payload: {
-          aps: {
-            alert: {
-              title: 'New Friend Request',
-              body: `${fromUsername} sent you a friend request`,
+      const fcmTokens = userDoc.data().fcmTokens || [];
+      if (fcmTokens.length === 0) {
+        throw new functions.https.HttpsError('failed-precondition', 'Recipient has no FCM tokens');
+      }
+  
+      const messages = fcmTokens.map(token => ({
+        notification: {
+          title: 'New Friend Request',
+          body: `${fromUsername} sent you a friend request`,
+        },
+        data: {
+          type: 'friend_request',
+          fromUserId: fromUserId,
+        },
+        token: token,
+        apns: {
+          payload: {
+            aps: {
+              alert: {
+                title: 'New Friend Request',
+                body: `${fromUsername} sent you a friend request`,
+              },
+              sound: 'default',
             },
-            sound: 'default',
           },
         },
-      },
-    };
+      }));
   
-    try {
-      const response = await admin.messaging().sendMulticast(message);
-      console.log('Successfully sent message:', response);
-      return { success: true };
+      const response = await admin.messaging().sendEach(messages);
+      console.log('Notification sending results:', response);
+  
+      if (response.failureCount > 0) {
+        const failedTokens = [];
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            failedTokens.push(fcmTokens[idx]);
+          }
+        });
+  
+        await admin.firestore().collection('users').doc(toUserId).update({
+          fcmTokens: admin.firestore.FieldValue.arrayRemove(...failedTokens)
+        });
+  
+        console.log('Removed failed tokens:', failedTokens);
+      }
+  
+      return { 
+        success: true, 
+        successCount: response.successCount, 
+        failureCount: response.failureCount 
+      };
     } catch (error) {
-      console.log('Error sending message:', error);
-      throw new functions.https.HttpsError('internal', 'Error sending notification');
+      console.error('Error sending friend request notification:', error);
+      throw new functions.https.HttpsError('internal', 'Error sending notification', error.message);
     }
   });
 

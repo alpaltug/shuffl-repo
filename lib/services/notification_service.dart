@@ -139,7 +139,7 @@ class NotificationService {
     print('Notification tapped: ${response.payload}');
   }
 
-  Future<void> sendFriendRequestNotification(String toUserId) async {
+   Future<void> sendFriendRequestNotification(String toUserId) async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) {
       print('Current user is null');
@@ -153,6 +153,16 @@ class NotificationService {
       print('From: ${currentUser.uid} ($username)');
       print('To: $toUserId');
 
+      // Check if the recipient exists and has FCM tokens
+      DocumentSnapshot recipientDoc = await _firestore.collection('users').doc(toUserId).get();
+      if (!recipientDoc.exists) {
+        throw Exception('Recipient user does not exist');
+      }
+      List<String> recipientTokens = List<String>.from(recipientDoc['fcmTokens'] ?? []);
+      if (recipientTokens.isEmpty) {
+        throw Exception('Recipient has no FCM tokens');
+      }
+
       HttpsCallable callable = _functions.httpsCallable('sendFriendRequestNotification');
       final result = await callable.call({
         'toUserId': toUserId,
@@ -161,6 +171,9 @@ class NotificationService {
       });
 
       print('Cloud Function result: ${result.data}');
+      if (result.data['success'] == false) {
+        throw Exception('Failed to send notification: ${result.data['error']}');
+      }
     } catch (e) {
       print('Error in sendFriendRequestNotification: $e');
       if (e is FirebaseFunctionsException) {
