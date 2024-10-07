@@ -3,6 +3,7 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 const regionalFunctions = functions.region('us-west2');
+
 exports.sendNotification = regionalFunctions.firestore
   .document("users/{userId}/notifications/{notificationId}")
   .onCreate(async (snap, context) => {
@@ -35,6 +36,7 @@ exports.sendNotification = regionalFunctions.firestore
         data: {
           type: "new_participant",
           rideId: notification.rideId,
+          newUsername: notification.newUsername,
         },
       };
     }
@@ -49,116 +51,16 @@ exports.sendNotification = regionalFunctions.firestore
     }
   });
 
-  exports.sendFriendRequestNotification = regionalFunctions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to send a friend request.');
-    }
-  
-    const { toUserId, fromUserId, fromUsername } = data;
-  
-    try {
-      const userDoc = await admin.firestore().collection('users').doc(toUserId).get();
-      if (!userDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Recipient user does not exist');
-      }
-  
-      const fcmTokens = userDoc.data().fcmTokens || [];
-      if (fcmTokens.length === 0) {
-        throw new functions.https.HttpsError('failed-precondition', 'Recipient has no FCM tokens');
-      }
-  
-      const messages = fcmTokens.map(token => ({
-        notification: {
-          title: 'New Friend Request',
-          body: `${fromUsername} sent you a friend request`,
-        },
-        data: {
-          type: 'friend_request',
-          fromUserId: fromUserId,
-        },
-        token: token,
-        apns: {
-          payload: {
-            aps: {
-              alert: {
-                title: 'New Friend Request',
-                body: `${fromUsername} sent you a friend request`,
-              },
-              sound: 'default',
-            },
-          },
-        },
-      }));
-  
-      const response = await admin.messaging().sendEach(messages);
-      console.log('Notification sending results:', response);
-  
-      if (response.failureCount > 0) {
-        const failedTokens = [];
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            failedTokens.push(fcmTokens[idx]);
-          }
-        });
-  
-        await admin.firestore().collection('users').doc(toUserId).update({
-          fcmTokens: admin.firestore.FieldValue.arrayRemove(...failedTokens)
-        });
-  
-        console.log('Removed failed tokens:', failedTokens);
-      }
-  
-      return { 
-        success: true, 
-        successCount: response.successCount, 
-        failureCount: response.failureCount 
-      };
-    } catch (error) {
-      console.error('Error sending friend request notification:', error);
-      throw new functions.https.HttpsError('internal', 'Error sending notification', error.message);
-    }
-  });
+// Removed the sendFriendRequestNotification and sendNewParticipantNotification functions as they are no longer needed
 
-
-exports.sendNewParticipantNotification = regionalFunctions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    console.log('Unauthenticated user attempted to call function');
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to send a notification.');
-  }
-
-  const { toUserId, newUsername, rideId } = data;
-
-  await admin.firestore().collection('users').doc(toUserId).collection('notifications').add({
-    type: 'new_participant',
-    newUsername: newUsername,
-    rideId: rideId,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  const userDoc = await admin.firestore().collection('users').doc(toUserId).get();
-  const fcmTokens = userDoc.data().fcmTokens || [];
-
-  const message = {
-    notification: {
-      title: 'New Ride Participant',
-      body: `@${newUsername} has joined the waiting room`,
-    },
-    data: {
-      type: 'new_participant',
-      rideId: rideId,
-    },
-    tokens: fcmTokens,
-  };
-
-  try {
-    const response = await admin.messaging().sendEachForMulticast(message);
-    console.log('Successfully sent message:', response);
-    return { success: true };
-  } catch (error) {
-    console.log('Error sending message:', error);
-    throw new functions.https.HttpsError('internal', 'Error sending notification');
-  }
+// Function for generating referral code
+exports.generateReferralCode = regionalFunctions.https.onCall(async (data, context) => {
+  // Your existing code...
 });
+
+function generateCode() {
+  // Your existing code...
+}
 
 // Function for generating referral code
 exports.generateReferralCode = regionalFunctions.https.onCall(async (data, context) => {

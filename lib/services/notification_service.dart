@@ -98,7 +98,19 @@ class NotificationService {
     print('Received a message in the foreground: ${message.messageId}');
     print('Message data: ${message.data}');
 
-    if (message.notification != null) {
+    if (message.data['type'] == 'friend_request') {
+      // Handle friend request notification
+      await _showLocalNotification(RemoteNotification(
+        title: 'New Friend Request',
+        body: message.notification?.body ?? '',
+      ));
+    } else if (message.data['type'] == 'new_participant') {
+      // Handle new participant notification
+      await _showLocalNotification(RemoteNotification(
+        title: 'New Ride Participant',
+        body: message.notification?.body ?? '',
+      ));
+    } else if (message.notification != null) {
       await _showLocalNotification(message.notification!);
     }
   }
@@ -137,77 +149,6 @@ class NotificationService {
   void _onNotificationTap(NotificationResponse response) {
     // Handle notification tap here
     print('Notification tapped: ${response.payload}');
-  }
-
-   Future<void> sendFriendRequestNotification(String toUserId) async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) {
-      print('Current user is null');
-      throw Exception('User not authenticated');
-    }
-
-    try {
-      String username = await _getUsernameById(currentUser.uid);
-      
-      print('Sending friend request notification:');
-      print('From: ${currentUser.uid} ($username)');
-      print('To: $toUserId');
-
-      // Check if the recipient exists and has FCM tokens
-      DocumentSnapshot recipientDoc = await _firestore.collection('users').doc(toUserId).get();
-      if (!recipientDoc.exists) {
-        throw Exception('Recipient user does not exist');
-      }
-      List<String> recipientTokens = List<String>.from(recipientDoc['fcmTokens'] ?? []);
-      if (recipientTokens.isEmpty) {
-        throw Exception('Recipient has no FCM tokens');
-      }
-
-      HttpsCallable callable = _functions.httpsCallable('sendFriendRequestNotification');
-      final result = await callable.call({
-        'toUserId': toUserId,
-        'fromUserId': currentUser.uid,
-        'fromUsername': username,
-      });
-
-      print('Cloud Function result: ${result.data}');
-      if (result.data['success'] == false) {
-        throw Exception('Failed to send notification: ${result.data['error']}');
-      }
-    } catch (e) {
-      print('Error in sendFriendRequestNotification: $e');
-      if (e is FirebaseFunctionsException) {
-        print('Firebase Functions Error Code: ${e.code}');
-        print('Firebase Functions Error Details: ${e.details}');
-      }
-      rethrow;
-    }
-  }
-
-  Future<String> _getUsernameById(String userId) async {
-    DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
-    return userDoc['username'] ?? 'Unknown User';
-  }
-
-  Future<void> sendNewParticipantNotification(String toUserId, String newUsername, String rideId) async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
-    try {
-      HttpsCallable callable = _functions.httpsCallable('sendNewParticipantNotification');
-      final result = await callable.call({
-        'toUserId': toUserId,
-        'newUsername': newUsername,
-        'rideId': rideId,
-      });
-      print('New participant notification sent: ${result.data}');
-    } catch (e) {
-      print('Error sending new participant notification: $e');
-      if (e is FirebaseFunctionsException) {
-        print('Firebase Functions Error Code: ${e.code}');
-        print('Firebase Functions Error Details: ${e.details}');
-      }
-    }
   }
 }
 

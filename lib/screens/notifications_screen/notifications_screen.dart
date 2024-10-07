@@ -5,7 +5,8 @@ import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
 import 'package:my_flutter_app/widgets/logoless_appbar.dart';
-
+import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
+import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -49,22 +50,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       appBar: const LogolessAppBar(
         title: 'Notifications',
-        automaticallyImplyLeading: true, // Include necessary buttons
+        automaticallyImplyLeading: true,
       ),
-      backgroundColor: kBackgroundColor, // Set the background color to match the app's theme
+      backgroundColor: kBackgroundColor,
       body: currentUser == null
           ? const Center(
               child: Text(
                 'No user logged in',
-                style: TextStyle(color: Colors.black), // Set text color to black
+                style: TextStyle(color: Colors.black),
               ),
             )
           : StreamBuilder<QuerySnapshot>(
-              stream: _firestore.collection('users').doc(currentUser!.uid).collection('notifications').snapshots(),
+              stream: _firestore
+                  .collection('users')
+                  .doc(currentUser!.uid)
+                  .collection('notifications')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(
-                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'),
                   );
                 }
 
@@ -74,7 +80,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   return const Center(
                     child: Text(
                       'No notifications',
-                      style: TextStyle(color: Colors.black), // Set text color to black
+                      style: TextStyle(color: Colors.black),
                     ),
                   );
                 }
@@ -83,49 +89,86 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   itemCount: notifications.length,
                   itemBuilder: (context, index) {
                     var notification = notifications[index];
-                    var fromUid = notification['fromUid'];
+                    var notificationType = notification['type'];
                     var notificationId = notification.id;
 
-                    return FutureBuilder<String>(
-                      future: _getUsername(fromUid),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const ListTile(
+                    if (notificationType == 'friend_request') {
+                      var fromUid = notification['fromUid'];
+
+                      return FutureBuilder<String>(
+                        future: _getUsername(fromUid),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const ListTile(
+                              title: Text(
+                                'Loading...',
+                                style: TextStyle(color: Colors.black),
+                              ),
+                            );
+                          }
+
+                          var username = snapshot.data!;
+                          return ListTile(
                             title: Text(
-                              'Loading...',
-                              style: TextStyle(color: Colors.black), // Set text color to black
+                              'Friend request from @$username',
+                              style: const TextStyle(color: Colors.black),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextButton(
+                                  onPressed: () => _acceptRequest(notificationId, fromUid),
+                                  child: const Text(
+                                    'Accept',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => _declineRequest(notificationId),
+                                  child: const Text(
+                                    'Decline',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              // Navigate to the sender's profile
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ViewUserProfile(uid: fromUid),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    } else if (notificationType == 'new_participant') {
+                      var newUsername = notification['newUsername'];
+                      var rideId = notification['rideId'];
+
+                      return ListTile(
+                        title: Text(
+                          '@$newUsername joined the waiting room',
+                          style: const TextStyle(color: Colors.black),
+                        ),
+                        subtitle: Text('Ride ID: $rideId'),
+                        onTap: () {
+                          // Navigate to the waiting screen of the specific ride
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => WaitingPage(rideId: rideId),
                             ),
                           );
-                        }
+                        },
+                      );
+                    }
 
-                        var username = snapshot.data!;
-                        return ListTile(
-                          title: Text(
-                            'Friend request from @$username',
-                            style: const TextStyle(color: Colors.black), // Set text color to black
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton(
-                                onPressed: () => _acceptRequest(notificationId, fromUid),
-                                child: const Text(
-                                  'Accept',
-                                  style: TextStyle(color: Colors.black), // Set button text color to black
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () => _declineRequest(notificationId),
-                                child: const Text(
-                                  'Decline',
-                                  style: TextStyle(color: Colors.black), // Set button text color to black
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
+                    // Handle other notification types if any
+
+                    return SizedBox.shrink(); // Return an empty widget if not handled
                   },
                 );
               },

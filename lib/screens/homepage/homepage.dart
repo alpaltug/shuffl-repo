@@ -25,6 +25,7 @@ import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
+import 'package:my_flutter_app/services/notification_service.dart';
 
 import 'package:my_flutter_app/functions/homepage_functions.dart'; 
 
@@ -62,6 +63,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   String rideId = '0';
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
   StreamSubscription<Position>? _positionStreamSubscription;
+  final _notificationService = NotificationService();
 
 
   Set<Marker> markers = {}; 
@@ -337,6 +339,7 @@ Future<void> _findRideAtScheduledTime({
           'dropoffLocations.${user.uid}': finalDropoffLocation, // Update dropoff locations map
           'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
         });
+        await _sendNewParticipantNotification(doc.id, user.uid);
         matched = true;
         rideId = doc.id;
         break;
@@ -665,6 +668,29 @@ Future<void> _getUniqueUnreadMessageSenderCount() async {
     int count = await _firestoreService.getUnreadMessageSenderCount(currentUser.uid);
     setState(() {
       _uniqueMessageSenderCount = count;
+    });
+  }
+}
+
+Future<void> _sendNewParticipantNotification(String rideId, String newParticipantId) async {
+  User? currentUser = _auth.currentUser;
+  if (currentUser == null) return;
+  
+  DocumentSnapshot rideDoc = await _firestore.collection('rides').doc(rideId).get();
+  if (!rideDoc.exists) return;
+
+  List<String> participants = List<String>.from(rideDoc['participants']);
+  participants.remove(newParticipantId);
+
+  DocumentSnapshot newUserDoc = await _firestore.collection('users').doc(newParticipantId).get();
+  String newUsername = newUserDoc['username'] ?? 'A user';
+
+  for (String participantId in participants) {
+    await _firestore.collection('users').doc(participantId).collection('notifications').add({
+      'type': 'new_participant',
+      'rideId': rideId,
+      'newUsername': newUsername,
+      'timestamp': FieldValue.serverTimestamp(),
     });
   }
 }
