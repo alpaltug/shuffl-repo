@@ -94,20 +94,28 @@ class NotificationService {
     }
   }
 
-  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     print('Received a message in the foreground: ${message.messageId}');
     print('Message data: ${message.data}');
 
-    if (message.data['type'] == 'friend_request') {
-      // Handle friend request notification
+    String notificationType = message.data['type'] ?? '';
+
+    if (notificationType == 'friend_request') {
+      // Friend request notification
       await _showLocalNotification(RemoteNotification(
         title: 'New Friend Request',
         body: message.notification?.body ?? '',
       ));
-    } else if (message.data['type'] == 'new_participant') {
-      // Handle new participant notification
+    } else if (notificationType == 'new_participant') {
+      // Waiting Room notification
       await _showLocalNotification(RemoteNotification(
         title: 'New Ride Participant',
+        body: message.notification?.body ?? '',
+      ));
+    } else if (notificationType == 'chat_message' || notificationType == 'ride_chat_message') {
+      // Chat message notifications
+      await _showLocalNotification(RemoteNotification(
+        title: message.notification?.title ?? '',
         body: message.notification?.body ?? '',
       ));
     } else if (message.notification != null) {

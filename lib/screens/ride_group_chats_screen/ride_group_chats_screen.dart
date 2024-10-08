@@ -151,7 +151,7 @@ class _RideGroupChatScreenState extends State<RideGroupChatScreen> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), 
                   );
                 }
 

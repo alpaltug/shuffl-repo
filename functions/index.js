@@ -51,52 +51,89 @@ exports.sendNotification = regionalFunctions.firestore
     }
   });
 
-// Removed the sendFriendRequestNotification and sendNewParticipantNotification functions as they are no longer needed
+  exports.sendChatMessageNotification = regionalFunctions.firestore
+  .document("users/{userId}/chats/{chatId}/messages/{messageId}")
+  .onCreate(async (snap, context) => {
+    const messageData = snap.data();
+    const senderId = messageData.senderId;
+    const content = messageData.content;
+    const chatId = context.params.chatId;
 
-// Function for generating referral code
-exports.generateReferralCode = regionalFunctions.https.onCall(async (data, context) => {
-  // Your existing code...
-});
+    const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
+    const senderUsername = senderDoc.data().username || 'Unknown User';
 
-function generateCode() {
-  // Your existing code...
-}
+    const chatDoc = await admin.firestore().collection('users').doc(senderId).collection('chats').doc(chatId).get();
+    const participants = chatDoc.data().participants || [];
 
-// Function for generating referral code
-exports.generateReferralCode = regionalFunctions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    console.log('Unauthenticated user attempted to call function');
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to generate a referral code.');
-  }
+    participants.forEach(async (recipientId) => {
+      if (recipientId !== senderId) {
+        const recipientDoc = await admin.firestore().collection('users').doc(recipientId).get();
+        const tokens = recipientDoc.data().fcmTokens || [];
 
-  const userId = context.auth.uid;
-  let referralCode;
+        if (tokens.length > 0) {
+          const payload = {
+            notification: {
+              title: `@${senderUsername}`,
+              body: content,
+            },
+            data: {
+              type: 'chat_message',
+              chatId: chatId,
+              senderId: senderId,
+            },
+          };
 
-  await admin.firestore().runTransaction(async (transaction) => {
-    let isUnique = false;
-    while (!isUnique) {
-      referralCode = generateCode();
-      const snapshot = await transaction.get(
-        admin.firestore().collection('users').where('referralCode', '==', referralCode)
-      );
-      if (snapshot.empty) {
-        isUnique = true;
-        transaction.update(admin.firestore().collection('users').doc(userId), {
-          referralCode: referralCode,
-          referralCount: admin.firestore.FieldValue.increment(0),
-        });
+          try {
+            const response = await admin.messaging().sendEachForMulticast({ tokens, ...payload });
+            console.log(`Notification sent to ${recipientId}:`, response);
+          } catch (error) {
+            console.error(`Error sending notification to ${recipientId}:`, error);
+          }
+        }
       }
-    }
+    });
   });
 
-  return { referralCode: referralCode };
-});
+  exports.sendRideGroupChatNotification = regionalFunctions.firestore
+  .document("{collectionId}/{rideId}/groupChat/{messageId}")
+  .onCreate(async (snap, context) => {
+    const messageData = snap.data();
+    const senderId = messageData.senderId;
+    const content = messageData.content;
+    const collectionId = context.params.collectionId; // rides active_rides difference
+    const rideId = context.params.rideId;
 
-function generateCode() {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 6; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
-}
+    const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
+    const senderUsername = senderDoc.data().username || 'Unknown User';
+
+    const rideDoc = await admin.firestore().collection(collectionId).doc(rideId).get();
+    const participants = rideDoc.data().participants || [];
+
+    participants.forEach(async (participantId) => {
+      if (participantId !== senderId) {
+        const recipientDoc = await admin.firestore().collection('users').doc(participantId).get();
+        const tokens = recipientDoc.data().fcmTokens || [];
+
+        if (tokens.length > 0) {
+          const payload = {
+            notification: {
+              title: `@${senderUsername}`,
+              body: content,
+            },
+            data: {
+              type: 'ride_chat_message',
+              rideId: rideId,
+              senderId: senderId,
+            },
+          };
+
+          try {
+            const response = await admin.messaging().sendEachForMulticast({ tokens, ...payload });
+            console.log(`Notification sent to ${participantId}:`, response);
+          } catch (error) {
+            console.error(`Error sending notification to ${participantId}:`, error);
+          }
+        }
+      }
+    });
+  });
