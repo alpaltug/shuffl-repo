@@ -731,7 +731,7 @@ Future<void> _toggleReadyStatus(String userId) async {
     List<dynamic> participants = data['participants'];
 
     bool currentStatus = readyStatus[userId] ?? false;
-    readyStatus[userId] = !currentStatus;
+    readyStatus[userId] = !currentStatus;  // Toggle the ready status
 
     transaction.update(rideDocRef, {'readyStatus': readyStatus});
 
@@ -741,10 +741,18 @@ Future<void> _toggleReadyStatus(String userId) async {
     }
   });
 
+  // If all participants are ready, initiate the ride
   if (shouldInitRide) {
     await _initRide(rideDocRef);
   }
+
+  // Ensure the UI updates (alp fix)
+  setState(() {
+    _readyStatus[userId] = !_readyStatus[userId]!;
+  });
 }
+
+
 
 
 List<LatLng> _decodePolyline(String polyline) {
@@ -817,7 +825,9 @@ Widget build(BuildContext context) {
           )
         : Column(
             children: [
-              GoogleMap(
+              SizedBox(
+                height: 300,  // Add a specific height to avoid infinite size errors
+                child: GoogleMap(
                   initialCameraPosition: CameraPosition(
                     target: currentPosition ?? _pickupLocation!,
                     zoom: 14,
@@ -825,11 +835,12 @@ Widget build(BuildContext context) {
                   markers: markers, // Combine markers and participantMarkers
                   polylines: _polylines,
                   myLocationEnabled: true,
-                  myLocationButtonEnabled: true, // Custom button used below
+                  myLocationButtonEnabled: true,
                   onMapCreated: (GoogleMapController controller) {
                     _mapController = controller;
                   },
                 ),
+              ),
               const Text('Go Online', style: TextStyle(color: Colors.black)),
                 Switch(
                   value: goOnline,
