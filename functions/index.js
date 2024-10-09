@@ -28,6 +28,14 @@ exports.sendNotification = regionalFunctions.firestore
         },
       };
     } else if (notification.type === "new_participant") {
+      const rideId = notification.rideId;
+      const newUid = notification.newUid; 
+    
+      const rideDoc = await admin.firestore().collection('rides').doc(rideId).get();
+      const dropoffLocations = rideDoc.data().dropoffLocations || {};
+    
+      const dropoffLocation = dropoffLocations[newUid] || 'Unknown Location';
+    
       payload = {
         notification: {
           title: "New Ride Participant",
@@ -35,7 +43,8 @@ exports.sendNotification = regionalFunctions.firestore
         },
         data: {
           type: "new_participant",
-          rideId: notification.rideId,
+          rideId: rideId,
+          dropoffLocation: dropoffLocation,
           newUsername: notification.newUsername,
         },
       };
@@ -136,4 +145,28 @@ exports.sendNotification = regionalFunctions.firestore
         }
       }
     });
+  });
+
+  exports.deleteRideNotifications = regionalFunctions.firestore
+  .document('active_rides/{rideId}')
+  .onCreate(async (snap, context) => {
+    const rideId = context.params.rideId;
+
+    const usersSnapshot = await admin.firestore().collection('users').get();
+
+    const batch = admin.firestore().batch();
+
+    for (const userDoc of usersSnapshot.docs) {
+      const notificationsRef = userDoc.ref.collection('notifications');
+      const notificationsSnapshot = await notificationsRef
+        .where('rideId', '==', rideId)
+        .get();
+
+      notificationsSnapshot.forEach((notificationDoc) => {
+        batch.delete(notificationDoc.ref);
+      });
+    }
+
+    await batch.commit();
+    console.log(`Notifications related to rideId ${rideId} have been deleted.`);
   });

@@ -133,7 +133,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               ],
                             ),
                             onTap: () {
-                              // Navigate to the sender's profile
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -145,30 +144,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         },
                       );
                     } else if (notificationType == 'new_participant') {
-                      var newUsername = notification['newUsername'];
-                      var rideId = notification['rideId'];
+                        var newUsername = notification['newUsername'];
+                        var dropoffLocation = notification['dropoffLocation'];
 
-                      return ListTile(
-                        title: Text(
-                          '@$newUsername joined the waiting room',
-                          style: const TextStyle(color: Colors.black),
-                        ),
-                        subtitle: Text('Ride ID: $rideId'),
-                        onTap: () {
-                          // Navigate to the waiting screen of the specific ride
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => WaitingPage(rideId: rideId),
-                            ),
-                          );
-                        },
-                      );
-                    }
+                        return ListTile(
+                          title: Text(
+                            '@$newUsername joined the waiting room',
+                            style: const TextStyle(color: Colors.black),
+                          ),
+                          subtitle: Text('Dropoff Location: $dropoffLocation', style: const TextStyle(color: Colors.black)),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => WaitingPage(rideId: notification['rideId']),
+                              ),
+                            );
+                          },
+                        );
+                      }
 
-                    // Handle other notification types if any
-
-                    return SizedBox.shrink(); // Return an empty widget if not handled
+                    return SizedBox.shrink(); 
                   },
                 );
               },

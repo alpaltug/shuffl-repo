@@ -685,11 +685,16 @@ Future<void> _sendNewParticipantNotification(String rideId, String newParticipan
   DocumentSnapshot newUserDoc = await _firestore.collection('users').doc(newParticipantId).get();
   String newUsername = newUserDoc['username'] ?? 'A user';
 
+  Map<String, dynamic> dropoffLocationsMap = Map<String, dynamic>.from(rideDoc['dropoffLocations']);
+  String dropoffLocation = dropoffLocationsMap[newParticipantId] ?? 'Unknown Location';
+
   for (String participantId in participants) {
     await _firestore.collection('users').doc(participantId).collection('notifications').add({
       'type': 'new_participant',
       'rideId': rideId,
       'newUsername': newUsername,
+      'newUid': newParticipantId,
+      'dropoffLocation': dropoffLocation,
       'timestamp': FieldValue.serverTimestamp(),
     });
   }

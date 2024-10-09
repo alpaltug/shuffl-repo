@@ -33,6 +33,7 @@ target 'Runner' do
   use_modular_headers!
 
   pod 'Firebase/Analytics'
+  pod 'Firebase/Messaging'
   pod 'Firebase/Auth', '~> 11.0.0'
   pod 'Firebase/Firestore', '~> 11.0.0'
   pod 'Firebase/Messaging'
