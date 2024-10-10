@@ -84,14 +84,22 @@ exports.sendNotification = regionalFunctions.firestore
   .document("users/{userId}/chats/{chatId}/messages/{messageId}")
   .onCreate(async (snap, context) => {
     const messageData = snap.data();
-    const senderId = messageData.senderId;
+    const senderId = messageData.senderId; 
     const content = messageData.content;
     const chatId = context.params.chatId;
+    const userId = context.params.userId; 
 
     const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
     const senderUsername = senderDoc.data().username || 'Unknown User';
 
-    const chatDoc = await admin.firestore().collection('users').doc(senderId).collection('chats').doc(chatId).get();
+
+    const chatDoc = await admin.firestore().collection('users').doc(userId).collection('chats').doc(chatId).get();
+    
+    if (!chatDoc.exists) {
+      console.error(`Chat document not found for userId ${userId} and chatId ${chatId}`);
+      return;
+    }
+
     const participants = chatDoc.data().participants || [];
 
     let allTokens = new Set();
@@ -120,7 +128,7 @@ exports.sendNotification = regionalFunctions.firestore
       };
 
       try {
-        const response = await admin.messaging().sendMulticast({ tokens: tokensArray, ...payload });
+        const response = await admin.messaging().sendEachForMulticast({ tokens: tokensArray, ...payload });
 
         const tokensToRemove = [];
         response.responses.forEach((res, idx) => {
@@ -162,7 +170,14 @@ exports.sendNotification = regionalFunctions.firestore
     const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
     const senderUsername = senderDoc.data().username || 'Unknown User';
 
+    // Fetch the ride document from the appropriate collection
     const rideDoc = await admin.firestore().collection(collectionId).doc(rideId).get();
+    
+    if (!rideDoc.exists) {
+      console.error(`Ride document not found in ${collectionId} for rideId ${rideId}`);
+      return;
+    }
+
     const participants = rideDoc.data().participants || [];
 
     let allTokens = new Set();
@@ -191,7 +206,7 @@ exports.sendNotification = regionalFunctions.firestore
       };
 
       try {
-        const response = await admin.messaging().sendMulticast({ tokens: tokensArray, ...payload });
+        const response = await admin.messaging().sendEachForMulticast({ tokens: tokensArray, ...payload });
         const tokensToRemove = [];
         response.responses.forEach((res, idx) => {
           if (!res.success) {
