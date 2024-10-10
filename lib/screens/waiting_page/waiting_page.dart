@@ -137,23 +137,29 @@ class _WaitingPageState extends State<WaitingPage> {
   // Callback to update 'currentPosition'
 void updatePosition(LatLng newPosition) {
   //print('Updating position with new position: $newPosition');
-  setState(() {
-    currentPosition = newPosition;
-  });
+  if (mounted) {
+    setState(() {
+      currentPosition = newPosition;
+    });
+  }
 }
 
 // Callback to update 'goOnline' state
 void updateGoOnlineState(bool newGoOnline) {
-  setState(() {
+  if (mounted) {
+    setState(() {
       goOnline = newGoOnline;
-  });
+    });
+  }
 }
 
 // Update state with a function, only if mounted
 void updateState(Function updateFn) {
-  setState(() {
-    updateFn();
-  });
+  if (mounted) {
+    setState(() {
+      updateFn();
+    });
+  }
 }
 
 Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
@@ -177,9 +183,11 @@ void updateMarkers(Set<Marker> newMarkers) async {
     ),
   );
 
-  setState(() {
-    markers = newMarkers;
-  });
+  if (mounted) {
+    setState(() {
+      markers = newMarkers;
+    });
+  }
 }
 
 
@@ -344,13 +352,14 @@ void updateMarkers(Set<Marker> newMarkers) async {
     User? user = _auth.currentUser;
     if (user != null) {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
-
-      setState(() {
-        _profileImageUrl = userProfile['imageUrl'];
-        _username = userProfile['username'];
-        _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-        goOnline = userProfile['goOnline'] ?? false;; //changed this line
-      });
+      if (mounted) {
+        setState(() {
+          _profileImageUrl = userProfile['imageUrl'];
+          _username = userProfile['username'];
+          _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
+          goOnline = userProfile['goOnline'] ?? false;; //changed this line
+        });
+      }
       //await HomePageFunctions.fetchGoOnlineStatus();
     }
   }
@@ -402,9 +411,11 @@ void updateMarkers(Set<Marker> newMarkers) async {
     //   );
     // }
 
-    setState(() {
-      markers = markers;
-    });
+    if (mounted) {
+      setState(() {
+        markers = markers;
+      });
+    }
   }
 
 
@@ -466,82 +477,87 @@ void updateMarkers(Set<Marker> newMarkers) async {
   }
 
   Future<void> _initRide(DocumentReference rideDocRef) async {
-    try {
-      bool isAlreadyInitialized = false;
+  try {
+    // Perform the transaction to ensure atomicity
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
 
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        DocumentSnapshot rideDoc = await transaction.get(rideDocRef);
+      if (!rideDoc.exists) {
+        print('Ride document does not exist.');
+        return;
+      }
 
-        if (!rideDoc.exists) {
-          print('Ride document does not exist.');
-          return;
-        }
+      Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
 
-        Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
+      // Check if the ride is already initialized
+      if (rideData['status'] == 'active') {
+        print('Ride is already active.');
+        return;
+      }
 
-        if (rideData['isComplete'] != true) {
-          print('Ride is not complete yet.');
-          return;
-        }
+      // If ride is marked complete but not yet initialized, proceed
+      if (rideData['isComplete'] != true) {
+        print('Ride is not complete yet.');
+        return;
+      }
 
-        if (rideData['status'] == 'active') {
-          isAlreadyInitialized = true;
-          return;
-        }
+      // Calculate the midpoint of pickup locations
+      List<LatLng> pickupLocations = [];
+      Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
+      for (var location in pickupLocationsMap.values) {
+        pickupLocations.add(await HomePageFunctions.getLatLngFromAddress(location));
+      }
 
-        List<LatLng> pickupLocations = [];
-        Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
-        for (var location in pickupLocationsMap.values) {
-          pickupLocations.add(await HomePageFunctions.getLatLngFromAddress(location));
-        }
+      LatLng midpoint = _calculateMidpoint(pickupLocations);
+      print('Midpoint: $midpoint');
 
-        LatLng midpoint = _calculateMidpoint(pickupLocations);
-        print('Midpoint: $midpoint');
-        
-        rideData['pickupLocation'] = {
-          'latitude': midpoint.latitude,
-          'longitude': midpoint.longitude,
-        };
+      // Prepare the active ride data
+      rideData['pickupLocation'] = {
+        'latitude': midpoint.latitude,
+        'longitude': midpoint.longitude,
+      };
+      rideData['startTime'] = FieldValue.serverTimestamp();
+      rideData['status'] = 'active';
+      rideData['endRideParticipants'] = [];  // Initialize the endRideParticipants field
 
-        Map<String, String> dropoffLocationsMap = Map<String, String>.from(rideData['dropoffLocations']);
-        rideData['dropoffLocations'] = dropoffLocationsMap;
+      // Create a reference for the active ride document
+      DocumentReference activeRideDocRef = FirebaseFirestore.instance
+          .collection('active_rides')
+          .doc(rideDocRef.id);
 
-        DocumentReference activeRideDocRef = FirebaseFirestore.instance
-            .collection('active_rides')
-            .doc(rideDocRef.id);
+      // Set the active ride document and transfer the group chat messages
+      transaction.set(activeRideDocRef, rideData);
 
-        rideData['startTime'] = FieldValue.serverTimestamp();
-        rideData['status'] = 'active';
-
-        transaction.set(activeRideDocRef, rideData);
-
-        QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
-        for (var messageDoc in messagesSnapshot.docs) {
-          transaction.set(
-            activeRideDocRef.collection('groupChat').doc(messageDoc.id),
-            messageDoc.data(),
-          );
-        }
-
-        transaction.delete(rideDocRef);
-      });
-
-      if (!isAlreadyInitialized && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => ActiveRidesPage(rideId: rideDocRef.id),
-          ),
+      QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
+      for (var messageDoc in messagesSnapshot.docs) {
+        transaction.set(
+          activeRideDocRef.collection('groupChat').doc(messageDoc.id),
+          messageDoc.data(),
         );
       }
-    } catch (e) {
-      print('Error initializing ride: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to start the ride. Please try again.')),
-        );
-      }
+
+      // Remove the ride from the 'rides' collection
+      transaction.delete(rideDocRef);
+    });
+
+    // Navigate to the ActiveRidesPage after initializing the ride
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ActiveRidesPage(rideId: rideDocRef.id),
+        ),
+      );
+    }
+  } catch (e) {
+    print('Error initializing ride: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to start the ride. Please try again.')),
+      );
     }
   }
+}
+
 
   Future<void> _leaveGroup() async {
     User? user = _auth.currentUser;
@@ -636,16 +652,19 @@ Future<void> _updateDirections() async {
 
   // Draw route for the current user using their current location
   final currentUserRoute = await _getDirections(currentPosition!, _pickupLocation!);
-  setState(() {
-    _polylines.add(
-      Polyline(
-        polylineId: const PolylineId('current_user_route'),
-        points: currentUserRoute,
-        color: Colors.yellow, // Different color for the current user's route
-        width: 5,
-      ),
-    );
-  });
+
+  if (mounted) {
+    setState(() {
+       _polylines.add(
+        Polyline(
+          polylineId: const PolylineId('current_user_route'),
+          points: currentUserRoute,
+          color: Colors.yellow, // Different color for the current user's route
+          width: 5,
+        ),
+      );
+    });
+  }
 
   // Iterate over each participantId to fetch their lastPickupLocation from Firestore
   for (String participantId in _participantIds) {
@@ -664,16 +683,18 @@ Future<void> _updateDirections() async {
       // Fetch and draw the route for the participant from their lastPickupLocation to the ride's pickup location
       //print('fetching directions for start and end: $participantLocation, $_pickupLocation');
       final participantRoute = await _getDirections(participantLocation, _pickupLocation!);
-      setState(() {
-        _polylines.add(
-          Polyline(
-            polylineId: PolylineId('route_$participantId'),
-            points: participantRoute,
-            color: Colors.black, // Use black for participant routes
-            width: 5,
-          ),
-        );
-      });
+      if (mounted) {
+        setState(() {
+          _polylines.add(
+            Polyline(
+              polylineId: PolylineId('route_$participantId'),
+              points: participantRoute,
+              color: Colors.black, // Use black for participant routes
+              width: 5,
+            ),
+          );
+        });
+      }
     }
   }
 }
@@ -747,9 +768,11 @@ Future<void> _toggleReadyStatus(String userId) async {
   }
 
   // Ensure the UI updates (alp fix)
-  setState(() {
-    _readyStatus[userId] = !_readyStatus[userId]!;
-  });
+  if (mounted) {
+    setState(() {
+      _readyStatus[userId] = !_readyStatus[userId]!;
+    });
+  }
 }
 
 

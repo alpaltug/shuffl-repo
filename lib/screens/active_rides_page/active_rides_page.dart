@@ -127,23 +127,29 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   // Callback to update 'currentPosition'
 void updatePosition(LatLng newPosition) {
   //print('Updating position with new position: $newPosition');
-  setState(() {
-    currentPosition = newPosition;
-  });
+  if (mounted) {
+    setState(() {
+      currentPosition = newPosition;
+    });
+  }
 }
 
 // Callback to update 'goOnline' state
 void updateGoOnlineState(bool newGoOnline) {
-  setState(() {
+  if (mounted) {
+    setState(() {
       goOnline = newGoOnline;
-  });
+    });
+  }
 }
 
 // Update state with a function, only if mounted
 void updateState(Function updateFn) {
-  setState(() {
-    updateFn();
-  });
+  if (mounted) {
+    setState(() {
+      updateFn();
+    });
+  }
 }
 
 Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
@@ -167,9 +173,11 @@ void updateMarkers(Set<Marker> newMarkers) async {
     ),
   );
 
-  setState(() {
-    markers = newMarkers;
-  });
+  if (mounted) {
+    setState(() {
+      markers = newMarkers;
+    });
+  }
 }
 
 
@@ -266,13 +274,14 @@ void updateMarkers(Set<Marker> newMarkers) async {
     User? user = _auth.currentUser;
     if (user != null) {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
-
-      setState(() {
-        _profileImageUrl = userProfile['imageUrl'];
-        _username = userProfile['username'];
-        _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-        goOnline = userProfile['goOnline'] ?? false;; //changed this line
-      });
+      if (mounted) {
+        setState(() {
+          _profileImageUrl = userProfile['imageUrl'];
+          _username = userProfile['username'];
+          _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
+          goOnline = userProfile['goOnline'] ?? false;; //changed this line
+        });
+      }
       //await HomePageFunctions.fetchGoOnlineStatus();
     }
   }
@@ -332,16 +341,18 @@ void updateMarkers(Set<Marker> newMarkers) async {
 
     // Draw route for the current user using their current location
     final currentUserRoute = await _getDirections(currentPosition!, _pickupLocation!);
-    setState(() {
-      _polylines.add(
-        Polyline(
-          polylineId: const PolylineId('current_user_route'),
-          points: currentUserRoute,
-          color: Colors.yellow, // Different color for the current user's route
-          width: 5,
-        ),
-      );
-    });
+    if (mounted) {
+        setState(() {
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('current_user_route'),
+              points: currentUserRoute,
+              color: Colors.yellow, // Different color for the current user's route
+              width: 5,
+            ),
+          );
+        });
+      }
 
     // Iterate over each participantId to fetch their lastPickupLocation from Firestore
     for (String participantId in _participantIds) {
@@ -360,16 +371,18 @@ void updateMarkers(Set<Marker> newMarkers) async {
         // Fetch and draw the route for the participant from their lastPickupLocation to the ride's pickup location
         //print('fetching directions for start and end: $participantLocation, $_pickupLocation');
         final participantRoute = await _getDirections(participantLocation, _pickupLocation!);
-        setState(() {
-          _polylines.add(
-            Polyline(
-              polylineId: PolylineId('route_$participantId'),
-              points: participantRoute,
-              color: Colors.black, // Use black for participant routes
-              width: 5,
-            ),
-          );
-        });
+        if (mounted) {
+          setState(() {
+            _polylines.add(
+              Polyline(
+                polylineId: PolylineId('route_$participantId'),
+                points: participantRoute,
+                color: Colors.black, // Use black for participant routes
+                width: 5,
+              ),
+            );
+          });
+        }
       }
     }
   }
@@ -476,50 +489,72 @@ void updateMarkers(Set<Marker> newMarkers) async {
     //   );
     // }
 
-    setState(() {
-      markers = markers;
-    });
+    if (mounted) {
+      setState(() {
+        markers = markers;
+      });
+    }
   }
 
   void _endRide() async {
-    bool? confirmEnd = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('End Ride', style: TextStyle(color: Colors.black)),
-        content: Text('Are you sure you want to end the ride? You will be directed to the rating screen.', style: TextStyle(color: Colors.black)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('End Ride', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+  bool? confirmEnd = await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('End Ride', style: TextStyle(color: Colors.black)),
+      content: Text('Are you sure you want to end the ride? You will be directed to the rating screen.', style: TextStyle(color: Colors.black)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text('End Ride', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmEnd == true) {
+    // Get the current user's ID
+    String? currentUserId = _auth.currentUser?.uid;
+
+    if (currentUserId != null) {
+      // Get the ride document
+      DocumentReference rideDocRef = FirebaseFirestore.instance.collection('active_rides').doc(widget.rideId);
+
+      // Perform a transaction to update the ride data
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // Get the ride document snapshot
+        DocumentSnapshot rideSnapshot = await transaction.get(rideDocRef);
+
+        if (!rideSnapshot.exists) {
+          print('Ride document does not exist.');
+          return;
+        }
+
+        // Update the document:
+        // 1. Add the current user to 'endRideParticipants'
+        // 2. Keep the current user in 'participants' for rating purposes
+        transaction.update(rideDocRef, {
+          'endRideParticipants': FieldValue.arrayUnion([currentUserId]),  // Add to new list
+        });
+      });
+    }
+
+    // Navigate to the RatingPage with the participants list
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RatingPage(
+          rideId: widget.rideId,
+          participants: _users.map((e) => e.id).toList(),  // Pass the original participants list
+        ),
       ),
     );
-
-    if (confirmEnd == true) {
-      // Remove current user from participants
-      String? currentUserId = _auth.currentUser?.uid;
-      if (currentUserId != null) {
-        await FirebaseFirestore.instance
-            .collection('active_rides')
-            .doc(widget.rideId)
-            .update({
-          'participants': FieldValue.arrayRemove([currentUserId]),
-        });
-      }
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => RatingPage(rideId: widget.rideId, participants: _users.map((e) => e.id).toList()),
-        ),
-      );
-    }
   }
+}
+
 
   @override
 Widget build(BuildContext context) {
