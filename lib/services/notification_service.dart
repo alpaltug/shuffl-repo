@@ -16,8 +16,6 @@ class NotificationService {
   late FirebaseFirestore _firestore;
   late FirebaseAuth _auth;
 
-  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(app: Firebase.app(), region: 'us-west2');
-
   Future<void> init() async {
     _fcm = FirebaseMessaging.instance;
     _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -27,7 +25,6 @@ class NotificationService {
     await _requestPermissions();
     await _initializeLocalNotifications();
     await _configureFCM();
-    await _saveInitialToken();
   }
 
   Future<void> _requestPermissions() async {
@@ -73,26 +70,38 @@ class NotificationService {
     FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
-  }
-
-  Future<void> _saveInitialToken() async {
     String? token = await _fcm.getToken();
     if (token != null) {
-      print('Initial FCM Token: $token');
       await _saveTokenToFirestore(token);
     }
+    _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
   }
 
   Future<void> _saveTokenToFirestore(String token) async {
     User? user = _auth.currentUser;
     if (user != null) {
-      await _firestore.collection('users').doc(user.uid).update({
-        'fcmTokens': FieldValue.arrayUnion([token]),
-      });
-      print('FCM Token saved to Firestore for user ${user.uid}');
+      DocumentReference userRef = _firestore.collection('users').doc(user.uid);
+
+      try {
+        await _firestore.runTransaction((transaction) async {
+          DocumentSnapshot userSnapshot = await transaction.get(userRef);
+          List<dynamic> tokens = userSnapshot['fcmTokens'] ?? [];
+
+          if (!tokens.contains(token)) {
+            transaction.update(userRef, {
+              'fcmTokens': FieldValue.arrayUnion([token]),
+            });
+            print('FCM Token saved to Firestore for user ${user.uid}');
+          } else {
+            print('FCM Token already exists for user ${user.uid}');
+          }
+        });
+      } catch (e) {
+        print('Error saving FCM token to Firestore: $e');
+      }
     }
   }
+
 
    Future<void> _handleForegroundMessage(RemoteMessage message) async {
     print('Received a message in the foreground: ${message.messageId}');
