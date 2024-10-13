@@ -310,62 +310,64 @@ Future<void> _findRideAtScheduledTime({
   }
 
 
-  Future<String> _createRideRequest(DateTime timeOfRide, {String? pickupLocation, String? dropoffLocation}) async {
-    User? user = _auth.currentUser;
-    if (user == null) return '';
+Future<String> _createRideRequest(DateTime timeOfRide, {String? pickupLocation, String? dropoffLocation}) async {
+  User? user = _auth.currentUser;
+  if (user == null) return '';
 
-    // Determine the pickup and dropoff locations to use
-    String finalPickupLocation = pickupLocation ?? _pickupController.text;
-    String finalDropoffLocation = dropoffLocation ?? _dropoffController.text;
+  // Determine the pickup and dropoff locations to use
+  String finalPickupLocation = pickupLocation ?? _pickupController.text;
+  String finalDropoffLocation = dropoffLocation ?? _dropoffController.text;
 
-    // Query ride requests with the same time of ride within a certain range (e.g., +/- 15 minutes)
-    QuerySnapshot existingRides = await _firestore
-        .collection('rides')
-        .where('timeOfRide', isGreaterThanOrEqualTo: timeOfRide.subtract(const Duration(minutes: 15)))
-        .where('timeOfRide', isLessThanOrEqualTo: timeOfRide.add(const Duration(minutes: 15)))
-        .get();
+  // Query ride requests with the same time of ride within a certain range (e.g., +/- 15 minutes)
+  QuerySnapshot existingRides = await _firestore
+      .collection('rides')
+      .where('timeOfRide', isGreaterThanOrEqualTo: timeOfRide.subtract(const Duration(minutes: 15)))
+      .where('timeOfRide', isLessThanOrEqualTo: timeOfRide.add(const Duration(minutes: 15)))
+      .get();
 
-    bool matched = false;
-    String rideId = '';
+  bool matched = false;
+  String rideId = '';
 
-    for (var doc in existingRides.docs) {
-      Future<bool> isMatch = _validateMatch(doc, timeOfRide);
+  for (var doc in existingRides.docs) {
+    // Pass the final pickup and dropoff locations to the _validateMatch function
+    Future<bool> isMatch = _validateMatch(doc, timeOfRide, finalPickupLocation, finalDropoffLocation);
 
-      if (await isMatch) {
-        // Add user to existing ride and update destinations
-        await doc.reference.update({
-          'participants': FieldValue.arrayUnion([user.uid]),
-          'pickupLocations.${user.uid}': finalPickupLocation, // Update pickup locations map
-          'dropoffLocations.${user.uid}': finalDropoffLocation, // Update dropoff locations map
-          'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
-        });
-        await _sendNewParticipantNotification(doc.id, user.uid);
-        matched = true;
-        rideId = doc.id;
-        break;
-      }
-    }
-
-    if (!matched) {
-      // Create a new ride request if no match was found
-      DocumentReference newRide = await _firestore.collection('rides').add({
-        'timeOfRide': timeOfRide,
-        'pickupLocations': {user.uid: finalPickupLocation}, // Store pickup locations as a map
-        'dropoffLocations': {user.uid: finalDropoffLocation}, // Store dropoff locations as a map
-        'participants': [user.uid],
-        'isComplete': false,
-        'timestamp': FieldValue.serverTimestamp(),
-        'readyStatus': {user.uid: false}, // Initialize ready status map with current user as false
+    if (await isMatch) {
+      // Add user to existing ride and update destinations
+      await doc.reference.update({
+        'participants': FieldValue.arrayUnion([user.uid]),
+        'pickupLocations.${user.uid}': finalPickupLocation, // Update pickup locations map
+        'dropoffLocations.${user.uid}': finalDropoffLocation, // Update dropoff locations map
+        'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
       });
-
-      rideId = newRide.id;
+      await _sendNewParticipantNotification(doc.id, user.uid);
+      matched = true;
+      rideId = doc.id;
+      break;
     }
+  }
 
-    // Reset the selected ride time after the request
-    _selectedRideTime = null;
+  if (!matched) {
+    // Create a new ride request if no match was found
+    DocumentReference newRide = await _firestore.collection('rides').add({
+      'timeOfRide': timeOfRide,
+      'pickupLocations': {user.uid: finalPickupLocation}, // Store pickup locations as a map
+      'dropoffLocations': {user.uid: finalDropoffLocation}, // Store dropoff locations as a map
+      'participants': [user.uid],
+      'isComplete': false,
+      'timestamp': FieldValue.serverTimestamp(),
+      'readyStatus': {user.uid: false}, // Initialize ready status map with current user as false
+    });
 
-    return rideId;
+    rideId = newRide.id;
+  }
+
+  // Reset the selected ride time after the request
+  _selectedRideTime = null;
+
+  return rideId;
 }
+
 
 
 Future<bool> _isValidRoute(LatLng pickup, LatLng newDropoff, List<LatLng> existingDropoffs) async {
@@ -396,52 +398,59 @@ Future<bool> _isValidRoute(LatLng pickup, LatLng newDropoff, List<LatLng> existi
     return true;
   }
 
-  // Further checks: If the new dropoff extends the route logically
-  // For example, does it follow the direction of the existing route?
+  // Step 1: Compute the initial route with existing dropoffs
+  List<LatLng> allStops = [pickup, ...existingDropoffs];
+  
+  // Step 2: Compute route with new dropoff added
+  List<LatLng> routeWithNewDropoff = [pickup, ...existingDropoffs, newDropoff];
 
-  LatLng start = dropoffLocations.first;
-  LatLng end = dropoffLocations.last;
+  // Step 3: Fetch routes from Google Directions API
+  double originalRouteDistance = await _getRouteDistance(allStops);
+  double newRouteDistance = await _getRouteDistance(routeWithNewDropoff);
 
-  double routeDirectionLat = end.latitude - start.latitude;
-  double routeDirectionLon = end.longitude - start.longitude;
-
-  double newDirectionLat = newDropoff.latitude - end.latitude;
-  double newDirectionLon = newDropoff.longitude - end.longitude;
-
-  // Basic check if the new direction is somewhat aligned with the route direction
-  if (routeDirectionLat * newDirectionLat >= 0 && routeDirectionLon * newDirectionLon >= 0) {
+  // Step 4: Decide based on the percentage increase in route distance
+  const double maxAllowedIncrease = 0.2; // For example, allow only a 20% increase in route distance
+  if (newRouteDistance <= originalRouteDistance * (1 + maxAllowedIncrease)) {
     return true;
   }
-
-  double pickupLat = pickup.latitude;
-  double pickupLong = pickup.longitude;
-
-  double dropoffLat = newDropoff.latitude;
-  double dropoffLong = newDropoff.longitude;
-
-  // Determine if the dropoff is north or south of the pickup
-  bool isDropoffNorth = dropoffLat > pickupLat;
-
-  for (LatLng loc in dropoffLocations) {
-    double lat = loc.latitude;
-    double long = loc.longitude;
-
-    // Check if the current location is on the same side as the dropoff
-    bool isLocNorth = lat > pickupLat;
-
-    if (isLocNorth == isDropoffNorth) {
-      print("Location $lat, $long is on the same side as the dropoff.");
-    } else {
-      print("Location $lat, $long is on the opposite side from the dropoff.");
-      return false;
-    }
-  }
-
-  // If the new dropoff is significantly off the current route, it's not a match
+  print('Failed to validate route with pickup: $pickup, existing dropoffs: $existingDropoffs');
   return false;
 }
 
-Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) async {
+Future<double> _getRouteDistance(List<LatLng> waypoints) async {
+  String origin = '${waypoints.first.latitude},${waypoints.first.longitude}';
+  String destination = '${waypoints.last.latitude},${waypoints.last.longitude}';
+  
+  // Add `optimize:true` to the waypoints parameter
+  String waypointsParam = 'optimize:true|' + waypoints.sublist(1, waypoints.length - 1)
+      .map((latLng) => '${latLng.latitude},${latLng.longitude}')
+      .join('|');
+
+  String url =
+      'https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&waypoints=$waypointsParam&key=$google_maps_api_key';
+
+  final response = await http.get(Uri.parse(url));
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    if (data['routes'] != null && data['routes'].isNotEmpty) {
+      return data['routes'][0]['legs']
+          .map<double>((leg) {
+            var distanceValue = leg['distance']['value'];
+            if (distanceValue != null && distanceValue is num) {
+              return distanceValue.toDouble(); // Ensure it is treated as a double
+            }
+            return 0.0; // Handle cases where distance might be missing or invalid
+          })
+          .fold(0.0, (sum, value) => sum + value); // Sum of all leg distances using fold
+    }
+  }
+
+  throw Exception('Failed to fetch directions');
+}
+
+
+
+Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide, String pickupLocation, String dropoffLocation) async {
   User? currentUser = _auth.currentUser;
   if (currentUser == null) return false;
 
@@ -459,11 +468,11 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
   // Check for blocked users within the ride participants
   for (String participantId in participants) {
     if (blockedUsers.contains(participantId) || blockedBy.contains(participantId)) {
-      return false; // If any participant is blocked or has blocked the current user, return false
+      return false;
     }
   }
 
-  // Retrieve the pickup locations and ensure they are LatLng objects
+  // Retrieve the pickup and dropoff locations and ensure they are LatLng objects
   List<LatLng> pickupLocationsList = [];
   Map<String, String> pickupLocationsMap = Map<String, String>.from(rideRequest['pickupLocations']);
 
@@ -473,7 +482,8 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
 
   if (pickupLocationsList.isEmpty) return false;
 
-  LatLng currentPickupLocation = await HomePageFunctions.getLatLngFromAddress(_pickupController.text);
+  // Use the provided pickup location for the user instead of _pickupController.text
+  LatLng currentPickupLocation = await HomePageFunctions.getLatLngFromAddress(pickupLocation);
   bool pickupProximityMatched = pickupLocationsList.any((location) =>
       HomePageFunctions.isWithinProximity(location, currentPickupLocation));
 
@@ -490,7 +500,8 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
 
   if (dropoffLocationsList.isEmpty) return false;
 
-  LatLng currentDropoffLocation = await HomePageFunctions.getLatLngFromAddress(_dropoffController.text);
+  // Use the provided dropoff location for the user instead of _dropoffController.text
+  LatLng currentDropoffLocation = await HomePageFunctions.getLatLngFromAddress(dropoffLocation);
 
   bool isRouteValid = await _isValidRoute(currentPickupLocation, currentDropoffLocation, dropoffLocationsList);
 
@@ -498,6 +509,7 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
     return false;
   }
 
+  // Validate preferences and return result
   for (String participantId in participants) {
     if (participantId == currentUser.uid) continue;
 
@@ -514,6 +526,7 @@ Future<bool> _validateMatch(DocumentSnapshot rideRequest, DateTime timeOfRide) a
 
   return true;
 }
+
 
 Future<void> _showDateTimeAndLocationPicker() async {
   DateTime? selectedDate = await showDatePicker(
