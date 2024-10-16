@@ -26,6 +26,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String? friendUsername;
   String? friendImageUrl;
   String? currentUserImageUrl;
+  bool _isSending = false;
+
 
   @override
   void initState() {
@@ -72,17 +74,29 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _sendMessage() async {
-    if (_controller.text.isEmpty) return;
+    if (_controller.text.isEmpty || _isSending) return;
+
+    _isSending = true; // Disable sending temporarily
+
+    print("Sending message: ${_controller.text}");
 
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
+      // Get the server timestamp
+      final timestamp = FieldValue.serverTimestamp();
+
+      // Pass the timestamp to the sendMessage method
       await _firestoreService.sendMessage(
-          chatId, currentUser.uid, widget.friendUid, _controller.text);
+          chatId, currentUser.uid, widget.friendUid, _controller.text, timestamp);
+
       // Mark the message as read for the sender
       await _firestoreService.markMessagesAsRead(chatId, currentUser.uid);
+
       _controller.clear();
     }
+    _isSending = false; // Enable sending
   }
+
 
   ImageProvider<Object> _getProfileImage(String? imageUrl) {
     // Always use the imageUrl from Firestore.

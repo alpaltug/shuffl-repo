@@ -127,14 +127,21 @@ class FirestoreService {
     }
   }
 
-  Future<void> sendMessage(String chatId, String currentUserId, String friendUserId, String messageContent) async {
+  Future<void> sendMessage(
+  String chatId,
+  String currentUserId,
+  String friendUserId,
+  String messageContent,
+  FieldValue timestamp // New parameter for the timestamp
+  ) async {
     final messageData = {
       'content': messageContent,
-      'timestamp': FieldValue.serverTimestamp(),
+      'timestamp': timestamp, // Use the provided timestamp
       'senderId': currentUserId,
       'read': currentUserId == friendUserId,
     };
 
+    // Save the message for the current user
     await _db
         .collection('users')
         .doc(currentUserId)
@@ -143,6 +150,7 @@ class FirestoreService {
         .collection('messages')
         .add(messageData);
 
+    // Save the message for the friend user
     await _db
         .collection('users')
         .doc(friendUserId)
@@ -151,19 +159,21 @@ class FirestoreService {
         .collection('messages')
         .add({
       'content': messageContent,
-      'timestamp': FieldValue.serverTimestamp(),
+      'timestamp': timestamp, // Use the same timestamp here
       'senderId': currentUserId,
       'read': false,
     });
 
+    // Update the last message information for both users
     final lastMessageData = {
       'lastMessage': {
         'content': messageContent,
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': timestamp, // Use the same timestamp here
       },
       'participants': [currentUserId, friendUserId],
     };
 
+    // Update the chat document for the current user
     await _db
         .collection('users')
         .doc(currentUserId)
@@ -171,6 +181,7 @@ class FirestoreService {
         .doc(chatId)
         .set(lastMessageData, SetOptions(merge: true));
 
+    // Update the chat document for the friend user
     await _db
         .collection('users')
         .doc(friendUserId)
@@ -178,6 +189,7 @@ class FirestoreService {
         .doc(chatId)
         .set(lastMessageData, SetOptions(merge: true));
   }
+
 
   Future<void> markMessagesAsRead(String chatId, String userId) async {
     final unreadMessages = await _db
