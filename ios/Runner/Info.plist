@@ -54,6 +54,8 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
 	<array>
 		<string>fetch</string>
 		<string>remote-notification</string>
