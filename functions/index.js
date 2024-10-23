@@ -54,7 +54,7 @@ exports.sendNotification = regionalFunctions.firestore
 
         if (payload && uniqueTokens.length > 0) {
         try {
-            const response = await admin.messaging().sendMulticast({
+            const response = await admin.messaging().sendEachForMulticast({
             tokens: uniqueTokens,
             notification: payload.notification,
             data: payload.data,
@@ -88,217 +88,165 @@ exports.sendChatMessageNotification = regionalFunctions.firestore
   .document("users/{userId}/chats/{chatId}/messages/{messageId}")
   .onCreate(async (snap, context) => {
     try {
-        const messageRef = snap.ref;
-        const messageData = snap.data();
-        const senderId = messageData.senderId;
-        const content = messageData.content;
-        const chatId = context.params.chatId;
-        const userId = context.params.userId;
+      const messageRef = snap.ref;
+      const messageData = snap.data();
+      const senderId = messageData.senderId;
+      const content = messageData.content;
+      const chatId = context.params.chatId;
+      const userId = context.params.userId;
 
-        const notificationId = `${chatId}_${context.params.messageId}`;
-        const notificationLogRef = admin.firestore().collection('notifications_log').doc(notificationId);
-
-        console.log(`Checking if notification already exists for notificationId: ${notificationId}`);
-
-        // Run a transaction to ensure atomicity for both the notification flag and logging
-        await admin.firestore().runTransaction(async (transaction) => {
-            const notificationLogDoc = await transaction.get(notificationLogRef);
-            
-            // Check if the notification log already exists
-            if (notificationLogDoc.exists) {
-                console.log(`Notification for ${notificationId} already logged. Skipping.`);
-                return;
-            }
-
-            const messageSnapshot = await transaction.get(messageRef);
-            const messageData = messageSnapshot.data();
-
-            // Check if notification was already sent inside the transaction
-            if (messageData.notificationSent) {
-                console.log('Notification already sent for this message. Skipping.');
-                return;
-            }
-
-            // ** Set notificationSent flag in the message and log notification in the transaction **
-            transaction.update(messageRef, { notificationSent: true });
-            transaction.set(notificationLogRef, {
-                chatId: chatId,
-                messageId: context.params.messageId,
-                senderId: senderId,
-                timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-            console.log("Notification sent flag marked as true in transaction.");
-            console.log("Notification log created for id: " + notificationId);
-
-            console.log(`Processing message from senderId: ${senderId} in chatId: ${chatId} for userId: ${userId}`);
-
-            const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
-            const senderUsername = senderDoc.data().username || 'Unknown User';
-            console.log("Message sender username is: " + senderUsername);
-
-            const chatDoc = await admin.firestore().collection('users').doc(userId).collection('chats').doc(chatId).get();
-
-            if (!chatDoc.exists) {
-                console.error(`Chat document not found for userId ${userId} and chatId ${chatId}`);
-                return;
-            }
-
-            const participants = chatDoc.data().participants || [];
-            console.log(`Participants in the chat: ${participants}`);
-
-            let allTokens = new Set();
-            for (const recipientId of participants) {
-                if (recipientId !== senderId) {
-                    const recipientDoc = await admin.firestore().collection('users').doc(recipientId).get();
-                    const tokens = recipientDoc.data().fcmTokens || [];
-                    tokens.forEach(token => allTokens.add(token));
-                }
-            }
-
-            const senderTokens = senderDoc.data().fcmTokens || [];
-            console.log("Sender tokens are: " + JSON.stringify(senderTokens));
-            console.log("All tokens are: " + JSON.stringify(Array.from(allTokens)));
-
-            const tokensArray = Array.from(allTokens);
-            console.log(`Final tokens to send notification to: ${tokensArray}`);
-
-            if (tokensArray.length > 0) {
-                const payload = {
-                    notification: {
-                        title: `@${senderUsername}`,
-                        body: content,
-                    },
-                    data: {
-                        type: 'chat_message',
-                        chatId: chatId,
-                        senderId: senderId,
-                    },
-                };
-
-                console.log('Sending payload:', JSON.stringify(payload));
-
-                const response = await admin.messaging().sendEachForMulticast({
-                    tokens: tokensArray,
-                    notification: payload.notification,
-                    data: payload.data,
-                });
-
-                console.log('FCM response:', JSON.stringify(response));
-
-                const tokensToRemove = [];
-                response.responses.forEach((res, idx) => {
-                    if (!res.success) {
-                        const errorCode = res.error.code;
-                        console.error(`Error sending to token ${tokensArray[idx]}:`, res.error);
-                        if (errorCode === 'messaging/invalid-registration-token' || errorCode === 'messaging/registration-token-not-registered') {
-                            tokensToRemove.push(tokensArray[idx]);
-                        }
-                    }
-                });
-
-                if (tokensToRemove.length > 0) {
-                    console.log(`Removing invalid tokens: ${tokensToRemove}`);
-                    for (const token of tokensToRemove) {
-                        for (const recipientId of participants) {
-                            if (recipientId !== senderId) {
-                                await admin.firestore().collection('users').doc(recipientId).update({
-                                    fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
-                                });
-                            }
-                        }
-                    }
-                }
-
-                console.log('Notification sent successfully.');
-            } else {
-                console.log('No tokens to send notification to.');
-            }
-        });
-    } catch (error) {
-        console.error('Error in sendChatMessageNotification:', error);
-    }
-});
-
-
-
-
-
-
-
-
-
-
-
-exports.sendRideGroupChatNotification = regionalFunctions.firestore
-  .document("{collectionId}/{rideId}/groupChat/{messageId}")
-  .onCreate(async (snap, context) => {
-    const messageData = snap.data();
-    const senderId = messageData.senderId;
-    const content = messageData.content;
-    const collectionId = context.params.collectionId; // 'rides' or 'active_rides'
-    const rideId = context.params.rideId;
-
-    // Fetch the timestamp of the last notification
-    const lastNotificationTime = messageData.notificationSentAt ? messageData.notificationSentAt.toMillis() : 0;
-    const currentTime = Date.now();
-    const timeThreshold = 5000; // 5 seconds threshold to prevent duplicate notifications
-
-    // If the last notification was sent less than 5 seconds ago, do not send another notification
-    if (lastNotificationTime && (currentTime - lastNotificationTime < timeThreshold)) {
-      console.log('Notification already sent recently, skipping.');
-      return;
-    }
-
-    const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
-    const senderUsername = senderDoc.data().username || 'Unknown User';
-
-    // Fetch the ride document from the appropriate collection
-    const rideDoc = await admin.firestore().collection(collectionId).doc(rideId).get();
-    
-    if (!rideDoc.exists) {
-      console.error(`Ride document not found in ${collectionId} for rideId ${rideId}`);
-      return;
-    }
-
-    const participants = rideDoc.data().participants || [];
-
-    let allTokens = new Set();
-
-    for (const participantId of participants) {
-      if (participantId !== senderId) {
-        const recipientDoc = await admin.firestore().collection('users').doc(recipientId).get();
-        const tokens = recipientDoc.data().fcmTokens || [];
-        tokens.forEach(token => allTokens.add(token));
+      // **Add this condition to prevent sending notifications to the sender**
+      if (userId === senderId) {
+        console.log("Message added to sender's collection. Skipping notification.");
+        return;
       }
-    }
 
-    const tokensArray = Array.from(allTokens);
+      // **Check if notification was already sent for this message**
+      if (messageData.notificationSent) {
+        console.log('Notification already sent for this message. Skipping.');
+        return;
+      }
 
-    if (tokensArray.length > 0) {
-      const payload = {
-        notification: {
-          title: `@${senderUsername}`,
-          body: content,
-        },
-        data: {
-          type: 'ride_chat_message',
-          rideId: rideId,
-          senderId: senderId,
-        },
-      };
+      // **Mark notification as sent**
+      await messageRef.update({ notificationSent: true });
 
-      try {
-        const response = await admin.messaging().sendMulticast({
-          tokens: tokensArray,
+      console.log(`Processing message from senderId: ${senderId} in chatId: ${chatId} for userId: ${userId}`);
+
+      // Fetch sender's username
+      const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
+      const senderUsername = senderDoc.data().username || 'Unknown User';
+      console.log("Message sender username is: " + senderUsername);
+
+      // Fetch recipient's FCM tokens
+      const recipientDoc = await admin.firestore().collection('users').doc(userId).get();
+      const recipientTokens = recipientDoc.data().fcmTokens || [];
+
+      console.log(`Recipient tokens: ${recipientTokens}`);
+
+      if (recipientTokens.length > 0) {
+        const payload = {
+          notification: {
+            title: `@${senderUsername}`,
+            body: content,
+          },
+          data: {
+            type: 'chat_message',
+            chatId: chatId,
+            senderId: senderId,
+          },
+        };
+
+        console.log('Sending payload:', JSON.stringify(payload));
+
+        const response = await admin.messaging().sendEachForMulticast({
+          tokens: recipientTokens,
           notification: payload.notification,
           data: payload.data,
         });
+
+        console.log('FCM response:', JSON.stringify(response));
 
         const tokensToRemove = [];
         response.responses.forEach((res, idx) => {
           if (!res.success) {
             const errorCode = res.error.code;
+            console.error(`Error sending to token ${recipientTokens[idx]}:`, res.error);
+            if (errorCode === 'messaging/invalid-registration-token' || errorCode === 'messaging/registration-token-not-registered') {
+              tokensToRemove.push(recipientTokens[idx]);
+            }
+          }
+        });
+
+        if (tokensToRemove.length > 0) {
+          console.log(`Removing invalid tokens: ${tokensToRemove}`);
+          await admin.firestore().collection('users').doc(userId).update({
+            fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
+          });
+        }
+
+        console.log('Notification sent successfully.');
+      } else {
+        console.log('No tokens to send notification to.');
+      }
+    } catch (error) {
+      console.error('Error in sendChatMessageNotification:', error);
+    }
+  });
+
+  exports.sendRideGroupChatNotification = regionalFunctions.firestore
+  .document("{collectionId}/{rideId}/groupChat/{messageId}")
+  .onCreate(async (snap, context) => {
+    try {
+      const messageRef = snap.ref;
+      const messageData = snap.data();
+      const senderId = messageData.senderId;
+      const content = messageData.content;
+      const collectionId = context.params.collectionId; // 'rides' or 'active_rides'
+      const rideId = context.params.rideId;
+
+      // **Check if notification was already sent for this message**
+      if (messageData.notificationSent) {
+        console.log('Notification already sent for this message. Skipping.');
+        return;
+      }
+
+      // **Mark notification as sent**
+      await messageRef.update({ notificationSent: true });
+
+      // Fetch the ride document from the appropriate collection
+      const rideDoc = await admin.firestore().collection(collectionId).doc(rideId).get();
+
+      if (!rideDoc.exists) {
+        console.error(`Ride document not found in ${collectionId} for rideId ${rideId}`);
+        return;
+      }
+
+      const participants = rideDoc.data().participants || [];
+
+      // **Exclude the sender from the list of recipients**
+      const recipientIds = participants.filter(uid => uid !== senderId);
+
+      let allTokens = new Set();
+
+      for (const recipientId of recipientIds) {
+        const recipientDoc = await admin.firestore().collection('users').doc(recipientId).get();
+        const tokens = recipientDoc.data().fcmTokens || [];
+        tokens.forEach(token => allTokens.add(token));
+      }
+
+      const tokensArray = Array.from(allTokens);
+
+      if (tokensArray.length > 0) {
+        const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
+        const senderUsername = senderDoc.data().username || 'Unknown User';
+
+        const payload = {
+          notification: {
+            title: `@${senderUsername}`,
+            body: content,
+          },
+          data: {
+            type: 'ride_chat_message',
+            rideId: rideId,
+            senderId: senderId,
+          },
+        };
+
+        console.log('Sending payload:', JSON.stringify(payload));
+
+        const response = await admin.messaging().sendEachForMulticast({
+          tokens: tokensArray,
+          notification: payload.notification,
+          data: payload.data,
+        });
+
+        console.log('FCM response:', JSON.stringify(response));
+
+        const tokensToRemove = [];
+        response.responses.forEach((res, idx) => {
+          if (!res.success) {
+            const errorCode = res.error.code;
+            console.error(`Error sending to token ${tokensArray[idx]}:`, res.error);
             if (errorCode === 'messaging/invalid-registration-token' ||
                 errorCode === 'messaging/registration-token-not-registered') {
               tokensToRemove.push(tokensArray[idx]);
@@ -306,25 +254,21 @@ exports.sendRideGroupChatNotification = regionalFunctions.firestore
           }
         });
 
-        for (const token of tokensToRemove) {
-          for (const participantId of participants) {
-            if (participantId !== senderId) {
-              await admin.firestore().collection('users').doc(participantId).update({
-                fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
-              });
-            }
+        if (tokensToRemove.length > 0) {
+          console.log(`Removing invalid tokens: ${tokensToRemove}`);
+          for (const recipientId of recipientIds) {
+            await admin.firestore().collection('users').doc(recipientId).update({
+              fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
+            });
           }
         }
 
-        // Update the message document with the current time to prevent duplicate notifications
-        await snap.ref.update({
-          notificationSentAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        console.log('Notification sent successfully:', response);
-      } catch (error) {
-        console.error('Error sending notification:', error);
+        console.log('Notification sent successfully.');
+      } else {
+        console.log('No tokens to send notification to.');
       }
+    } catch (error) {
+      console.error('Error in sendRideGroupChatNotification:', error);
     }
   });
 
