@@ -371,80 +371,90 @@ Future<String> _createRideRequest(DateTime timeOfRide, {String? pickupLocation, 
 
 
 Future<bool> _isValidRoute(LatLng pickup, LatLng newDropoff, List<LatLng> existingDropoffs) async {
-  // Convert the list of existing drop-offs into LatLng objects (if necessary)
+  print('Validating route with pickup: $pickup, newDropoff: $newDropoff, existingDropoffs: $existingDropoffs');
+  
   List<LatLng> dropoffLocations = existingDropoffs;
   const double maxDistance = 160.934; // 100 miles in kilometers
-
-  // We can start with simple checks, e.g., is the new dropoff within an acceptable distance of existing dropoffs?
-  // for (LatLng existingDropoff in dropoffLocations) {
-  //   double distance = _calculateDistance(existingDropoff, newDropoff);
-  //   if (distance > maxDistance) {
-  //     return false; // New dropoff is too far from an existing dropoff
-  //   }
-  // }
-
-  // We can start with simple checks, e.g., is the new dropoff between the first and last dropoff?
-  // For simplicity, we can assume that if the new dropoff is within the bounding box of the existing dropoffs,
-  // it's a valid addition. A more sophisticated approach could involve actual route planning.
-
+  
+  // Simple bounding box check
   double minLat = dropoffLocations.map((loc) => loc.latitude).reduce((a, b) => a < b ? a : b);
   double maxLat = dropoffLocations.map((loc) => loc.latitude).reduce((a, b) => a > b ? a : b);
   double minLon = dropoffLocations.map((loc) => loc.longitude).reduce((a, b) => a < b ? a : b);
   double maxLon = dropoffLocations.map((loc) => loc.longitude).reduce((a, b) => a > b ? a : b);
 
-  // Check if the new dropoff is within the bounding box
+  print('Bounding box calculated: minLat: $minLat, maxLat: $maxLat, minLon: $minLon, maxLon: $maxLon');
+  
   if (newDropoff.latitude >= minLat && newDropoff.latitude <= maxLat &&
       newDropoff.longitude >= minLon && newDropoff.longitude <= maxLon) {
+    print('New dropoff is within the bounding box');
     return true;
   }
 
   // Step 1: Compute the initial route with existing dropoffs
   List<LatLng> allStops = [pickup, ...existingDropoffs];
+  print('Original route: $allStops');
   
   // Step 2: Compute route with new dropoff added
   List<LatLng> routeWithNewDropoff = [pickup, ...existingDropoffs, newDropoff];
+  print('Route with new dropoff: $routeWithNewDropoff');
 
   // Step 3: Fetch routes from Google Directions API
   double originalRouteDistance = await _getRouteDistance(allStops);
   double newRouteDistance = await _getRouteDistance(routeWithNewDropoff);
+  
+  print('Original route distance: $originalRouteDistance, New route distance: $newRouteDistance');
 
   // Step 4: Decide based on the percentage increase in route distance
-  const double maxAllowedIncrease = 0.2; // For example, allow only a 20% increase in route distance
+  const double maxAllowedIncrease = 0.2; // Allow only a 20% increase in route distance
   if (newRouteDistance <= originalRouteDistance * (1 + maxAllowedIncrease)) {
+    print('Route is valid, distance increase is within allowed range.');
     return true;
   }
+  
   print('Failed to validate route with pickup: $pickup, existing dropoffs: $existingDropoffs');
   return false;
 }
 
+
 Future<double> _getRouteDistance(List<LatLng> waypoints) async {
+  print('Fetching route distance for waypoints: $waypoints');
+
   String origin = '${waypoints.first.latitude},${waypoints.first.longitude}';
   String destination = '${waypoints.last.latitude},${waypoints.last.longitude}';
   
-  // Add `optimize:true` to the waypoints parameter
   String waypointsParam = 'optimize:true|' + waypoints.sublist(1, waypoints.length - 1)
       .map((latLng) => '${latLng.latitude},${latLng.longitude}')
       .join('|');
-
+  
   String url =
       'https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&waypoints=$waypointsParam&key=$google_maps_api_key';
 
+  print('Requesting Google Directions API with URL: $url');
+  
   final response = await http.get(Uri.parse(url));
+  print('Google Directions API response status: ${response.statusCode}');
+  
   if (response.statusCode == 200) {
     final data = json.decode(response.body);
+    print('Google Directions API response data: $data');
+
     if (data['routes'] != null && data['routes'].isNotEmpty) {
-      return data['routes'][0]['legs']
+      double totalDistance = data['routes'][0]['legs']
           .map<double>((leg) {
             var distanceValue = leg['distance']['value'];
+            print('Leg distance: $distanceValue');
             if (distanceValue != null && distanceValue is num) {
-              return distanceValue.toDouble(); // Ensure it is treated as a double
+              return distanceValue.toDouble();
             }
-            return 0.0; // Handle cases where distance might be missing or invalid
+            return 0.0;
           })
-          .fold(0.0, (sum, value) => sum + value); // Sum of all leg distances using fold
+          .fold(0.0, (sum, value) => sum + value);
+      print('Total route distance calculated: $totalDistance');
+      return totalDistance;
     }
   }
-
+  
+  print('Failed to fetch directions');
   throw Exception('Failed to fetch directions');
 }
 
