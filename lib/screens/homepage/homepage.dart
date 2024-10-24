@@ -887,17 +887,17 @@ Widget build(BuildContext context) {
               }
             },
           ),
-                      ListTile(
-              leading: const Icon(Icons.card_giftcard),
-              title: const Text('Refer a Friend'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ReferFriendScreen()),
-                );
-              },
-            ),
+            //           ListTile(
+            //   leading: const Icon(Icons.card_giftcard),
+            //   title: const Text('Refer a Friend'),
+            //   onTap: () {
+            //     Navigator.pop(context); // Close the drawer
+            //     Navigator.push(
+            //       context,
+            //       MaterialPageRoute(builder: (context) => const ReferFriendScreen()),
+            //     );
+            //   },
+            // ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.privacy_tip),
