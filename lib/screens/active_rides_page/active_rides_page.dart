@@ -46,6 +46,8 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
   int? _estimatedTime;
   String? _pickupAddress;
   List<String> userIds = [];
+  bool _isLoading = true;  // Initially, data is being loaded (added this as a new feature to avoid non-loading issues)
+
 
   StreamSubscription<Position>? _positionStreamSubscription;
   StreamSubscription<QuerySnapshot>? _participantsSubscription;
@@ -70,39 +72,26 @@ class _ActiveRidesPageState extends State<ActiveRidesPage> {
     super.initState();
     _loadUserProfile();
     _loadActiveRideDetails().then((_) {
-      // Listen to the current position and update it
-      //print('Listening to position updates...');
-      HomePageFunctions.determinePosition(
-        _auth,
-        _firestore,
-        updatePosition,
-        _positionStreamSubscription,
-        markers,
-        updateState,
-      );
-      // print('Listened to position updates. here are the current position: $currentPosition');
-      // print('Listening to online participants...');
-      _fetchOnlineParticipants();
-      // print('Listened to online participants. here are the markers: $markers');
-      // print('Loading markers...');
-      //_loadMarkers();
-      // print('Loaded markers. here are the markers: $markers');
-      // print('Updating directions...');
-      _updateDirections();
-      // print('Updated directions. here are the polylines: $_polylines');
-  });
-
-    // Start listening for online users and update markers in real-time
-    // HomePageFunctions.fetchOnlineParticipants(
-    //   _auth,
-    //   _firestore,
-    //   updateMarkers, // Pass the updateMarkers callback to update the map
-    //   currentPosition,
-    //   markers,
-    //   widget.rideId,
-    // );
-
-    //_dropoffLocationsFuture = _getDropoffLocations(); // Call this once in initState
+      if (_pickupLocation != null) {
+        // Only proceed if _pickupLocation is successfully loaded
+        HomePageFunctions.determinePosition(
+          _auth,
+          _firestore,
+          updatePosition,
+          _positionStreamSubscription,
+          markers,
+          updateState,
+        );
+        _fetchOnlineParticipants();
+        _updateDirections();
+      } else {
+        print('Error: Pickup location is still null after load.');
+      }
+      // Set loading to false once data is fetched
+      setState(() {
+        _isLoading = false;
+      });
+    });
   }
 
   @override
@@ -161,22 +150,24 @@ Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
 
 
 void updateMarkers(Set<Marker> newMarkers) async {
-  // Create a custom marker icon using the image
-  //BitmapDescriptor customIcon = await _createCustomMarkerIcon(context);
+  if (_pickupLocation != null) {
+    // Safeguard for pickupLocation
+    newMarkers.add(
+      Marker(
+        markerId: const MarkerId('pickup'),
+        position: _pickupLocation!,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: const InfoWindow(title: 'Pickup Location'),
+      ),
+    );
 
-  newMarkers.add(
-    Marker(
-      markerId: const MarkerId('pickup'),
-      position: _pickupLocation!,
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      infoWindow: const InfoWindow(title: 'Pickup Location'),
-    ),
-  );
-
-  if (mounted) {
-    setState(() {
-      markers = newMarkers;
-    });
+    if (mounted) {
+      setState(() {
+        markers = newMarkers;
+      });
+    }
+  } else {
+    print('Error: Pickup location is null');
   }
 }
 
@@ -213,59 +204,96 @@ void updateMarkers(Set<Marker> newMarkers) async {
   
 
   Future<void> _loadActiveRideDetails() async {
-  try {
-    _fetchOnlineParticipants();
-    DocumentSnapshot rideDoc = await FirebaseFirestore.instance
-        .collection('active_rides')
-        .doc(widget.rideId)
-        .get();
+    int retryCount = 0; // Limit retry attempts
+    const maxRetries = 5; // Maximum number of retries
+    const retryDelay = Duration(seconds: 1); // Delay between retries
 
-    if (rideDoc.exists) {
-      _pickupLocation = LatLng(
-        rideDoc['pickupLocation']['latitude'],
-        rideDoc['pickupLocation']['longitude'],
-      );
+    // Show loading indicator while waiting
+    setState(() {
+      _rideDetailsText = null; // Set to null to indicate loading
+    });
 
-      _pickupAddress = await HomePageFunctions.getAddressFromLatLng(_pickupLocation!);
+    try {
+      while (retryCount < maxRetries) {
+        await Future.delayed(retryDelay); // Add delay at the start
 
-      final dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
-      if (dropoffLocationsMap.isNotEmpty) {
-        _dropoffAddresses = dropoffLocationsMap.values.toList();
-      }
-
-      List<String> userIds = List<String>.from(rideDoc['participants']);
-      _participantIds = userIds;
-      List<DocumentSnapshot> userDocs = [];
-      for (String uid in userIds) {
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
+        DocumentSnapshot rideDoc = await FirebaseFirestore.instance
+            .collection('active_rides')
+            .doc(widget.rideId)
             .get();
-        if (userDoc.exists) {
-          userDocs.add(userDoc);
+
+        if (rideDoc.exists) {
+          // Set pickupLocation from the ride document
+          _pickupLocation = LatLng(
+            rideDoc['pickupLocation']['latitude'],
+            rideDoc['pickupLocation']['longitude'],
+          );
+
+          if (_pickupLocation == null) {
+            print('Error: Failed to load pickup location.');
+            return;  // Abort further operations if pickupLocation is not set
+          }
+
+          _pickupAddress = await HomePageFunctions.getAddressFromLatLng(_pickupLocation!);
+
+          final dropoffLocationsMap = Map<String, String>.from(rideDoc['dropoffLocations']);
+          if (dropoffLocationsMap.isNotEmpty) {
+            _dropoffAddresses = dropoffLocationsMap.values.toList();
+          }
+
+          // Load participant details
+          List<String> userIds = List<String>.from(rideDoc['participants']);
+          _participantIds = userIds;
+          List<DocumentSnapshot> userDocs = [];
+          for (String uid in userIds) {
+            DocumentSnapshot userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .get();
+            if (userDoc.exists) {
+              userDocs.add(userDoc);
+            } else {
+              print('User with UID $uid not found.');
+            }
+          }
+
+          // Ensure setState is called only after data is loaded
+          if (mounted) {
+            setState(() {
+              _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
+              _users = userDocs;
+              _rideDetailsText = "Pickup: $_pickupAddress";
+              _estimatedTime = _calculateEstimatedTime(_rideTime!);
+            });
+
+            // Trigger updates only after data is fully loaded
+            _updateDirections();
+            _fetchOnlineParticipants();
+          }
+          return; // Exit the loop once data is successfully loaded
         } else {
-          print('User with UID $uid not found.');
+          retryCount++;
+          print('Ride document does not exist. Retrying ($retryCount/$maxRetries)...');
         }
       }
-      print('Ride details loaded successfully.');
-      // Check if the widget is still mounted before calling setState
+
+      // If we reach here, the document was not found after max retries
       if (mounted) {
         setState(() {
-          _rideTime = (rideDoc['timeOfRide'] as Timestamp).toDate();
-          _users = userDocs;
-          _rideDetailsText = "Pickup: $_pickupAddress";
-          _estimatedTime = _calculateEstimatedTime(_rideTime!);
+          _rideDetailsText = 'Failed to load ride details';
         });
       }
-    } else {
-      print('Ride document does not exist.');
-    }
-  } catch (e) {
-    if (mounted) {
-      print('Error loading ride details: $e');
+    } catch (e) {
+      if (mounted) {
+        print('Error loading ride details: $e');
+        setState(() {
+          _rideDetailsText = 'Error loading ride details';
+        });
+      }
     }
   }
-}
+
+
 
 
 
@@ -556,7 +584,7 @@ void updateMarkers(Set<Marker> newMarkers) async {
 }
 
 
-  @override
+@override
 Widget build(BuildContext context) {
   //final dropoffLocations = _dropoffLocations ?? []; // Assuming _dropoffLocations is initialized elsewhere
 
@@ -588,29 +616,34 @@ Widget build(BuildContext context) {
         ),
       ],
     ),
-    body: Column(
-      children: [
-        if (_pickupLocation != null)
-          Expanded(
-            child: Stack(
-              children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: currentPosition ?? _pickupLocation!,
-                    zoom: 14,
+    // Display loading spinner while data is being fetched
+    body: _isLoading
+        ? const Center(
+            child: CircularProgressIndicator(),
+          )
+        : Column(
+            children: [
+              if (_pickupLocation != null)
+                Expanded(
+                  child: Stack(
+                    children: [
+                      GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: currentPosition ?? _pickupLocation!,
+                          zoom: 14,
+                        ),
+                        markers: markers,
+                        polylines: _polylines,
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: true,
+                        onMapCreated: (GoogleMapController controller) {
+                          _mapController = controller;
+                        },
+                      ),
+                    ],
                   ),
-                  markers: markers, // Combine markers and participantMarkers
-                  polylines: _polylines,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true, // Custom button used below
-                  onMapCreated: (GoogleMapController controller) {
-                    _mapController = controller;
-                  },
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8), 
+              const SizedBox(width: 8),
               Row(
                 children: [
                   const Text('Go Online', style: TextStyle(color: Colors.black)),
@@ -619,33 +652,33 @@ Widget build(BuildContext context) {
                     onChanged: (value) {
                       _toggleGoOnline(value);
                     },
-                    activeColor: Colors.yellow, 
-                    activeTrackColor: Colors.yellowAccent, 
+                    activeColor: Colors.yellow,
+                    activeTrackColor: Colors.yellowAccent,
                   ),
                 ],
               ),
-        if (_rideDetailsText != null && _estimatedTime != null)
-          RideInfoWidget(
-            rideDetails: _rideDetailsText!,
-            rideTimeText: _getRideTimeText(),
-            dropoffAddresses: _dropoffAddresses, // Pass dropoff addresses as a list
+              if (_rideDetailsText != null && _estimatedTime != null)
+                RideInfoWidget(
+                  rideDetails: _rideDetailsText!,
+                  rideTimeText: _getRideTimeText(),
+                  dropoffAddresses: _dropoffAddresses,
+                ),
+              if (_users.isNotEmpty)
+                Expanded(
+                  child: ParticipantListWidget(users: _users),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton(
+                  onPressed: _endRide,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                  ),
+                  child: const Text('End Ride'),
+                ),
+              ),
+            ],
           ),
-        if (_users.isNotEmpty)
-          Expanded(
-            child: ParticipantListWidget(users: _users),
-          ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ElevatedButton(
-            onPressed: _endRide,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red, // Red button for ending the ride
-            ),
-            child: const Text('End Ride'),
-          ),
-        ),
-      ],
-    ),
   );
 }
 }
