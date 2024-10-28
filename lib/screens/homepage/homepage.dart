@@ -27,6 +27,9 @@ import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
 import 'package:my_flutter_app/services/notification_service.dart';
 
+import 'package:my_flutter_app/widgets/find_ride_widget.dart';
+
+
 import 'package:my_flutter_app/functions/homepage_functions.dart'; 
 
 import 'package:my_flutter_app/widgets/schedule_ride.dart'; 
@@ -417,44 +420,33 @@ Future<bool> _isValidRoute(LatLng pickup, LatLng newDropoff, List<LatLng> existi
 
 
 Future<double> _getRouteDistance(List<LatLng> waypoints) async {
-  print('Fetching route distance for waypoints: $waypoints');
-
   String origin = '${waypoints.first.latitude},${waypoints.first.longitude}';
   String destination = '${waypoints.last.latitude},${waypoints.last.longitude}';
   
+  // Add `optimize:true` to the waypoints parameter
   String waypointsParam = 'optimize:true|' + waypoints.sublist(1, waypoints.length - 1)
       .map((latLng) => '${latLng.latitude},${latLng.longitude}')
       .join('|');
-  
+
   String url =
       'https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&waypoints=$waypointsParam&key=$google_maps_api_key';
 
-  print('Requesting Google Directions API with URL: $url');
-  
   final response = await http.get(Uri.parse(url));
-  print('Google Directions API response status: ${response.statusCode}');
-  
   if (response.statusCode == 200) {
     final data = json.decode(response.body);
-    print('Google Directions API response data: $data');
-
     if (data['routes'] != null && data['routes'].isNotEmpty) {
-      double totalDistance = data['routes'][0]['legs']
+      return data['routes'][0]['legs']
           .map<double>((leg) {
             var distanceValue = leg['distance']['value'];
-            print('Leg distance: $distanceValue');
             if (distanceValue != null && distanceValue is num) {
-              return distanceValue.toDouble();
+              return distanceValue.toDouble(); // Ensure it is treated as a double
             }
-            return 0.0;
+            return 0.0; // Handle cases where distance might be missing or invalid
           })
-          .fold(0.0, (sum, value) => sum + value);
-      print('Total route distance calculated: $totalDistance');
-      return totalDistance;
+          .fold(0.0, (sum, value) => sum + value); // Sum of all leg distances using fold
     }
   }
-  
-  print('Failed to fetch directions');
+
   throw Exception('Failed to fetch directions');
 }
 
@@ -626,6 +618,15 @@ void _scheduleRideWrapper(DateTime timeOfRide, String pickupLocation, String dro
   );
 }
 
+void _findRideWithLocations(String pickupLocation, String dropoffLocation) {
+  _findRideAtScheduledTime(
+    timeOfRide: DateTime.now(),
+    pickupLocation: pickupLocation,
+    dropoffLocation: dropoffLocation,
+  );
+}
+
+
 void _locationSearchWrapper(bool isPickup, Function(String) onSelectAddressCallback) {
   _navigateToLocationSearch(isPickup, onSelectAddressCallback: onSelectAddressCallback);
 }
@@ -723,11 +724,11 @@ Future<void> _sendNewParticipantNotification(String rideId, String newParticipan
   }
 }
 
- @override
+@override
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
-       title: Text(_fullName != null ? 'Hi, $_fullName!' : 'Hi, Shuffl User!'),
+      title: Text(_fullName != null ? 'Hi, $_fullName!' : 'Hi, Shuffl User!'),
       backgroundColor: kBackgroundColor,
       actions: [
         StreamBuilder<int>(
@@ -897,17 +898,6 @@ Widget build(BuildContext context) {
               }
             },
           ),
-            //           ListTile(
-            //   leading: const Icon(Icons.card_giftcard),
-            //   title: const Text('Refer a Friend'),
-            //   onTap: () {
-            //     Navigator.pop(context); // Close the drawer
-            //     Navigator.push(
-            //       context,
-            //       MaterialPageRoute(builder: (context) => const ReferFriendScreen()),
-            //     );
-            //   },
-            // ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.privacy_tip),
@@ -940,30 +930,28 @@ Widget build(BuildContext context) {
             },
           ),
           ListTile(
-          leading: const Icon(Icons.report),
-          title: const Text('Report'),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ReportPage(),
-              ),
-            );
-          }
+            leading: const Icon(Icons.report),
+            title: const Text('Report'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ReportPage()),
+              );
+            },
           ),
-           ListTile(
-              leading: const Icon(Icons.school),
-              title: const Text('Tutorial'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-                showDialog(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return const TutorialComponent();
-                  },
-                );
-              },
-            ),
+          ListTile(
+            leading: const Icon(Icons.school),
+            title: const Text('Tutorial'),
+            onTap: () {
+              Navigator.pop(context);
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return const TutorialComponent();
+                },
+              );
+            },
+          ),
         ],
       ),
     ),
@@ -971,67 +959,6 @@ Widget build(BuildContext context) {
       children: [
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: TextField(
-            controller: _pickupController,
-            decoration: InputDecoration(
-              hintText: 'Enter pick-up location',
-              prefixIcon: const Icon(Icons.location_on),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), 
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), 
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), 
-              ),
-            ),
-            style: const TextStyle(color: Colors.black),
-            readOnly: true,
-            onTap: () => _navigateToLocationSearch(true),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: TextField(
-            controller: _dropoffController,
-            decoration: InputDecoration(
-              hintText: 'Enter destination',
-              prefixIcon: const Icon(Icons.location_on),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), 
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), 
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.black), 
-              ),
-            ),
-            style: const TextStyle(color: Colors.black),
-            readOnly: true,
-            onTap: () => _navigateToLocationSearch(false),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: ElevatedButton(
-            onPressed: _findRide,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              backgroundColor: Colors.yellow,
-            ),
-            child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0), // Add horizontal padding to match "Find Ride Now" button
           child: Row(
             children: [
               Expanded(
@@ -1047,24 +974,47 @@ Widget build(BuildContext context) {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.yellow,
-                    minimumSize: const Size(0, 40), // Set a minimum height to match "Find Ride Now" button
+                    minimumSize: const Size(double.infinity, 50),
                   ),
                   child: const Text('Schedule Ahead', style: TextStyle(color: Colors.black)),
                 ),
               ),
-              const SizedBox(width: 8), 
-              Row(
-                children: [
-                  const Text('Go Online', style: TextStyle(color: Colors.black)),
-                  Switch(
-                    value: goOnline,
-                    onChanged: (value) {
-                      _toggleGoOnline(value);
-                    },
-                    activeColor: Colors.yellow, 
-                    activeTrackColor: Colors.yellowAccent, 
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      builder: (context) => RideWidget(
+                        onSubmit: _findRideWithLocations,
+                        onLocationSearch: _locationSearchWrapper,
+                        isJoinRide: false,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow,
+                    minimumSize: const Size(double.infinity, 50),
                   ),
-                ],
+                  child: const Text('Find Ride Now', style: TextStyle(color: Colors.black)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Go Online', style: TextStyle(color: Colors.black)),
+              Switch(
+                value: goOnline,
+                onChanged: (value) {
+                  _toggleGoOnline(value);
+                },
+                activeColor: Colors.yellow,
+                activeTrackColor: Colors.yellowAccent,
               ),
             ],
           ),

@@ -74,10 +74,36 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildActionButton("CANCEL", Colors.grey[300], Colors.black, () {
-                Navigator.pop(context);
-              }),
-              _buildActionButton("Schedule the Ride", Colors.yellow, Colors.black, _onScheduleRidePressed),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Cancel button to close the widget
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[300], // Gray color for cancel button
+                    foregroundColor: Colors.black, // Black text color
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                  child: const Text("CANCEL", style: TextStyle(fontSize: 16)),
+                ),
+              ),
+              const SizedBox(width: 10), // Space between buttons
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _onScheduleRidePressed,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow, // Yellow color for main action button
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                  child: const Text(
+                    "Schedule Ride",
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -157,18 +183,6 @@ class _ScheduleRideWidgetState extends State<ScheduleRideWidget> {
           readOnly: true,
         ),
       ),
-    );
-  }
-
-  Widget _buildActionButton(String text, Color? backgroundColor, Color textColor, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: backgroundColor,
-        foregroundColor: textColor,
-        minimumSize: const Size(120, 50),
-      ),
-      child: Text(text),
     );
   }
 

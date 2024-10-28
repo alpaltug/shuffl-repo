@@ -8,9 +8,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
-import 'package:my_flutter_app/widgets/ride_card.dart'; 
+import 'package:my_flutter_app/widgets/ride_card.dart';
 import 'package:my_flutter_app/widgets/ride_details_popup.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
+
+import 'package:my_flutter_app/widgets/find_ride_widget.dart';
 
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
@@ -64,24 +66,6 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     return participantDetails;
   }
 
-  void _showRideDetailsPopup(BuildContext context, DocumentSnapshot ride, List<Map<String, String>> participants) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-      ),
-      builder: (context) {
-        return RideDetailsPopup(
-          participants: participants,
-          onJoinRide: (pickupLocation, dropoffLocation) {
-            _joinRide(ride.id, pickupLocation, dropoffLocation, List<String>.from(ride['participants']));
-          },
-        );
-      },
-    );
-  }
-
-
   Future<void> _joinRide(String rideId, String pickupLocation, String dropoffLocation, List<String> participants) async {
     User? user = _auth.currentUser;
     if (user == null) return;
@@ -89,12 +73,11 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     if (!participants.contains(user.uid)) {
       participants.add(user.uid);
 
-      // Update the ride document with optional pickup and dropoff locations
       await _firestore.collection('rides').doc(rideId).update({
         'participants': participants,
         if (pickupLocation.isNotEmpty) 'pickupLocations.${user.uid}': pickupLocation,
         if (dropoffLocation.isNotEmpty) 'dropoffLocations.${user.uid}': dropoffLocation,
-        'readyStatus.${user.uid}': false, // Initialize ready status as false for the new participant
+        'readyStatus.${user.uid}': false,
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,8 +91,29 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     );
   }
 
+  void _showRideDetailsPopup(BuildContext context, DocumentSnapshot ride, List<Map<String, String>> participants) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (context) {
+        String? pickupLocation;
+        String? dropoffLocation;
 
-  void _navigateToLocationSearch(bool isPickup) {
+        return RideWidget(
+          onSubmit: (pickupLocation, dropoffLocation) {
+            _joinRide(ride.id, pickupLocation, dropoffLocation, List<String>.from(ride['participants']));
+          },
+          onLocationSearch: (isPickup, onSelectAddress) => _navigateToLocationSearch(isPickup, onSelectAddressCallback: onSelectAddress),
+          isJoinRide: true,
+          participants: participants,
+        );
+      },
+    );
+  }
+
+  void _navigateToLocationSearch(bool isPickup, {required Function(String) onSelectAddressCallback}) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -117,171 +121,142 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
           isPickup: isPickup,
           currentPosition: _currentPosition,
           onSelectAddress: (address) {
-            if (isPickup) {
-              _pickupController.text = address;
-            } else {
-              _dropoffController.text = address;
-            }
+            onSelectAddressCallback(address);
           },
         ),
       ),
     );
   }
 
+
+
   Widget _buildFilterSection() {
-  return Padding(
-    padding: const EdgeInsets.all(8.0),
-    child: Column(
-      children: [
-        TextField(
-          controller: _pickupController,
-          decoration: InputDecoration(
-            labelText: 'Pickup Location',
-            labelStyle: const TextStyle(color: Colors.black),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.black), // Default border color
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          TextField(
+            controller: _pickupController,
+            decoration: InputDecoration(
+              labelText: 'Pickup Location',
+              prefixIcon: const Icon(Icons.location_on),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.black), // Black border when focused
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.black), // Black border when enabled
-            ),
-            prefixIcon: const Icon(Icons.location_on),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(true, onSelectAddressCallback: (address) {
+              setState(() {
+                _pickupController.text = address;
+              });
+            }),
           ),
-          style: const TextStyle(color: Colors.black),
-          readOnly: true,
-          onTap: () => _navigateToLocationSearch(true),
-        ),
-        const SizedBox(height: 8.0),
-        TextField(
-          controller: _dropoffController,
-          decoration: InputDecoration(
-            labelText: 'Dropoff Location',
-            labelStyle: const TextStyle(color: Colors.black),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.black), // Default border color
+          const SizedBox(height: 8.0),
+          TextField(
+            controller: _dropoffController,
+            decoration: InputDecoration(
+              labelText: 'Dropoff Location',
+              prefixIcon: const Icon(Icons.location_on),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.black), // Black border when focused
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.black), // Black border when enabled
-            ),
-            prefixIcon: const Icon(Icons.location_on),
+            style: const TextStyle(color: Colors.black),
+            readOnly: true,
+            onTap: () => _navigateToLocationSearch(false, onSelectAddressCallback: (address) {
+              setState(() {
+                _dropoffController.text = address;
+              });
+            }),
           ),
-          style: const TextStyle(color: Colors.black),
-          readOnly: true,
-          onTap: () => _navigateToLocationSearch(false),
-        ),
-        const SizedBox(height: 8.0),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _pickupFilter = _pickupController.text;
-                  _dropoffFilter = _dropoffController.text;
-                  _filteredRidesFuture = _fetchFilteredRides();
-                });
-              },
-              child: const Text(
-                'Apply Filters',
-                style: TextStyle(color: Colors.black),
+          const SizedBox(height: 8.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _pickupFilter = _pickupController.text;
+                    _dropoffFilter = _dropoffController.text;
+                    _filteredRidesFuture = _fetchFilteredRides();
+                  });
+                },
+                child: const Text(
+                  'Apply Filters',
+                  style: TextStyle(color: Colors.black),
+                ),
               ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _pickupController.clear();
-                  _dropoffController.clear();
-                  _pickupFilter = null;
-                  _dropoffFilter = null;
-                  _filteredRidesFuture = _fetchFilteredRides();
-                });
-              },
-              child: const Text(
-                'Remove Filters',
-                style: TextStyle(color: Colors.black),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _pickupController.clear();
+                    _dropoffController.clear();
+                    _pickupFilter = null;
+                    _dropoffFilter = null;
+                    _filteredRidesFuture = _fetchFilteredRides();
+                  });
+                },
+                child: const Text(
+                  'Remove Filters',
+                  style: TextStyle(color: Colors.black),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent, // Red color for the remove filters button
-              ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
+  Future<List<DocumentSnapshot>> _fetchFilteredRides() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return [];
 
- Future<List<DocumentSnapshot>> _fetchFilteredRides() async {
-  User? currentUser = _auth.currentUser;
-  if (currentUser == null) return [];
+    try {
+      DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      Map<String, dynamic>? currentUserData = currentUserDoc.data() as Map<String, dynamic>?;
+      List<String> blockedUsers = currentUserData != null && currentUserData.containsKey('blockedUsers') 
+          ? List<String>.from(currentUserData['blockedUsers']) 
+          : [];
+      List<String> blockedBy = currentUserData != null && currentUserData.containsKey('blockedBy') 
+          ? List<String>.from(currentUserData['blockedBy']) 
+          : [];
 
-  try {
-    // Fetch current user document
-    DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-    
-    // Explicitly cast the document data to Map<String, dynamic>
-    Map<String, dynamic>? currentUserData = currentUserDoc.data() as Map<String, dynamic>?;
+      DateTime now = DateTime.now();
+      QuerySnapshot snapshot = await _firestore.collection('rides').orderBy('timeOfRide').get();
+      List<DocumentSnapshot> filteredRides = [];
 
-    // Safely get 'blockedUsers' and 'blockedBy' fields with fallback to empty lists if fields don't exist
-    List<String> blockedUsers = currentUserData != null && currentUserData.containsKey('blockedUsers') 
-        ? List<String>.from(currentUserData['blockedUsers']) 
-        : [];
-    List<String> blockedBy = currentUserData != null && currentUserData.containsKey('blockedBy') 
-        ? List<String>.from(currentUserData['blockedBy']) 
-        : [];
+      for (var ride in snapshot.docs) {
+        bool isComplete = ride['isComplete'] ?? false;
+        List<String> participants = List<String>.from(ride['participants']);
+        bool containsBlockedUser = participants.any((participant) => blockedUsers.contains(participant) || blockedBy.contains(participant));
 
-    DateTime now = DateTime.now();
-    QuerySnapshot snapshot = await _firestore.collection('rides').orderBy('timeOfRide').get();
-
-    List<DocumentSnapshot> filteredRides = [];
-
-    for (var ride in snapshot.docs) {
-      bool isComplete = ride['isComplete'] ?? false;
-      List<String> participants = List<String>.from(ride['participants']);
-
-      // Filter out rides involving blocked users or users who blocked the current user
-      bool containsBlockedUser = participants.any((participant) => blockedUsers.contains(participant) || blockedBy.contains(participant));
-
-      if (!isComplete && !participants.contains(currentUser.uid) && !containsBlockedUser) {
-        if (_pickupFilter != null || _dropoffFilter != null) {
-          bool pickupMatch = await _matchesLocation(_pickupFilter, ride['pickupLocations']);
-          bool dropoffMatch = await _matchesLocation(_dropoffFilter, ride['dropoffLocations']);
-
-          if ((_pickupFilter == null || pickupMatch) && (_dropoffFilter == null || dropoffMatch)) {
+        if (!isComplete && !participants.contains(currentUser.uid) && !containsBlockedUser) {
+          if (_pickupFilter != null || _dropoffFilter != null) {
+            bool pickupMatch = await _matchesLocation(_pickupFilter, ride['pickupLocations']);
+            bool dropoffMatch = await _matchesLocation(_dropoffFilter, ride['dropoffLocations']);
+            if ((_pickupFilter == null || pickupMatch) && (_dropoffFilter == null || dropoffMatch)) {
+              filteredRides.add(ride);
+            }
+          } else {
             filteredRides.add(ride);
           }
-        } else {
-          filteredRides.add(ride);
         }
       }
-    }
 
-    // Optional cleanup of old rides
-    for (var ride in snapshot.docs) {
-      DateTime timeOfRide = ride['timeOfRide'].toDate();
-      if (timeOfRide.isBefore(now.subtract(const Duration(hours: 24)))) {
-        await ride.reference.delete();
+      for (var ride in snapshot.docs) {
+        DateTime timeOfRide = ride['timeOfRide'].toDate();
+        if (timeOfRide.isBefore(now.subtract(const Duration(hours: 24)))) {
+          await ride.reference.delete();
+        }
       }
-    }
 
-    return filteredRides;
-  } catch (e) {
-    print('Error fetching rides: $e');
-    return [];
+      return filteredRides;
+    } catch (e) {
+      print('Error fetching rides: $e');
+      return [];
+    }
   }
-}
 
   Future<bool> _matchesLocation(String? filter, Map<String, dynamic> locations) async {
     if (filter == null || filter.isEmpty) {
@@ -330,6 +305,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       throw Exception('Failed to get location from address: $e');
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -341,7 +317,7 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
             fontWeight: FontWeight.bold, 
           ),
         ),
-        backgroundColor: kBackgroundColor, 
+        backgroundColor: kBackgroundColor,
       ),
       body: Column(
         children: [

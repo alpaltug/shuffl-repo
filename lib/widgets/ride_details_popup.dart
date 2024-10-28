@@ -18,6 +18,11 @@ class _RideDetailsPopupState extends State<RideDetailsPopup> {
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropoffController = TextEditingController();
 
+  String? _pickupLocation;
+  String? _dropoffLocation;
+  String? _pickupError;
+  String? _dropoffError;
+
   void _openLocationSearchPage(bool isPickup) {
     Navigator.push(
       context,
@@ -27,9 +32,13 @@ class _RideDetailsPopupState extends State<RideDetailsPopup> {
           onSelectAddress: (String address) {
             setState(() {
               if (isPickup) {
+                _pickupLocation = address;
                 _pickupController.text = address;
+                _pickupError = null; // Clear error on selection
               } else {
+                _dropoffLocation = address;
                 _dropoffController.text = address;
+                _dropoffError = null; // Clear error on selection
               }
             });
           },
@@ -38,10 +47,29 @@ class _RideDetailsPopupState extends State<RideDetailsPopup> {
     );
   }
 
+  void _onFindRidePressed() {
+    setState(() {
+      _pickupError = _pickupLocation == null ? 'Please select a pickup location' : null;
+      _dropoffError = _dropoffLocation == null ? 'Please select a dropoff location' : null;
+    });
+
+    if (_pickupLocation != null && _dropoffLocation != null) {
+      widget.onJoinRide(_pickupLocation!, _dropoffLocation!);
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+    return Container(
+      padding: const EdgeInsets.all(20.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -55,16 +83,23 @@ class _RideDetailsPopupState extends State<RideDetailsPopup> {
           ),
           const SizedBox(height: 20),
           _buildLocationPicker("Pickup Location (Optional)", _pickupController, true),
+          if (_pickupError != null)
+            Text(
+              _pickupError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
           const SizedBox(height: 10),
           _buildLocationPicker("Dropoff Location (Optional)", _dropoffController, false),
+          if (_dropoffError != null)
+            Text(
+              _dropoffError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
           const SizedBox(height: 20),
           _buildParticipantsList(),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: () {
-              widget.onJoinRide(_pickupController.text.trim(), _dropoffController.text.trim());
-              Navigator.of(context).pop();
-            },
+            onPressed: _onFindRidePressed,
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -89,6 +124,7 @@ class _RideDetailsPopupState extends State<RideDetailsPopup> {
             prefixIcon: const Icon(Icons.location_on, color: Colors.black),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.grey),
             ),
           ),
           style: const TextStyle(color: Colors.black),
@@ -163,7 +199,6 @@ class LocationSearchPage extends StatelessWidget {
               },
             ),
           ),
-          // You can add a map or suggestions here if needed
         ],
       ),
     );
