@@ -44,11 +44,11 @@
 	<key>NSCameraUsageDescription</key>
 	<string>We need access to your camera to take a picture for your profile.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>We need your location to show your current position on the map.</string>
+	<string>We need your location to show relevant rides.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to show your current position on the map.</string>
+	<string>We need your location to show relevant rides.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We need your location to show your current position on the map.</string> 
+	<string>We need your location to show relevant rides.</string> 
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to upload your profile picture.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -71,5 +71,12 @@
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>We need your permission to track your activity.</string>
 </dict>
 </plist>

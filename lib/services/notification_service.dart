@@ -21,59 +21,82 @@ class NotificationService {
     _firestore = FirebaseFirestore.instance;
     _auth = FirebaseAuth.instance;
 
-    await _requestPermissions();
-    await _initializeLocalNotifications();
-    await _configureFCM();
+    try {
+      await _requestPermissions();
+      await _initializeLocalNotifications();
+      await _configureFCM();
+    } catch (e) {
+      print('Error during notification service initialization: $e');
+      // Handle initialization error appropriately
+    }
   }
 
   Future<void> _requestPermissions() async {
-    NotificationSettings settings = await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-    print('User granted permission: ${settings.authorizationStatus}');
-
-    if (Platform.isIOS) {
-      await _fcm.setForegroundNotificationPresentationOptions(
+    try {
+      NotificationSettings settings = await _fcm.requestPermission(
         alert: true,
         badge: true,
         sound: true,
+        provisional: false,
       );
+      print('User granted permission: ${settings.authorizationStatus}');
+
+      if (Platform.isIOS) {
+        await _fcm.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+    } catch (e) {
+      print('Error requesting notification permissions: $e');
+      // Handle permission request error
     }
   }
 
   Future<void> _initializeLocalNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    final DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
+    try {
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      final DarwinInitializationSettings initializationSettingsIOS =
+          DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+      final InitializationSettings initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsIOS,
+      );
 
-    await _flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: _onNotificationTap,
-    );
+      await _flutterLocalNotificationsPlugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: _onNotificationTap,
+      );
+    } catch (e) {
+      print('Error initializing local notifications: $e');
+      // Handle initialization error
+    }
   }
 
   Future<void> _configureFCM() async {
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    try {
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    String? token = await _fcm.getToken();
-    if (token != null) {
-      await _saveTokenToFirestore(token);
+      String? token = await _fcm.getToken();
+      if (token != null) {
+        await _saveTokenToFirestore(token);
+      } else {
+        print('FCM token is null');
+      }
+
+      _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
+    } catch (e) {
+      print('Error configuring FCM: $e');
+      // Handle FCM configuration error
     }
-    _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
   }
 
   Future<void> _saveTokenToFirestore(String token) async {
@@ -97,7 +120,10 @@ class NotificationService {
         });
       } catch (e) {
         print('Error saving FCM token to Firestore: $e');
+        // Handle Firestore transaction error
       }
+    } else {
+      print('No user is currently signed in. Cannot save FCM token.');
     }
   }
 
@@ -143,29 +169,34 @@ class NotificationService {
   }
 
   Future<void> _showLocalNotification({required String title, required String body}) async {
-    AndroidNotificationDetails androidDetails = const AndroidNotificationDetails(
-      'high_importance_channel',
-      'High Importance Notifications',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-    DarwinNotificationDetails iOSDetails = const DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-    NotificationDetails platformDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: iOSDetails,
-    );
+    try {
+      AndroidNotificationDetails androidDetails = const AndroidNotificationDetails(
+        'high_importance_channel',
+        'High Importance Notifications',
+        importance: Importance.max,
+        priority: Priority.high,
+      );
+      DarwinNotificationDetails iOSDetails = const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      NotificationDetails platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iOSDetails,
+      );
 
-    await _flutterLocalNotificationsPlugin.show(
-      title.hashCode ^ body.hashCode,
-      title,
-      body,
-      platformDetails,
-      payload: 'Default_Sound',
-    );
+      await _flutterLocalNotificationsPlugin.show(
+        title.hashCode ^ body.hashCode,
+        title,
+        body,
+        platformDetails,
+        payload: 'Default_Sound',
+      );
+    } catch (e) {
+      print('Error showing local notification: $e');
+      // Handle notification display error
+    }
   }
 
   void _handleBackgroundMessage(RemoteMessage message) {
