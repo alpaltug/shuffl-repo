@@ -22,16 +22,20 @@ class _DirectionsWidgetState extends State<DirectionsWidget> {
   }
 
   Future<void> _getCurrentLocation() async {
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    setState(() {
-      _currentPosition = position;
-    });
-    _mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(
-        LatLng(position.latitude, position.longitude),
-        14.0,
-      ),
-    );
+    try {
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      setState(() {
+        _currentPosition = position;
+      });
+      _mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(position.latitude, position.longitude),
+          14.0,
+        ),
+      );
+    } catch (e) {
+      print('Error getting current location: $e');
+    }
   }
 
   @override
