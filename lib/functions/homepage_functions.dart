@@ -98,24 +98,48 @@ class HomePageFunctions {
 
 
     // Determine Position
-    static Future<void> determinePosition(FirebaseAuth auth, FirebaseFirestore firestore, Function updatePosition, StreamSubscription<Position>? positionStreamSubscription,
+    static Future<void> determinePosition(
+    FirebaseAuth auth,
+    FirebaseFirestore firestore,
+    Function updatePosition,
+    StreamSubscription<Position>? positionStreamSubscription,
     Set<Marker> markers,
-    Function setState
+    Function setState,
     ) async {
-        positionStreamSubscription?.cancel(); // Cancel any previous subscription
+        // Cancel any previous subscription
+        await positionStreamSubscription?.cancel();
+
+        // Start listening to position updates with error handling
         positionStreamSubscription = Geolocator.getPositionStream(
-            locationSettings: const LocationSettings(
+        locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
             distanceFilter: 10, // Update every 10 meters
-            ),
-        ).listen((Position position) async {
+        ),
+        ).handleError((error) {
+        // Handle location errors gracefully
+        print('Error in position stream: $error');
+        
+        if (error is PermissionDeniedException) {
+            print("Location permission denied. Please enable location access.");
+            // Handle the specific error, such as showing a dialog to the user
+        } else if (error is LocationServiceDisabledException) {
+            print("Location services are disabled. Please enable them in settings.");
+            // Handle the specific error, such as showing a dialog to the user
+        } else {
+            print("An unknown error occurred with geolocation.");
+        }
+        }).listen((Position position) async {
+        try {
+            // Process position updates
             LatLng newPosition = LatLng(position.latitude, position.longitude);
+            
+            // Update the user's location in Firestore
             await updateUserLocationInFirestore(newPosition, auth, firestore);
 
             // Fetch the profile image URL from Firestore
             String? profileImageUrl = await _getProfileImageUrl(auth, firestore);
 
-            // If the profileImageUrl is not available, use a default marker
+            // Optionally handle the marker update logic
             // BitmapDescriptor markerIcon;
             // if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
             //     markerIcon = await createCustomMarkerWithImage(profileImageUrl);
@@ -127,7 +151,11 @@ class HomePageFunctions {
             updatePosition(newPosition);
 
             // Update location marker with the user's profile image or default marker
-            //updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
+            // updateCurrentLocationMarker(newPosition, markers, setState, markerIcon);
+        } catch (e) {
+            print('Error handling position update: $e');
+            // Handle any additional errors during position update processing
+        }
         });
     }
 

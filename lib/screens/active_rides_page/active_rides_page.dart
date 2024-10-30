@@ -570,6 +570,13 @@ void updateMarkers(Set<Marker> newMarkers) async {
       });
     }
 
+    // Log the ride completion
+    await FirebaseFirestore.instance.collection('ride_updates').add({
+      'rideId': widget.rideId,
+      'action': 'ride_completed',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
     // Navigate to the RatingPage with the participants list
     Navigator.pushReplacement(
       context,
