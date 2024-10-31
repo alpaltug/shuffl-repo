@@ -150,8 +150,12 @@ Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
 
 
 void updateMarkers(Set<Marker> newMarkers) async {
-  if (_pickupLocation != null && goOnline) {
-    newMarkers.add(
+  // Filter out markers that are already in the existing markers set
+  Set<Marker> uniqueNewMarkers = newMarkers.difference(markers);
+
+  // Add the pickup marker if conditions are met
+  if (_pickupLocation != null) {
+    uniqueNewMarkers.add(
       Marker(
         markerId: const MarkerId('pickup'),
         position: _pickupLocation!,
@@ -161,9 +165,10 @@ void updateMarkers(Set<Marker> newMarkers) async {
     );
   }
 
-  if (mounted) {
+  // Only update the state if there are new unique markers to add
+  if (uniqueNewMarkers.isNotEmpty && mounted) {
     setState(() {
-      markers = newMarkers;
+      markers.addAll(uniqueNewMarkers);
     });
   }
 }

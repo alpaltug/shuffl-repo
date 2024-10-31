@@ -30,6 +30,7 @@ class HomePageFunctions {
     String rideId,  // Named optional parameter with default value "0"
     String rideScreen,
     ) async {
+        print("Entering toggleGoOnline with value: $value");
         User? user = auth.currentUser;
         if (user != null) {
             // Update user's online status in Firestore
@@ -38,14 +39,21 @@ class HomePageFunctions {
             });
 
             // Update goOnline state in the UI
-            updateGoOnlineState(value);
+            await updateGoOnlineState(value);
 
             // Stop the existing listeners if toggled off
             if (!value) {
-                positionStreamSubscription?.cancel(); // Cancel position listener
+                //print("Toggling off goOnline for user: ${user.uid}");
+                // positionStreamSubscription?.cancel(); // Cancel position listener
 
                 // Remove the current user's marker from the markers set
-                markers.removeWhere((marker) => marker.markerId.value == user.uid);
+                markers.forEach((marker) {
+                    if (marker.markerId.value == user.uid) {
+                        markers.remove(marker);
+                        print("Removing marker for user: ${user.uid}");
+                    }
+                });
+                // markers.removeWhere((marker) => marker.markerId.value == user.uid);
                 updateMarkers(markers); // Update markers
 
                 return value; // Stop further execution as the user is offline
@@ -68,10 +76,10 @@ class HomePageFunctions {
             // Fetch online users or participants based on rideId
             if (rideId != "0" && rideScreen != "0") {
                 print("Entering active ride for rideId: $rideId");
-                fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId, rideScreen);
+                await fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId, rideScreen);
             } else {
-                //print("Entering normal online users");
-                fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers);
+                print("Entering normal online users");
+                await fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers);
             }
         }
         return value;

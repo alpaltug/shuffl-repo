@@ -68,6 +68,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
   StreamSubscription<Position>? _positionStreamSubscription;
   final _notificationService = NotificationService();
 
+  Map<String, DateTime> markerTimestamps = {}; // To track the last update time for each marker
+
 
   Set<Marker> markers = {}; 
 
@@ -140,11 +142,16 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   // Callback to update 'markers'
-  void updateMarkers(Set<Marker> newMarkers) {
-    //print('Updating markers');
-    setState(() {
-      markers = newMarkers;
-    });
+  void updateMarkers(Set<Marker> newMarkers) async {
+    // Filter out markers that are already in the existing markers set
+    Set<Marker> uniqueNewMarkers = newMarkers.difference(markers);
+
+    // Only update the state if there are new unique markers to add
+    if (uniqueNewMarkers.isNotEmpty && mounted) {
+      setState(() {
+        markers.addAll(uniqueNewMarkers);
+      });
+    }
   }
 
   // Toggle 'goOnline' and update necessary state variables
