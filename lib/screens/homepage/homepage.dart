@@ -161,7 +161,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
       _positionStreamSubscription,
       markers,
       updateMarkers,
-      rideId,
+      "0",
+      "0"
     );
   }
 

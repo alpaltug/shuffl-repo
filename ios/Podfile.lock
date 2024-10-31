@@ -1509,6 +1509,7 @@ DEPENDENCIES:
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/ios`)
   - google_maps_flutter_ios (from `.symlinks/plugins/google_maps_flutter_ios/ios`)
   - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/darwin`)
+  - GoogleMaps (~> 8.4.0)
   - GoogleSignIn (~> 7.0)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
@@ -1647,6 +1648,6 @@ SPEC CHECKSUMS:
   syncfusion_flutter_pdfviewer: bb9998884b864cfedf72628df3503bdf57e397c0
   url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
 
-PODFILE CHECKSUM: de103e55bc79e2da81b7acdae0b1e68b50f76eca
+PODFILE CHECKSUM: 7936892d513315c0bb52f5b93f3f5e44d7d52543
 
 COCOAPODS: 1.15.2

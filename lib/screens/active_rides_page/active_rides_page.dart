@@ -150,8 +150,7 @@ Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
 
 
 void updateMarkers(Set<Marker> newMarkers) async {
-  if (_pickupLocation != null) {
-    // Safeguard for pickupLocation
+  if (_pickupLocation != null && goOnline) {
     newMarkers.add(
       Marker(
         markerId: const MarkerId('pickup'),
@@ -160,14 +159,12 @@ void updateMarkers(Set<Marker> newMarkers) async {
         infoWindow: const InfoWindow(title: 'Pickup Location'),
       ),
     );
+  }
 
-    if (mounted) {
-      setState(() {
-        markers = newMarkers;
-      });
-    }
-  } else {
-    print('Error: Pickup location is null');
+  if (mounted) {
+    setState(() {
+      markers = newMarkers;
+    });
   }
 }
 
@@ -187,6 +184,7 @@ void updateMarkers(Set<Marker> newMarkers) async {
       markers,
       updateMarkers,
       widget.rideId,
+      "2",
     );
   }
 
@@ -199,13 +197,14 @@ void updateMarkers(Set<Marker> newMarkers) async {
       currentPosition,
       markers,
       widget.rideId,
+      "2",
     );
   }
   
 
   Future<void> _loadActiveRideDetails() async {
     int retryCount = 0; // Limit retry attempts
-    const maxRetries = 5; // Maximum number of retries
+    const maxRetries = 20; // Maximum number of retries
     const retryDelay = Duration(seconds: 1); // Delay between retries
 
     // Show loading indicator while waiting
@@ -353,34 +352,46 @@ void updateMarkers(Set<Marker> newMarkers) async {
 
   Future<void> _updateDirections() async {
     User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
+    if (currentUser == null) {
+      print('Current user is null');
+      return;
+    }
     if (currentPosition == null) {
       DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-      if (!userDoc.exists) return;
+      if (!userDoc.exists) {
+        print('User document does not exist');
+        return;
+      }
 
       var userData = userDoc.data() as Map<String, dynamic>;
-      if (userData['lastPickupLocation'] == null) {
+      if (userData['lastPickupLocation'] == null || userData['goOnline'] == false) {
+        print('Last pickup location is null or user is not online');
         return;
       } else {
         currentPosition = LatLng(userData['lastPickupLocation'].latitude, userData['lastPickupLocation'].longitude);
-        //print('Current position updated to: $currentPosition');
+        print('Current position updated to: $currentPosition');
       }
+    }
+
+    if (_pickupLocation == null) {
+      print('Pickup location is null');
+      return;
     }
 
     // Draw route for the current user using their current location
     final currentUserRoute = await _getDirections(currentPosition!, _pickupLocation!);
     if (mounted) {
-        setState(() {
-          _polylines.add(
-            Polyline(
-              polylineId: const PolylineId('current_user_route'),
-              points: currentUserRoute,
-              color: Colors.yellow, // Different color for the current user's route
-              width: 5,
-            ),
-          );
-        });
-      }
+      setState(() {
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('current_user_route'),
+            points: currentUserRoute,
+            color: Colors.yellow, // Different color for the current user's route
+            width: 5,
+          ),
+        );
+      });
+    }
 
     // Iterate over each participantId to fetch their lastPickupLocation from Firestore
     for (String participantId in _participantIds) {
@@ -392,12 +403,11 @@ void updateMarkers(Set<Marker> newMarkers) async {
           .doc(participantId)
           .get();
 
-      if (participantSnapshot.exists && participantSnapshot['lastPickupLocation'] != null) {
+      if (participantSnapshot.exists && participantSnapshot['lastPickupLocation'] != null && participantSnapshot['goOnline'] == true) {
         GeoPoint lastPickupLocation = participantSnapshot['lastPickupLocation'];
         LatLng participantLocation = LatLng(lastPickupLocation.latitude, lastPickupLocation.longitude);
 
         // Fetch and draw the route for the participant from their lastPickupLocation to the ride's pickup location
-        //print('fetching directions for start and end: $participantLocation, $_pickupLocation');
         final participantRoute = await _getDirections(participantLocation, _pickupLocation!);
         if (mounted) {
           setState(() {
@@ -406,7 +416,7 @@ void updateMarkers(Set<Marker> newMarkers) async {
                 polylineId: PolylineId('route_$participantId'),
                 points: participantRoute,
                 color: Colors.black, // Use black for participant routes
-                width: 5,
+                width: 3,
               ),
             );
           });
@@ -424,11 +434,11 @@ void updateMarkers(Set<Marker> newMarkers) async {
 
     try {
       final response = await http.get(Uri.parse(url));
-      //print('Response status code: ${response.statusCode}');
+      print('Response status code: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
-        //print('Response body: $jsonResponse');
+        print('Response body: $jsonResponse');
         
         if (jsonResponse['routes'].isNotEmpty) {
           final route = jsonResponse['routes'][0];

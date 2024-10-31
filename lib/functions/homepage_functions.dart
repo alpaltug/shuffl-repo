@@ -28,16 +28,28 @@ class HomePageFunctions {
     Set<Marker> markers,
     Function(Set<Marker>) updateMarkers,
     String rideId,  // Named optional parameter with default value "0"
+    String rideScreen,
     ) async {
         User? user = auth.currentUser;
         if (user != null) {
             // Update user's online status in Firestore
             await firestore.collection('users').doc(user.uid).update({
-            'goOnline': value,
+                'goOnline': value,
             });
 
             // Update goOnline state in the UI
             updateGoOnlineState(value);
+
+            // Stop the existing listeners if toggled off
+            if (!value) {
+                positionStreamSubscription?.cancel(); // Cancel position listener
+
+                // Remove the current user's marker from the markers set
+                markers.removeWhere((marker) => marker.markerId.value == user.uid);
+                updateMarkers(markers); // Update markers
+
+                return value; // Stop further execution as the user is offline
+            }
 
             // Stop the existing listeners if toggled off
             // if (!value) {
@@ -54,9 +66,9 @@ class HomePageFunctions {
             }
 
             // Fetch online users or participants based on rideId
-            if (rideId != "0") {
-                //print("Entering active ride for rideId: $rideId");
-                fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId);
+            if (rideId != "0" && rideScreen != "0") {
+                print("Entering active ride for rideId: $rideId");
+                fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId, rideScreen);
             } else {
                 //print("Entering normal online users");
                 fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers);
@@ -137,7 +149,7 @@ class HomePageFunctions {
             await updateUserLocationInFirestore(newPosition, auth, firestore);
 
             // Fetch the profile image URL from Firestore
-            String? profileImageUrl = await _getProfileImageUrl(auth, firestore);
+            // String? profileImageUrl = await _getProfileImageUrl(auth, firestore);
 
             // Optionally handle the marker update logic
             // BitmapDescriptor markerIcon;
@@ -206,20 +218,22 @@ class HomePageFunctions {
 
             for (var doc in userSnapshot.docs) {
                 var userData = doc.data() as Map<String, dynamic>;
+                //print('Username: ${userData['fullName']}');
 
                 // Skip the current user
                 //if (doc.id == currentUser.uid) continue;
 
                 // Check if the user has a valid lastPickupLocation and lastPickupTime
-                if (userData['lastPickupLocation'] != null && userData['lastPickupTime'] != null) {
+                if (userData['lastPickupLocation'] != null) {
+                    //print('User has a valid lastPickupLocation');
                     GeoPoint location = userData['lastPickupLocation'];
                     Timestamp lastPickupTime = userData['lastPickupTime'];
 
                     // Check if the last pickup time is within the last 15 minutes
-                    DateTime pickupTime = lastPickupTime.toDate();
-                    if (now.difference(pickupTime).inMinutes > 15) {
-                        continue; // Skip users with old pickup times
-                    }
+                    // DateTime pickupTime = lastPickupTime.toDate();
+                    // if (now.difference(pickupTime).inMinutes > 15) {
+                    //     continue; // Skip users with old pickup times
+                    // }
 
                     LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
 
@@ -280,6 +294,7 @@ class HomePageFunctions {
         LatLng? currentPosition,
         Set<Marker> markers,
         String rideId,  // New rideId parameter to fetch participants for the specific ride
+        String isActiveRide,
     ) async {
         User? currentUser = auth.currentUser;
         // if (currentUser == null || currentPosition == null || rideId.isEmpty) return;
@@ -288,7 +303,12 @@ class HomePageFunctions {
         //print('Fetching online participants for ride: $rideId');
 
         // Query the active_rides collection to get participants for the specified ride
-        firestore.collection('active_rides').doc(rideId).snapshots().listen((DocumentSnapshot rideDoc) async {
+        String docTable = 'rides';
+        if (isActiveRide == '2') {
+            docTable = 'active_rides';
+        }
+        print('DocTable: $docTable');
+        firestore.collection(docTable).doc(rideId).snapshots().listen((DocumentSnapshot rideDoc) async {
             if (!rideDoc.exists) return;  // If no such ride, exit early
             //print('Ride document exists for rideId: $rideId');
 

@@ -37,6 +37,8 @@ target 'Runner' do
   pod 'Firebase/Auth', '~> 11.2'
   pod 'Firebase/Firestore', '= 11.2.0'
   pod 'GoogleSignIn', '~> 7.0'
+  pod 'GoogleMaps', '~> 8.4.0'
+  
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   
