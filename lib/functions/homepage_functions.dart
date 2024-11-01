@@ -34,35 +34,35 @@ class HomePageFunctions {
         User? user = auth.currentUser;
         if (user != null) {
             // Update user's online status in Firestore
-            await firestore.collection('users').doc(user.uid).update({
+            firestore.collection('users').doc(user.uid).update({
                 'goOnline': value,
             });
 
             // Update goOnline state in the UI
-            await updateGoOnlineState(value);
+            updateGoOnlineState(value);
 
             // Stop the existing listeners if toggled off
-            if (!value) {
-                //print("Toggling off goOnline for user: ${user.uid}");
-                // positionStreamSubscription?.cancel(); // Cancel position listener
+            // if (!value) {
+            //     //print("Toggling off goOnline for user: ${user.uid}");
+            //     // positionStreamSubscription?.cancel(); // Cancel position listener
 
-                // Remove the current user's marker from the markers set
-                Set<Marker> markersToRemove = {};
-                markers.forEach((marker) {
-                    if (marker.userId == currentUser.id) {
-                        print("Removing marker for user: ${currentUser.id}");
-                        markersToRemove.add(marker);
-                        break;
-                    }
-                });
+            //     // Remove the current user's marker from the markers set
+            //     Set<Marker> markersToRemove = {};
+            //     markers.forEach((marker) {
+            //         if (marker.userId == currentUser.id) {
+            //             print("Removing marker for user: ${currentUser.id}");
+            //             markersToRemove.add(marker);
+            //             break;
+            //         }
+            //     });
 
-                if (markersToRemove.isNotEmpty) {
-                    markers.removeAll(markersToRemove);
-                    updateMarkers(markers);
-                }
+            //     if (markersToRemove.isNotEmpty) {
+            //         markers.removeAll(markersToRemove);
+            //         updateMarkers(markers);
+            //     }
 
-                return value; // Stop further execution as the user is offline
-            }
+            //     return value; // Stop further execution as the user is offline
+            // }
 
             // Stop the existing listeners if toggled off
             // if (!value) {
@@ -72,15 +72,17 @@ class HomePageFunctions {
             // }
 
             // If toggled on, determine position and fetch online users/participants
-            await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
+            if (value) {
+                await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
 
-            // Fetch online users or participants based on rideId
-            if (rideId != "0" && rideScreen != "0") {
-                print("Entering active ride for rideId: $rideId");
-                await fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId, rideScreen);
-            } else {
-                print("Entering normal online users");
-                await fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers);
+                // Fetch online users or participants based on rideId
+                if (rideId != "0" && rideScreen != "0") {
+                    print("Entering active ride for rideId: $rideId");
+                    await fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId, rideScreen, value);
+                } else {
+                    print("Entering normal online users");
+                    await fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers, value);
+                }
             }
         }
         return value;
@@ -215,6 +217,7 @@ class HomePageFunctions {
     Function(Set<Marker>) updateMarkers,
     LatLng? currentPosition,
     Set<Marker> markers,
+    bool value,
     ) async {
         User? currentUser = auth.currentUser;
         if (currentUser == null || currentPosition == null) return;
@@ -230,7 +233,7 @@ class HomePageFunctions {
                 //print('Username: ${userData['fullName']}');
 
                 // Skip the current user
-                //if (doc.id == currentUser.uid) continue;
+                if (!value && doc.id == currentUser.uid) continue;
 
                 // Check if the user has a valid lastPickupLocation and lastPickupTime
                 if (userData['lastPickupLocation'] != null) {
@@ -258,7 +261,7 @@ class HomePageFunctions {
                         }
 
                         // Adjust the position slightly to avoid marker overlap
-                        double offset = 0.00002 * (locationCount[locationKey]! - 1);
+                        double offset = 0.001 * (locationCount[locationKey]! - 1);
                         LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
 
                         String? displayName = userData['fullName'];
@@ -304,6 +307,7 @@ class HomePageFunctions {
         Set<Marker> markers,
         String rideId,  // New rideId parameter to fetch participants for the specific ride
         String isActiveRide,
+        bool value,
     ) async {
         User? currentUser = auth.currentUser;
         // if (currentUser == null || currentPosition == null || rideId.isEmpty) return;
@@ -332,7 +336,7 @@ class HomePageFunctions {
             for (String participantId in participants) {
                 //print('Checking participant with the uid: $participantId');
                 // Skip the current user
-                //if (participantId == currentUser.uid) continue;
+                if (!value && participantId == currentUser.uid) continue;
 
                 // Get the participant's document from the 'users' collection
                 DocumentSnapshot userDoc = await firestore.collection('users').doc(participantId).get();
@@ -357,7 +361,7 @@ class HomePageFunctions {
                         }
 
                         // Adjust the position slightly to avoid marker overlap
-                        double offset = 0.00001 * (locationCount[locationKey]! - 1);
+                        double offset = 0.001 * (locationCount[locationKey]! - 1);
                         LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
 
                         String? displayName = userData['fullName'];
