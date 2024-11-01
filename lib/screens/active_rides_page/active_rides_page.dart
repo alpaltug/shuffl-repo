@@ -203,6 +203,7 @@ void updateMarkers(Set<Marker> newMarkers) async {
       markers,
       widget.rideId,
       "2",
+      goOnline,
     );
   }
   

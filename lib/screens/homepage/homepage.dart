@@ -95,6 +95,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       updateMarkers, // Pass the updateMarkers callback to update the map
       currentPosition,
       markers,
+      goOnline,
     );
 
     _listenToUnreadMessageSenderCount();
@@ -184,6 +185,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       updateMarkers,   // Use the callback function for currentPosition
       currentPosition,
       markers,
+      goOnline,
     );
   }
 
