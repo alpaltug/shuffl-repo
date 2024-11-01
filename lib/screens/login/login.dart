@@ -143,16 +143,9 @@ class _LoginState extends State<Login> {
   }
 
   Future<void> _signInWithApple() async {
-    setState(() {
-      _errorMessage = null;
-    });
-
     try {
       final isAvailable = await SignInWithApple.isAvailable();
       if (!isAvailable) {
-        setState(() {
-          _errorMessage = 'Apple Sign-In is not available on this device.';
-        });
         return;
       }
 
@@ -202,18 +195,9 @@ class _LoginState extends State<Login> {
         }
       } else {
         await _auth.signOut();
-        setState(() {
-          _errorMessage = 'There was an error signing you in. Please try again.';
-        });
       }
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to sign in with Apple: ${e.message}';
-      });
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to sign in with Apple: $e';
-      });
+      // Do nothing; do not display error message
     }
   }
 
@@ -245,8 +229,8 @@ class _LoginState extends State<Login> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogolessAppBar(
-          title: 'Shuffl', automaticallyImplyLeading: false),
+      appBar:
+          const LogolessAppBar(title: 'Shuffl', automaticallyImplyLeading: false),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
@@ -308,7 +292,8 @@ class _LoginState extends State<Login> {
                     Center(
                       child: Text(
                         'Or sign up with',
-                        style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        style:
+                            TextStyle(color: Colors.white.withOpacity(0.6)),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -323,8 +308,8 @@ class _LoginState extends State<Login> {
                           style: TextStyle(color: Colors.white),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                              color: Colors.white.withOpacity(0.2)),
+                          side:
+                              BorderSide(color: Colors.white.withOpacity(0.2)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -344,8 +329,8 @@ class _LoginState extends State<Login> {
                         ),
                         style: OutlinedButton.styleFrom(
                           backgroundColor: Colors.black,
-                          side: BorderSide(
-                              color: Colors.white.withOpacity(0.2)),
+                          side:
+                              BorderSide(color: Colors.white.withOpacity(0.2)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
