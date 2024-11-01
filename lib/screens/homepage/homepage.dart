@@ -143,8 +143,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   // Callback to update 'markers'
   void updateMarkers(Set<Marker> newMarkers) async {
+    // Create a copy of the current markers set
+    Set<Marker> currentMarkersCopy = Set.from(markers);
+
     // Filter out markers that are already in the existing markers set
-    Set<Marker> uniqueNewMarkers = newMarkers.difference(markers);
+    Set<Marker> uniqueNewMarkers = newMarkers.difference(currentMarkersCopy);
 
     // Only update the state if there are new unique markers to add
     if (uniqueNewMarkers.isNotEmpty && mounted) {

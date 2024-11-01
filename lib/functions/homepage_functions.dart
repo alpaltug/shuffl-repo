@@ -47,14 +47,19 @@ class HomePageFunctions {
                 // positionStreamSubscription?.cancel(); // Cancel position listener
 
                 // Remove the current user's marker from the markers set
+                Set<Marker> markersToRemove = {};
                 markers.forEach((marker) {
-                    if (marker.markerId.value == user.uid) {
-                        markers.remove(marker);
-                        print("Removing marker for user: ${user.uid}");
+                    if (marker.userId == currentUser.id) {
+                        print("Removing marker for user: ${currentUser.id}");
+                        markersToRemove.add(marker);
+                        break;
                     }
                 });
-                // markers.removeWhere((marker) => marker.markerId.value == user.uid);
-                updateMarkers(markers); // Update markers
+
+                if (markersToRemove.isNotEmpty) {
+                    markers.removeAll(markersToRemove);
+                    updateMarkers(markers);
+                }
 
                 return value; // Stop further execution as the user is offline
             }
@@ -67,11 +72,7 @@ class HomePageFunctions {
             // }
 
             // If toggled on, determine position and fetch online users/participants
-            if (value) {
-                await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
-            } else {
-                //updateMarkers({}); // Clear markers
-            }
+            await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
 
             // Fetch online users or participants based on rideId
             if (rideId != "0" && rideScreen != "0") {
