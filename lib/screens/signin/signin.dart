@@ -11,7 +11,11 @@ import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/widgets/green_action_button.dart';
 import 'package:my_flutter_app/widgets/grey_text_field.dart';
 import 'package:my_flutter_app/widgets/logoless_appbar.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Add shared_preferences
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -25,14 +29,14 @@ class _SignInState extends State<SignIn> {
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
-  
-  bool _rememberMe = false; // Add remember me state
+
+  bool _rememberMe = false;
   String? _errorMessage;
 
-  // Method to get email from username
   Future<String?> _getEmailFromUsername(String username) async {
     try {
-      QuerySnapshot snapshot = await _firestoreService.getUserByUsername(username);
+      QuerySnapshot snapshot =
+          await _firestoreService.getUserByUsername(username);
       if (snapshot.docs.isNotEmpty) {
         return snapshot.docs.first['email'];
       }
@@ -42,7 +46,6 @@ class _SignInState extends State<SignIn> {
     return null;
   }
 
-  // Normal sign-in method
   void _signIn() async {
     setState(() {
       _errorMessage = null;
@@ -78,7 +81,6 @@ class _SignInState extends State<SignIn> {
         return;
       }
 
-      // Save Remember Me preference
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('remember_me', _rememberMe);
 
@@ -92,7 +94,8 @@ class _SignInState extends State<SignIn> {
       setState(() {
         switch (e.code) {
           case 'user-not-found':
-            _errorMessage = 'Email or username does not exist. Please check your input.';
+            _errorMessage =
+                'Email or username does not exist. Please check your input.';
             break;
           case 'invalid-email':
             _errorMessage = 'The email address is not valid.';
@@ -101,7 +104,8 @@ class _SignInState extends State<SignIn> {
             _errorMessage = 'Incorrect password. Please try again.';
             break;
           case 'user-disabled':
-            _errorMessage = 'This user has been disabled. Please contact support.';
+            _errorMessage =
+                'This user has been disabled. Please contact support.';
             break;
           default:
             _errorMessage = 'The email or password is incorrect. Try again.';
@@ -111,26 +115,27 @@ class _SignInState extends State<SignIn> {
     }
   }
 
-  // Sign-in with Google method
   void _signInWithGoogle() async {
     setState(() {
       _errorMessage = null;
     });
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
+      final GoogleSignInAuthentication? googleAuth =
+          await googleUser?.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
         idToken: googleAuth?.idToken,
         accessToken: googleAuth?.accessToken,
       );
-      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
 
       User? user = userCredential.user;
 
       if (user != null && user.email != null) {
-        final userExists = await _firestoreService.checkIfUserExists(user.uid);
+        final userExists =
+            await _firestoreService.checkIfUserExists(user.uid);
         if (userExists) {
-          // Save Remember Me preference for Google sign-in
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('remember_me', _rememberMe);
 
@@ -167,6 +172,97 @@ class _SignInState extends State<SignIn> {
     }
   }
 
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _errorMessage = null;
+    });
+
+    try {
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!isAvailable) {
+        setState(() {
+          _errorMessage = 'Apple Sign-In is not available on this device.';
+        });
+        return;
+      }
+
+      final rawNonce = generateNonce();
+      final hashedNonce = sha256ofString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      UserCredential userCredential =
+          await _auth.signInWithCredential(oauthCredential);
+
+      User? user = userCredential.user;
+
+      if (user != null) {
+        final userExists =
+            await _firestoreService.checkIfUserExists(user.uid);
+        if (userExists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomePage(),
+            ),
+          );
+        } else {
+          String email = appleCredential.email ?? '';
+          String name =
+              '${appleCredential.givenName ?? ''} ${appleCredential.familyName ?? ''}'
+                  .trim();
+          await _firestoreService.addUser(user.uid, email, name: name);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreateProfile(),
+            ),
+          );
+        }
+      } else {
+        await _auth.signOut();
+        setState(() {
+          _errorMessage = 'There was an error signing you in. Please try again.';
+        });
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to sign in with Apple: ${e.message}';
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to sign in with Apple: $e';
+      });
+    }
+  }
+
+  String generateNonce([int length = 32]) {
+    final charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+            length, (_) => charset[random.nextInt(charset.length)])
+        .join();
+  }
+
+  String sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   Future<void> _deleteUser(User? user) async {
     if (user != null) {
       try {
@@ -180,7 +276,8 @@ class _SignInState extends State<SignIn> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogolessAppBar(title: 'Shuffl', automaticallyImplyLeading: false),
+      appBar: const LogolessAppBar(
+          title: 'Shuffl', automaticallyImplyLeading: false),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
@@ -253,7 +350,8 @@ class _SignInState extends State<SignIn> {
                     Center(
                       child: Text(
                         'Or sign in with',
-                        style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        style:
+                            TextStyle(color: Colors.white.withOpacity(0.6)),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -261,13 +359,36 @@ class _SignInState extends State<SignIn> {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: _signInWithGoogle,
-                        icon: const Icon(Icons.g_translate, color: Colors.white),
+                        icon:
+                            const Icon(Icons.g_translate, color: Colors.white),
                         label: const Text(
                           'Continue with Google',
                           style: TextStyle(color: Colors.white),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                          side:
+                              BorderSide(color: Colors.white.withOpacity(0.2)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _signInWithApple,
+                        icon: const Icon(Icons.apple, color: Colors.white),
+                        label: const Text(
+                          'Continue with Apple',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          side:
+                              BorderSide(color: Colors.white.withOpacity(0.2)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -281,7 +402,8 @@ class _SignInState extends State<SignIn> {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const Login()),
+                            MaterialPageRoute(
+                                builder: (context) => const Login()),
                           );
                         },
                         child: const Text(
@@ -296,7 +418,8 @@ class _SignInState extends State<SignIn> {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const ForgotPassword()),
+                            MaterialPageRoute(
+                                builder: (context) => const ForgotPassword()),
                           );
                         },
                         child: const Text(
@@ -308,6 +431,7 @@ class _SignInState extends State<SignIn> {
                   ],
                 ),
               ),
+              const SizedBox(height: defaultPadding),
             ],
           ),
         ),

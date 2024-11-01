@@ -6,10 +6,15 @@ import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/signin/signin.dart';
-import 'package:my_flutter_app/screens/verification/verification_screen.dart'; 
+import 'package:my_flutter_app/screens/verification/verification_screen.dart';
 import 'package:my_flutter_app/widgets/green_action_button.dart';
 import 'package:my_flutter_app/widgets/grey_text_field.dart';
 import 'package:my_flutter_app/widgets/logoless_appbar.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'dart:io' show Platform;
+import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -21,11 +26,8 @@ class Login extends StatefulWidget {
 class _LoginState extends State<Login> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
-  // final TextEditingController _firstNameController = TextEditingController();
-  // final TextEditingController _lastNameController = TextEditingController();
-  // final TextEditingController _userNameController = TextEditingController();
-  // final TextEditingController _phoneNumberController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
   bool _rememberMe = false;
@@ -40,18 +42,6 @@ class _LoginState extends State<Login> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String confirmPassword = _confirmPasswordController.text.trim();
-    // String firstName = _firstNameController.text.trim();
-    // String lastName = _lastNameController.text.trim();
-    // String userName = _userNameController.text.trim();
-    // String phoneNumber = _phoneNumberController.text.trim();
-    // String name = firstName + " " + lastName;
-
-    // if (!email.endsWith('.edu')) {
-    //   setState(() {
-    //     _errorMessage = 'Please use a school email address ending with .edu';
-    //   });
-    //   return;
-    // }
 
     if (password != confirmPassword) {
       setState(() {
@@ -61,7 +51,8 @@ class _LoginState extends State<Login> {
     }
 
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -81,7 +72,8 @@ class _LoginState extends State<Login> {
       setState(() {
         switch (e.code) {
           case 'email-already-in-use':
-            _errorMessage = 'The email address is already in use by another account.';
+            _errorMessage =
+                'The email address is already in use by another account.';
             break;
           case 'invalid-email':
             _errorMessage = 'The email address is not valid.';
@@ -103,12 +95,14 @@ class _LoginState extends State<Login> {
     });
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
+      final GoogleSignInAuthentication? googleAuth =
+          await googleUser?.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
         idToken: googleAuth?.idToken,
         accessToken: googleAuth?.accessToken,
       );
-      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
 
       User? user = userCredential.user;
 
@@ -148,6 +142,81 @@ class _LoginState extends State<Login> {
     }
   }
 
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _errorMessage = null;
+    });
+
+    try {
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!isAvailable) {
+        setState(() {
+          _errorMessage = 'Apple Sign-In is not available on this device.';
+        });
+        return;
+      }
+
+      final rawNonce = generateNonce();
+      final hashedNonce = sha256ofString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      UserCredential userCredential =
+          await _auth.signInWithCredential(oauthCredential);
+
+      User? user = userCredential.user;
+
+      if (user != null) {
+        final userExists = await _firestoreService.checkIfUserExists(user.uid);
+        if (userExists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomePage(),
+            ),
+          );
+        } else {
+          String email = appleCredential.email ?? '';
+          String name =
+              '${appleCredential.givenName ?? ''} ${appleCredential.familyName ?? ''}'
+                  .trim();
+          await _firestoreService.addUser(user.uid, email, name: name);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreateProfile(),
+            ),
+          );
+        }
+      } else {
+        await _auth.signOut();
+        setState(() {
+          _errorMessage = 'There was an error signing you in. Please try again.';
+        });
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to sign in with Apple: ${e.message}';
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to sign in with Apple: $e';
+      });
+    }
+  }
+
   Future<void> _deleteUser(User? user) async {
     if (user != null) {
       try {
@@ -158,10 +227,26 @@ class _LoginState extends State<Login> {
     }
   }
 
+  String generateNonce([int length = 32]) {
+    final charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+            length, (_) => charset[random.nextInt(charset.length)])
+        .join();
+  }
+
+  String sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogolessAppBar(title: 'Shuffl', automaticallyImplyLeading: false),
+      appBar: const LogolessAppBar(
+          title: 'Shuffl', automaticallyImplyLeading: false),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
@@ -191,31 +276,11 @@ class _LoginState extends State<Login> {
                       'Create an account or sign in if you already have an existing account. Please enter a school designated email to get verified!',
                       style: TextStyle(color: Colors.white),
                     ),
-                    /*const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'First Name',
-                      controller: _firstNameController,
-                    ),*/
-                    /*const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'Last Name',
-                      controller: _lastNameController,
-                    ),*/
                     const SizedBox(height: 20),
                     GreyTextField(
                       labelText: 'Email',
                       controller: _emailController,
                     ),
-                    /*const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'Username',
-                      controller: _userNameController,
-                    ),*/
-                    /*const SizedBox(height: 20),
-                    GreyTextField(
-                      labelText: 'Phone Number',
-                      controller: _phoneNumberController,
-                    ),*/
                     const SizedBox(height: 20),
                     GreyTextField(
                       labelText: 'Password',
@@ -251,13 +316,36 @@ class _LoginState extends State<Login> {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: _signInWithGoogle,
-                        icon: const Icon(Icons.g_translate_rounded, color: Colors.white),
+                        icon: const Icon(Icons.g_translate_rounded,
+                            color: Colors.white),
                         label: const Text(
                           'Continue with Google',
                           style: TextStyle(color: Colors.white),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                          side: BorderSide(
+                              color: Colors.white.withOpacity(0.2)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _signInWithApple,
+                        icon: const Icon(Icons.apple, color: Colors.white),
+                        label: const Text(
+                          'Continue with Apple',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          side: BorderSide(
+                              color: Colors.white.withOpacity(0.2)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -285,6 +373,7 @@ class _LoginState extends State<Login> {
                   ],
                 ),
               ),
+              const SizedBox(height: defaultPadding),
             ],
           ),
         ),
@@ -292,24 +381,3 @@ class _LoginState extends State<Login> {
     );
   }
 }
-
-// APPLE SIGN IN BUTTON
-  // const SizedBox(height: 20),
-                    // SizedBox(
-                    //   width: double.infinity,
-                    //   child: OutlinedButton.icon(
-                    //     onPressed: () {}, // BACKEND - Apple Sign In API
-                    //     icon: const Icon(Icons.apple, color: Colors.white),
-                    //     label: const Text(
-                    //       'Continue with Apple',
-                    //       style: TextStyle(color: Colors.white),
-                    //     ),
-                    //     style: OutlinedButton.styleFrom(
-                    //       side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                    //       padding: const EdgeInsets.symmetric(vertical: 16),
-                    //       shape: RoundedRectangleBorder(
-                    //         borderRadius: BorderRadius.circular(10),
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
