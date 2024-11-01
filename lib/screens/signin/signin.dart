@@ -173,16 +173,9 @@ class _SignInState extends State<SignIn> {
   }
 
   Future<void> _signInWithApple() async {
-    setState(() {
-      _errorMessage = null;
-    });
-
     try {
       final isAvailable = await SignInWithApple.isAvailable();
       if (!isAvailable) {
-        setState(() {
-          _errorMessage = 'Apple Sign-In is not available on this device.';
-        });
         return;
       }
 
@@ -197,7 +190,7 @@ class _SignInState extends State<SignIn> {
         nonce: hashedNonce,
       );
 
-      final oauthCredential = OAuthProvider('apple.com').credential(
+      final oauthCredential = OAuthProvider("apple.com").credential(
         idToken: appleCredential.identityToken,
         rawNonce: rawNonce,
         accessToken: appleCredential.authorizationCode,
@@ -233,18 +226,8 @@ class _SignInState extends State<SignIn> {
         }
       } else {
         await _auth.signOut();
-        setState(() {
-          _errorMessage = 'There was an error signing you in. Please try again.';
-        });
       }
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to sign in with Apple: ${e.message}';
-      });
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to sign in with Apple: $e';
-      });
     }
   }
 
