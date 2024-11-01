@@ -150,25 +150,31 @@ Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
 
 
 void updateMarkers(Set<Marker> newMarkers) async {
-  // Filter out markers that are already in the existing markers set
-  Set<Marker> uniqueNewMarkers = newMarkers.difference(markers);
-
-  // Add the pickup marker if conditions are met
-  if (_pickupLocation != null) {
-    uniqueNewMarkers.add(
-      Marker(
-        markerId: const MarkerId('pickup'),
-        position: _pickupLocation!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: const InfoWindow(title: 'Pickup Location'),
-      ),
-    );
-  }
-
-  // Only update the state if there are new unique markers to add
-  if (uniqueNewMarkers.isNotEmpty && mounted) {
+  if (mounted) {
+    // remove if a previous marker with markerId pickup exits
+    markers.removeWhere((marker) => marker.markerId.value == 'pickup');
+    if (_pickupLocation != null) {
+      newMarkers.add(
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: _pickupLocation!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          infoWindow: const InfoWindow(title: 'Pickup Location'),
+        ),
+      );
+    }
     setState(() {
-      markers.addAll(uniqueNewMarkers);
+      // Calculate markers to remove (present in markers but not in newMarkers)
+      Set<Marker> markersToRemove = markers.difference(newMarkers);
+
+      // Calculate markers to add (present in newMarkers but not in markers)
+      Set<Marker> markersToAdd = newMarkers.difference(markers);
+
+      // Remove old markers
+      markers.removeAll(markersToRemove);
+
+      // Add new markers
+      markers.addAll(markersToAdd);
     });
   }
 }
