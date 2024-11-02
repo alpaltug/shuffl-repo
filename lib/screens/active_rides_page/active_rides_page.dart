@@ -11,7 +11,6 @@ import 'package:my_flutter_app/widgets/ride_info_widget.dart';
 import 'package:my_flutter_app/widgets/participant_list_widget.dart';
 import 'package:my_flutter_app/widgets/create_custom_marker.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
-import 'package:my_flutter_app/widgets/loading_widget.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -151,18 +150,6 @@ Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
 
 void updateMarkers(Set<Marker> newMarkers) async {
   if (mounted) {
-    // remove if a previous marker with markerId pickup exits
-    markers.removeWhere((marker) => marker.markerId.value == 'pickup');
-    if (_pickupLocation != null) {
-      newMarkers.add(
-        Marker(
-          markerId: const MarkerId('pickup'),
-          position: _pickupLocation!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          infoWindow: const InfoWindow(title: 'Pickup Location'),
-        ),
-      );
-    }
     setState(() {
       // Calculate markers to remove (present in markers but not in newMarkers)
       Set<Marker> markersToRemove = markers.difference(newMarkers);
