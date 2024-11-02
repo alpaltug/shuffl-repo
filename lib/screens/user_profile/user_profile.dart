@@ -9,6 +9,11 @@ import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/blocked_users_screen/blocked_users_screen.dart';
 import 'package:my_flutter_app/widgets/green_action_button.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 
 class UserProfile extends StatefulWidget {
   const UserProfile({super.key});
@@ -38,7 +43,8 @@ class _UserProfileState extends State<UserProfile> {
   void _loadUserProfile() async {
     User? user = _auth.currentUser;
     if (user != null) {
-      DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
+      DocumentSnapshot userProfile =
+          await _firestore.collection('users').doc(user.uid).get();
       setState(() {
         _displayName = userProfile['fullName'];
         _username = userProfile['username'];
@@ -47,6 +53,139 @@ class _UserProfileState extends State<UserProfile> {
         _numRides = userProfile['numRides'] ?? 0;
       });
     }
+  }
+
+  Future<void> _deleteAccount(User user) async {
+    try {
+      // Ask for confirmation
+      bool confirmed = await _showDeleteConfirmationDialog();
+      if (!confirmed) {
+        return; // User canceled deletion
+      }
+
+      // Determine the sign-in methods used by the user
+      List<UserInfo> providerData = user.providerData;
+      List<String> providers = providerData.map((info) => info.providerId).toList();
+
+      // Reauthenticate the user based on their provider
+      if (providers.contains('password')) {
+        // Email/password user
+        String? password = await _getPasswordFromUser();
+        if (password == null) {
+          // User canceled password input
+          return;
+        }
+        AuthCredential credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: password,
+        );
+        await user.reauthenticateWithCredential(credential);
+      } else if (providers.contains('google.com')) {
+        // Google sign-in user
+        bool reauthenticated = await _reauthenticateWithGoogle();
+        if (!reauthenticated) {
+          return; // User canceled Google sign-in
+        }
+      } else if (providers.contains('apple.com')) {
+        // Apple sign-in user
+        bool reauthenticated = await _reauthenticateWithApple();
+        if (!reauthenticated) {
+          return; // User canceled Apple sign-in
+        }
+      } else {
+        // Other providers not handled
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Cannot delete account with this sign-in method.')),
+        );
+        return;
+      }
+
+      // Delete user document from Firestore
+      await _firestore.collection('users').doc(user.uid).delete();
+
+      // Delete the user from Firebase Auth
+      await user.delete();
+
+      // Navigate to the sign-in screen and remove all previous routes
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const SignIn()),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      print('Error deleting user: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'An error occurred while deleting your account. Please try again.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<bool> _showDeleteConfirmationDialog() async {
+    String enteredUsername = '';
+    bool confirmed = false;
+    await showCupertinoDialog(
+      context: context,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: Text(
+            'Confirm Account Deletion',
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            children: [
+              SizedBox(height: 10),
+              Text(
+                'Deleting your account is a permanent action and cannot be undone. Please type your username to confirm you wish to proceed.',
+                style: TextStyle(
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(height: 10),
+              CupertinoTextField(
+                onChanged: (value) {
+                  enteredUsername = value;
+                },
+                placeholder: 'Enter your username',
+                style: TextStyle(color: Colors.black),
+              ),
+            ],
+          ),
+          actions: [
+            CupertinoDialogAction(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            CupertinoDialogAction(
+              child: Text('Delete'),
+              isDestructiveAction: true,
+              onPressed: () {
+                if (enteredUsername == _username) {
+                  confirmed = true;
+                  Navigator.of(context).pop(); // Close the dialog
+                } else {
+                  Navigator.of(context).pop(); // Close the dialog
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Username does not match. Account not deleted.'),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed;
   }
 
   Future<String?> _getPasswordFromUser() async {
@@ -112,40 +251,71 @@ class _UserProfileState extends State<UserProfile> {
     return password;
   }
 
-  Future<void> _deleteAccount(User user) async {
+  Future<bool> _reauthenticateWithGoogle() async {
     try {
-      // Ask for the user's password to reauthenticate
-      String? password = await _getPasswordFromUser();
-      if (password == null) {
-        // User canceled the password input
-        return;
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) {
+        return false;
       }
-
-      // Reauthenticate the user
-      AuthCredential credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: password,
+      final GoogleSignInAuthentication? googleAuth =
+          await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth?.accessToken,
+        idToken: googleAuth?.idToken,
       );
-      await user.reauthenticateWithCredential(credential);
-
-      // Delete user document from Firestore
-      await _firestore.collection('users').doc(user.uid).delete();
-
-      // Delete the user from Firebase Auth
-      await user.delete();
-
-      // Navigate to the sign-in screen and remove all previous routes
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const SignIn()),
-        (Route<dynamic> route) => false,
-      );
+      await user!.reauthenticateWithCredential(credential);
+      return true;
     } catch (e) {
-      print('Error deleting user: $e');
+      print('Error reauthenticating with Google: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred while deleting your account. Please try again.')),
+        SnackBar(content: Text('Failed to reauthenticate with Google.')),
       );
+      return false;
     }
+  }
+
+  Future<bool> _reauthenticateWithApple() async {
+    try {
+      final rawNonce = generateNonce();
+      final hashedNonce = sha256ofString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final oauthCredential = OAuthProvider("apple.com").credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      await user!.reauthenticateWithCredential(oauthCredential);
+      return true;
+    } catch (e) {
+      print('Error reauthenticating with Apple: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to reauthenticate with Apple.')),
+      );
+      return false;
+    }
+  }
+
+  String generateNonce([int length = 32]) {
+    final charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+            length, (_) => charset[random.nextInt(charset.length)])
+        .join();
+  }
+
+  String sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
   }
 
   @override
@@ -192,7 +362,8 @@ class _UserProfileState extends State<UserProfile> {
                       radius: 50,
                       backgroundImage: _imageUrl != null && _imageUrl!.isNotEmpty
                           ? NetworkImage(_imageUrl!)
-                          : const AssetImage('assets/icons/ShuffleLogo.jpeg') as ImageProvider,
+                          : const AssetImage('assets/icons/ShuffleLogo.jpeg')
+                              as ImageProvider,
                     ),
                     const SizedBox(height: 10),
                     Text(
@@ -301,65 +472,7 @@ class _UserProfileState extends State<UserProfile> {
                       text: 'Delete Account',
                       onPressed: () async {
                         if (user != null) {
-                          // Show confirmation dialog
-                          await showCupertinoDialog(
-                            context: context,
-                            builder: (context) {
-                              String enteredUsername = '';
-                              return CupertinoAlertDialog(
-                                title: Text(
-                                  'Confirm Account Deletion',
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                content: Column(
-                                  children: [
-                                    SizedBox(height: 10),
-                                    Text(
-                                      'Deleting your account is a permanent action and cannot be undone. Please type your username to confirm you wish to proceed.',
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    SizedBox(height: 10),
-                                    CupertinoTextField(
-                                      onChanged: (value) {
-                                        enteredUsername = value;
-                                      },
-                                      placeholder: 'Enter your username',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ],
-                                ),
-                                actions: [
-                                  CupertinoDialogAction(
-                                    child: Text('Cancel'),
-                                    onPressed: () {
-                                      Navigator.of(context).pop(); // Close the dialog
-                                    },
-                                  ),
-                                  CupertinoDialogAction(
-                                    child: Text('Delete'),
-                                    isDestructiveAction: true,
-                                    onPressed: () async {
-                                      if (enteredUsername == _username) {
-                                        Navigator.of(context).pop(); // Close the dialog
-                                        await _deleteAccount(user!);
-                                      } else {
-                                        // Show error message: username does not match
-                                        Navigator.of(context).pop(); // Close the dialog
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Username does not match. Account not deleted.')),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
-                          );
+                          await _deleteAccount(user!);
                         }
                       },
                     ),
