@@ -8,6 +8,7 @@ import 'package:my_flutter_app/screens/user_friends/user_friends.dart';
 import 'package:my_flutter_app/screens/search_users/search_users.dart';
 import 'package:my_flutter_app/screens/blocked_users_screen/blocked_users_screen.dart';
 import 'package:my_flutter_app/widgets/green_action_button.dart';
+import 'package:flutter/cupertino.dart';
 
 class UserProfile extends StatefulWidget {
   const UserProfile({super.key});
@@ -20,6 +21,7 @@ class _UserProfileState extends State<UserProfile> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  User? user;
   String? _displayName;
   String? _username;
   String? _imageUrl;
@@ -29,6 +31,7 @@ class _UserProfileState extends State<UserProfile> {
   @override
   void initState() {
     super.initState();
+    user = _auth.currentUser;
     _loadUserProfile();
   }
 
@@ -43,6 +46,105 @@ class _UserProfileState extends State<UserProfile> {
         _averageRating = userProfile['rating'] ?? 0.0;
         _numRides = userProfile['numRides'] ?? 0;
       });
+    }
+  }
+
+  Future<String?> _getPasswordFromUser() async {
+    String? password;
+    bool isCancelled = false;
+    await showCupertinoDialog(
+      context: context,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: Text(
+            'Reauthenticate',
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            children: [
+              SizedBox(height: 10),
+              Text(
+                'Please enter your password to confirm account deletion:',
+                style: TextStyle(color: Colors.black),
+              ),
+              SizedBox(height: 10),
+              CupertinoTextField(
+                obscureText: true,
+                onChanged: (value) {
+                  password = value;
+                },
+                placeholder: 'Password',
+                style: TextStyle(color: Colors.black),
+              ),
+            ],
+          ),
+          actions: [
+            CupertinoDialogAction(
+              child: Text('Cancel'),
+              onPressed: () {
+                isCancelled = true;
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            CupertinoDialogAction(
+              child: Text('Confirm'),
+              onPressed: () {
+                if (password == null || password!.isEmpty) {
+                  // Show error message if password is empty
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Password cannot be empty.')),
+                  );
+                } else {
+                  Navigator.of(context).pop(); // Close the dialog
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+    if (isCancelled) {
+      return null;
+    }
+    return password;
+  }
+
+  Future<void> _deleteAccount(User user) async {
+    try {
+      // Ask for the user's password to reauthenticate
+      String? password = await _getPasswordFromUser();
+      if (password == null) {
+        // User canceled the password input
+        return;
+      }
+
+      // Reauthenticate the user
+      AuthCredential credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      // Delete user document from Firestore
+      await _firestore.collection('users').doc(user.uid).delete();
+
+      // Delete the user from Firebase Auth
+      await user.delete();
+
+      // Navigate to the sign-in screen and remove all previous routes
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const SignIn()),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      print('Error deleting user: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred while deleting your account. Please try again.')),
+      );
     }
   }
 
@@ -192,6 +294,73 @@ class _UserProfileState extends State<UserProfile> {
                           context,
                           MaterialPageRoute(builder: (context) => const SignIn()),
                         );
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    GreenActionButton(
+                      text: 'Delete Account',
+                      onPressed: () async {
+                        if (user != null) {
+                          // Show confirmation dialog
+                          await showCupertinoDialog(
+                            context: context,
+                            builder: (context) {
+                              String enteredUsername = '';
+                              return CupertinoAlertDialog(
+                                title: Text(
+                                  'Confirm Account Deletion',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                content: Column(
+                                  children: [
+                                    SizedBox(height: 10),
+                                    Text(
+                                      'Deleting your account is a permanent action and cannot be undone. Please type your username to confirm you wish to proceed.',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    SizedBox(height: 10),
+                                    CupertinoTextField(
+                                      onChanged: (value) {
+                                        enteredUsername = value;
+                                      },
+                                      placeholder: 'Enter your username',
+                                      style: TextStyle(color: Colors.black),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  CupertinoDialogAction(
+                                    child: Text('Cancel'),
+                                    onPressed: () {
+                                      Navigator.of(context).pop(); // Close the dialog
+                                    },
+                                  ),
+                                  CupertinoDialogAction(
+                                    child: Text('Delete'),
+                                    isDestructiveAction: true,
+                                    onPressed: () async {
+                                      if (enteredUsername == _username) {
+                                        Navigator.of(context).pop(); // Close the dialog
+                                        await _deleteAccount(user!);
+                                      } else {
+                                        // Show error message: username does not match
+                                        Navigator.of(context).pop(); // Close the dialog
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Username does not match. Account not deleted.')),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        }
                       },
                     ),
                   ],

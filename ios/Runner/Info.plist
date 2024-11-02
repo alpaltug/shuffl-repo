@@ -44,9 +44,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>We need access to your camera to take a picture for your profile.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>We need your location to show relevant rides.</string>
+	<string>We use your location to enhance your experience with real-time ride tracking.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to show relevant rides.</string>
+	<string>We need your location to display nearby rides and improve your ride experience.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need your location to show relevant rides.</string> 
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -77,6 +77,6 @@
 		<true/>
 	</dict>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>We need your permission to track your activity.</string>
+	<string>We request tracking permission to improve user experience and ensure a seamless ride experience.</string>	
 </dict>
 </plist>
