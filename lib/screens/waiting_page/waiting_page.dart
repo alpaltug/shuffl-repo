@@ -163,6 +163,18 @@ Future<BitmapDescriptor> _createCustomMarkerIcon(BuildContext context) async {
 
 void updateMarkers(Set<Marker> newMarkers) async {
   if (mounted) {
+    // remove if a previous marker with markerId pickup exits
+    markers.removeWhere((marker) => marker.markerId.value == 'pickup');
+    if (_pickupLocation != null) {
+      newMarkers.add(
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: _pickupLocation!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          infoWindow: const InfoWindow(title: 'Pickup Location'),
+        ),
+      );
+    }
     setState(() {
       // Calculate markers to remove (present in markers but not in newMarkers)
       Set<Marker> markersToRemove = markers.difference(newMarkers);
