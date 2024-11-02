@@ -173,9 +173,16 @@ class _SignInState extends State<SignIn> {
   }
 
   Future<void> _signInWithApple() async {
+    setState(() {
+      _errorMessage = null;
+    });
+
     try {
       final isAvailable = await SignInWithApple.isAvailable();
       if (!isAvailable) {
+        setState(() {
+          _errorMessage = 'Apple Sign-In is not available on this device.';
+        });
         return;
       }
 
@@ -212,7 +219,7 @@ class _SignInState extends State<SignIn> {
             ),
           );
         } else {
-          String email = appleCredential.email ?? '';
+          String email = appleCredential.email ?? user.email ?? '';
           String name =
               '${appleCredential.givenName ?? ''} ${appleCredential.familyName ?? ''}'
                   .trim();
@@ -226,8 +233,15 @@ class _SignInState extends State<SignIn> {
         }
       } else {
         await _auth.signOut();
+        setState(() {
+          _errorMessage =
+              'Failed to sign in with Apple. Please try again later.';
+        });
       }
     } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to sign in with Apple. Please try again later.';
+      });
     }
   }
 
@@ -259,8 +273,8 @@ class _SignInState extends State<SignIn> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LogolessAppBar(
-          title: 'Shuffl', automaticallyImplyLeading: false),
+      appBar:
+          const LogolessAppBar(title: 'Shuffl', automaticallyImplyLeading: false),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: defaultPadding),
@@ -333,8 +347,7 @@ class _SignInState extends State<SignIn> {
                     Center(
                       child: Text(
                         'Or sign in with',
-                        style:
-                            TextStyle(color: Colors.white.withOpacity(0.6)),
+                        style: TextStyle(color: Colors.white.withOpacity(0.6)),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -342,15 +355,13 @@ class _SignInState extends State<SignIn> {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: _signInWithGoogle,
-                        icon:
-                            const Icon(Icons.g_translate, color: Colors.white),
+                        icon: const Icon(Icons.g_translate, color: Colors.white),
                         label: const Text(
                           'Continue with Google',
                           style: TextStyle(color: Colors.white),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side:
-                              BorderSide(color: Colors.white.withOpacity(0.2)),
+                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -370,8 +381,7 @@ class _SignInState extends State<SignIn> {
                         ),
                         style: OutlinedButton.styleFrom(
                           backgroundColor: Colors.black,
-                          side:
-                              BorderSide(color: Colors.white.withOpacity(0.2)),
+                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
