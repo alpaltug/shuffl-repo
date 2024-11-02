@@ -42,15 +42,15 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera to take a picture for your profile.</string>
+	<string> use your camera to take your profile picture and send photos of landmarks near you in chat to coordinate pick-ups.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>We use your location to enhance your experience with real-time ride tracking.</string>
+	<string> Enabling Always allows us to keep track of your ride in realtime to ensure you reach your destination without having to keep you on the app page during the whole ride.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to display nearby rides and improve your ride experience.</string>
+	<string>We need your location to identify rides departing nearby and provide you with better ones.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need your location to show relevant rides.</string> 
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photo library to upload your profile picture.</string>
+	<string>Grant access to your photo library in order to upload a profile picture.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
@@ -77,6 +77,6 @@
 		<true/>
 	</dict>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>We request tracking permission to improve user experience and ensure a seamless ride experience.</string>	
+	<string>We request tracking permission to improve user experience and ensure a seamless ride.</string>	
 </dict>
 </plist>
