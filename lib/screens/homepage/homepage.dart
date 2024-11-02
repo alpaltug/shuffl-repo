@@ -195,18 +195,42 @@ class _HomePageState extends State<HomePage> with RouteAware {
   void _loadUserProfile() async {
     User? user = _auth.currentUser;
     if (user != null) {
-      DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
+      try {
+        DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-      setState(() {
-        _profileImageUrl = userProfile['imageUrl'];
-        _username = userProfile['username'];
-        _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-        goOnline = userProfile['goOnline'] ?? false;
-      });
+        if (userProfile.exists) {
+          Map<String, dynamic>? data = userProfile.data() as Map<String, dynamic>?;
 
-      //await HomePageFunctions.fetchGoOnlineStatus();
+          if (data != null) {
+            if (mounted) {
+              setState(() {
+                _profileImageUrl = data['imageUrl'] ?? '';
+                _username = data['username'] ?? '';
+                _fullName = data['fullName'] ?? 'Shuffl User';
+                goOnline = data['goOnline'] ?? false;
+              });
+            }
+          } else {
+            print('User profile data is null.');
+            // Handle the case when data is null
+          }
+        } else {
+          print('User profile document does not exist.');
+          // Handle the case when the user document does not exist
+        }
+      } on FirebaseException catch (e) {
+        print('FirebaseException fetching user profile: $e');
+        // Handle Firebase-specific exceptions
+      } catch (e) {
+        print('Unknown error fetching user profile: $e');
+        // Handle any other exceptions
+      }
+
+      // Optionally, call fetchGoOnlineStatus or any other methods
+      // await HomePageFunctions.fetchGoOnlineStatus();
     }
   }
+
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;

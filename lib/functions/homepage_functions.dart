@@ -34,9 +34,21 @@ class HomePageFunctions {
         User? user = auth.currentUser;
         if (user != null) {
             // Update user's online status in Firestore
-            firestore.collection('users').doc(user.uid).update({
-                'goOnline': value,
-            });
+            try {
+                // Update user's online status in Firestore
+                await firestore.collection('users').doc(user.uid).update({
+                    'goOnline': value,
+                });
+                } on FirebaseException catch (e) {
+                if (e.code == 'not-found') {
+                    print('User document not found. Cannot update goOnline status.');
+                    // Optionally, create the document or handle as needed
+                } else {
+                    print('FirebaseException updating goOnline status: $e');
+                }
+                } catch (e) {
+                print('Unknown error updating goOnline status: $e');
+            }
 
             // Update goOnline state in the UI
             updateGoOnlineState(value);
@@ -486,13 +498,28 @@ class HomePageFunctions {
 
 
     // Update User Location in Firestore
-    static Future<void> updateUserLocationInFirestore(LatLng currentPosition, FirebaseAuth auth, FirebaseFirestore firestore) async {
+    static Future<void> updateUserLocationInFirestore(
+    LatLng currentPosition,
+    FirebaseAuth auth,
+    FirebaseFirestore firestore,
+    ) async {
         User? user = auth.currentUser;
         if (user != null) {
-            await firestore.collection('users').doc(user.uid).update({
-            'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
-            'lastPickupTime': FieldValue.serverTimestamp(),
-            });
+            try {
+                await firestore.collection('users').doc(user.uid).update({
+                    'lastPickupLocation': GeoPoint(currentPosition.latitude, currentPosition.longitude),
+                    'lastPickupTime': FieldValue.serverTimestamp(),
+                });
+            } on FirebaseException catch (e) {
+                if (e.code == 'not-found') {
+                    print('User document not found. Cannot update location.');
+                    // Optionally, create the document or handle as needed
+                } else {
+                    print('FirebaseException updating user location: $e');
+                }
+            } catch (e) {
+                print('Unknown error updating user location: $e');
+            }
         }
     }
 
