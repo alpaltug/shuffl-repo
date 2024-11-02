@@ -257,6 +257,14 @@ class _UserProfileState extends State<UserProfile> {
       if (googleUser == null) {
         return false;
       }
+
+      if (googleUser.email != user!.email) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('The Google account does not match the current user.')),
+        );
+        return false;
+      }
+
       final GoogleSignInAuthentication? googleAuth =
           await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -285,6 +293,14 @@ class _UserProfileState extends State<UserProfile> {
         ],
         nonce: hashedNonce,
       );
+
+      String? appleEmail = appleCredential.email;
+      if (appleEmail != null && appleEmail != user!.email) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('The Apple account does not match the current user.')),
+        );
+        return false;
+      }
 
       final oauthCredential = OAuthProvider("apple.com").credential(
         idToken: appleCredential.identityToken,
