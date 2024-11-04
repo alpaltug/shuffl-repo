@@ -14,97 +14,109 @@ final googleMapsApiKey = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
 class HomePageFunctions {
 
-    // Toggle Go Online
-    static Future<bool> toggleGoOnline(
-    bool value,
+    // Toggle Visibility Option
+    static Future<void> toggleVisibilityOption(
+    String visibilityOption, // Accept visibility option instead of a boolean
     LatLng? currentPosition,
     FirebaseAuth auth,
-    FirebaseFirestore firestore, 
-    Function setState, 
+    FirebaseFirestore firestore,
+    Function(Function) updateState,
     Function(LatLng) updatePosition,
-    Function(bool) updateGoOnlineState,
+    Function(String) updateVisibilityOption, // Update visibility state
     Function fetchOnlineUsers,
-    StreamSubscription<Position>? positionStreamSubscription, 
+    StreamSubscription<Position>? positionStreamSubscription,
     Set<Marker> markers,
     Function(Set<Marker>) updateMarkers,
-    String rideId,  // Named optional parameter with default value "0"
-    String rideScreen,
+    String rideId,
+    String isActiveRide,
     ) async {
-        print("Entering toggleGoOnline with value: $value");
         User? user = auth.currentUser;
-        if (user != null) {
-            // Update user's online status in Firestore
-            try {
-                // Update user's online status in Firestore
-                await firestore.collection('users').doc(user.uid).update({
-                    'goOnline': value,
-                });
-                } on FirebaseException catch (e) {
-                if (e.code == 'not-found') {
-                    print('User document not found. Cannot update goOnline status.');
-                    // Optionally, create the document or handle as needed
-                } else {
-                    print('FirebaseException updating goOnline status: $e');
-                }
-                } catch (e) {
-                print('Unknown error updating goOnline status: $e');
-            }
+        if (user == null) return;
 
-            // Update goOnline state in the UI
-            updateGoOnlineState(value);
+        updateState(() {
+        // Update the visibility option state
+        updateVisibilityOption(visibilityOption);
+        });
 
-            // Stop the existing listeners if toggled off
-            // if (!value) {
-            //     //print("Toggling off goOnline for user: ${user.uid}");
-            //     // positionStreamSubscription?.cancel(); // Cancel position listener
+        // Update the user's visibility option in Firestore
+        await firestore.collection('users').doc(user.uid).update({
+        'visibilityOption': visibilityOption,
+        'currentPosition': currentPosition != null
+            ? GeoPoint(currentPosition.latitude, currentPosition.longitude)
+            : null,
+        });
 
-            //     // Remove the current user's marker from the markers set
-            //     Set<Marker> markersToRemove = {};
-            //     markers.forEach((marker) {
-            //         if (marker.userId == currentUser.id) {
-            //             print("Removing marker for user: ${currentUser.id}");
-            //             markersToRemove.add(marker);
-            //             break;
-            //         }
-            //     });
-
-            //     if (markersToRemove.isNotEmpty) {
-            //         markers.removeAll(markersToRemove);
-            //         updateMarkers(markers);
-            //     }
-
-            //     return value; // Stop further execution as the user is offline
-            // }
-
-            // Stop the existing listeners if toggled off
-            // if (!value) {
-            //     positionStreamSubscription?.cancel(); // Cancel position listener
-            //     updateMarkers({}); // Clear markers
-            //     return value; // Stop further execution as the user is offline
-            // }
-
-            // If toggled on, determine position and fetch online users/participants
-            if (value) {
-                await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, setState);
-
-                // Fetch online users or participants based on rideId
-                if (rideId != "0" && rideScreen != "0") {
-                    print("Entering active ride for rideId: $rideId");
-                    await fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId, rideScreen, value);
-                } else {
-                    print("Entering normal online users");
-                    await fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers, value);
-                }
-            }
+        if (visibilityOption != 'offline') {
+            // Cancel the existing position stream subscription if it exists
+            await determinePosition(auth, firestore, updatePosition, positionStreamSubscription, markers, updateState);
+        } else {
+        // If offline, cancel position updates and remove location from Firestore
+        await firestore.collection('users').doc(user.uid).update({
+            'currentPosition': null,
+        });
+        await positionStreamSubscription?.cancel();
+        positionStreamSubscription = null;
         }
-        return value;
+
+        // Fetch online users to update markers
+        if (rideId == '0') {
+            print('fetching online users');
+            await fetchOnlineUsers(auth, firestore, updateMarkers, currentPosition, markers, visibilityOption);
+        } else {
+            print('fetching online participants');
+            await fetchOnlineParticipants(auth, firestore, updateMarkers, currentPosition, markers, rideId, isActiveRide, visibilityOption);
+        }
     }
 
+    static Future<bool> _shouldDisplayUser(
+    String otherUserId,
+    FirebaseAuth auth,
+    {required DocumentSnapshot currentUserData,
+    required DocumentSnapshot otherUserData,
+    required String currentUserVisibility,
+    required String otherUserVisibility, // Change type to dynamic
+    }) async {
+        User? user = auth.currentUser;
+        // print('1Checking if the user should be displayed, other user visibility: $otherUserVisibility');
+        if (user == null) return false;
+        if (otherUserId == user.uid) return false;
+
+        // Ensure 'otherUserVisibility' is a string
+        if (otherUserVisibility is! String) {
+            otherUserVisibility = 'offline';
+        }
+
+        if (otherUserVisibility == 'offline') return false;
+        if (otherUserVisibility == 'everyone') return true;
+
+        // Fetch friends and tags for both users
+        List<String> currentUserFriends = List<String>.from(currentUserData['friends'] ?? []);
+        List<String> otherUserFriends = List<String>.from(otherUserData['friends'] ?? []);
+
+        List<String> currentUserTags = List<String>.from(currentUserData['tags'] ?? []);
+        List<String> otherUserTags = List<String>.from(otherUserData['tags'] ?? []);
+
+        if (otherUserVisibility == 'friends' && otherUserFriends.contains(user.uid)) {
+            return true;
+        }
+
+        if (otherUserVisibility == 'tags' && currentUserTags.any((tag) => otherUserTags.contains(tag))) {
+            return true;
+        }
+
+        if (otherUserVisibility == 'tags_and_friends' &&
+            (otherUserFriends.contains(user.uid) ||
+                currentUserTags.any((tag) => otherUserTags.contains(tag)))) {
+            return true;
+        }
+
+        return false;
+    }
 
     static Future<void> fetchGoOnlineStatus(
     FirebaseAuth auth,
     FirebaseFirestore firestore,
-    Function(bool) updateGoOnlineState
+    Function(String) updateGoOnlineState
     ) async {
         User? user = auth.currentUser;
         if (user != null) {
@@ -114,18 +126,18 @@ class HomePageFunctions {
                 .get();
 
             if (userDoc.exists) {
-                // Get the 'goOnline' value from the user document, defaulting to 'false' if not found
-                bool goOnlineValue = userDoc['goOnline'] ?? false;
+                // Get the 'goOnline' value from the user document, defaulting to 'offline' if not found
+                String goOnlineValue = userDoc['goOnline'] ?? 'offline';
                 
                 // Call the callback to update the goOnline state
                 updateGoOnlineState(goOnlineValue);
             } else {
-                // If the document doesn't exist, set the goOnline state to false
-                updateGoOnlineState(false);
+                // If the document doesn't exist, set the goOnline state to 'offline'
+                updateGoOnlineState('offline');
             }
         } else {
-            // If no user is logged in, set the goOnline state to false
-            updateGoOnlineState(false);
+            // If no user is logged in, set the goOnline state to 'offline'
+            updateGoOnlineState('offline');
         }
     }
 
@@ -222,94 +234,6 @@ class HomePageFunctions {
         });
     }
 
-    // Fetch Online Users with a real-time listener
-    static Future<void> fetchOnlineUsers(
-    FirebaseAuth auth,
-    FirebaseFirestore firestore,
-    Function(Set<Marker>) updateMarkers,
-    LatLng? currentPosition,
-    Set<Marker> markers,
-    bool value,
-    ) async {
-        User? currentUser = auth.currentUser;
-        if (currentUser == null || currentPosition == null) return;
-
-        // Listen to users who have goOnline set to true and whose lastPickupTime is within 15 minutes
-        firestore.collection('users').where('goOnline', isEqualTo: true).snapshots().listen((QuerySnapshot userSnapshot) async {
-            Set<Marker> onlineMarkers = {};
-            Map<String, int> locationCount = {};
-            final DateTime now = DateTime.now();
-
-            for (var doc in userSnapshot.docs) {
-                var userData = doc.data() as Map<String, dynamic>;
-                //print('Username: ${userData['fullName']}');
-
-                // Skip the current user
-                if (!value && doc.id == currentUser.uid) continue;
-
-                // Check if the user has a valid lastPickupLocation and lastPickupTime
-                if (userData['lastPickupLocation'] != null) {
-                    //print('User has a valid lastPickupLocation');
-                    GeoPoint location = userData['lastPickupLocation'];
-                    Timestamp lastPickupTime = userData['lastPickupTime'];
-
-                    // Check if the last pickup time is within the last 15 minutes
-                    // DateTime pickupTime = lastPickupTime.toDate();
-                    // if (now.difference(pickupTime).inMinutes > 15) {
-                    //     continue; // Skip users with old pickup times
-                    // }
-
-                    LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
-
-                    // Check proximity (5000 miles in meters)
-                    double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition);
-                    if (distance < 8046720) {
-                        //print('User is within 5 miles, adding marker');
-                        String locationKey = '${location.latitude},${location.longitude}';
-                        if (locationCount.containsKey(locationKey)) {
-                            locationCount[locationKey] = locationCount[locationKey]! + 1;
-                        } else {
-                            locationCount[locationKey] = 1;
-                        }
-
-                        // Adjust the position slightly to avoid marker overlap
-                        double offset = 0.001 * (locationCount[locationKey]! - 1);
-                        LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
-
-                        String? displayName = userData['fullName'];
-                        String? profileImageUrl = userData['imageUrl'];
-
-                        MarkerId markerId = MarkerId(doc.id);
-
-                        // Check if the profileImageUrl is null or empty, and handle it accordingly
-                        BitmapDescriptor markerIcon;
-                        if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
-                            // Use the profile image if available
-                            markerIcon = await createCustomMarkerWithImage(profileImageUrl);
-                        } else {
-                            // Fallback to the default asset if no profile picture is available
-
-                            markerIcon = await createCustomMarkerFromAsset();
-                        }
-                        //print('MarkerId: ${doc.id}');
-                        markers.removeWhere((marker) => marker.markerId.value == doc.id);
-                        onlineMarkers.add(
-                            Marker(
-                            markerId: markerId,
-                            position: adjustedPosition,
-                            icon: markerIcon,
-                            infoWindow: InfoWindow(title: displayName),
-                            ),
-                        );
-                    }
-                }
-            }
-
-            // Update the markers in real-time using the callback
-            updateMarkers(onlineMarkers);
-        });
-    }
-
     // Fetch Online Participants for a specific ride with a real-time listener
     static Future<void> fetchOnlineParticipants(
         FirebaseAuth auth,
@@ -319,11 +243,14 @@ class HomePageFunctions {
         Set<Marker> markers,
         String rideId,  // New rideId parameter to fetch participants for the specific ride
         String isActiveRide,
-        bool value,
+        String visibilityOption,
     ) async {
         User? currentUser = auth.currentUser;
+        Set<Marker> onlineMarkers = {};
         // if (currentUser == null || currentPosition == null || rideId.isEmpty) return;
         if (currentUser == null || rideId.isEmpty) return;
+
+        DocumentSnapshot curUserData = await firestore.collection('users').doc(currentUser.uid).get();
 
         //print('Fetching online participants for ride: $rideId');
 
@@ -331,40 +258,58 @@ class HomePageFunctions {
         String docTable = 'rides';
         if (isActiveRide == '2') {
             docTable = 'active_rides';
-        }
+        } 
         print('DocTable: $docTable');
         firestore.collection(docTable).doc(rideId).snapshots().listen((DocumentSnapshot rideDoc) async {
             if (!rideDoc.exists) return;  // If no such ride, exit early
-            //print('Ride document exists for rideId: $rideId');
 
             Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
             List<dynamic> participants = rideData['participants'] ?? [];
 
-            Set<Marker> onlineMarkers = {};
+            Set<Marker> waitingMarkers = {};
             Map<String, int> locationCount = {};
             final DateTime now = DateTime.now();
 
             // Iterate through the list of participants in the ride
             for (String participantId in participants) {
-                //print('Checking participant with the uid: $participantId');
-                // Skip the current user
-                if (!value && participantId == currentUser.uid) continue;
-
+                DocumentSnapshot doc = await firestore.collection('users').doc(participantId).get();
                 // Get the participant's document from the 'users' collection
-                DocumentSnapshot userDoc = await firestore.collection('users').doc(participantId).get();
-                if (!userDoc.exists) continue;
+                if (!doc.exists) continue;
 
-                var userData = userDoc.data() as Map<String, dynamic>;
+                var userData = doc.data() as Map<String, dynamic>;
 
-                // Check if the user has a valid lastPickupLocation and lastPickupTime
-                if (userData['lastPickupLocation'] != null && userData['goOnline'] == true) {
-                    //print('User with the uid: $participantId is online');
-                    GeoPoint location = userData['lastPickupLocation'];
+                // Ignore current user
+                if (participantId == currentUser.uid) continue;
 
-                    LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+                // Retrieve goOnline as String
+                dynamic otherUserVisibility = userData['goOnline'] ?? 'offline';
+                if (otherUserVisibility is bool) {
+                    otherUserVisibility = otherUserVisibility ? 'online' : 'offline';
+                } else if (otherUserVisibility is! String) {
+                    otherUserVisibility = 'offline';
+                }
 
-                    if (true) {  // If within proximity, add the marker (skip this but have the structure)
-                        print('adding marker for user: $participantId');
+                // Determine if the current user should see this user based on visibility settings
+                bool shouldDisplay = await _shouldDisplayUser(
+                    participantId,
+                    auth,
+                    currentUserData: curUserData,
+                    otherUserData: doc,
+                    currentUserVisibility: visibilityOption,
+                    otherUserVisibility: otherUserVisibility,
+                );
+                // print('Username is: $username | Should display: $shouldDisplay | Visibility: $otherUserVisibility');
+
+                if (shouldDisplay) {
+
+                    // Check if the user has a valid lastPickupLocation and is marked as 'ready' in readyStatus
+                    if (userData['lastPickupLocation'] != null && rideData['readyStatus'][participantId] == false) {
+                        GeoPoint location = userData['lastPickupLocation'];
+
+                        LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+
+                        // Add the marker (without proximity check as per your note)
+                        print('Adding marker for user: $participantId');
                         String locationKey = '${location.latitude},${location.longitude}';
                         if (locationCount.containsKey(locationKey)) {
                             locationCount[locationKey] = locationCount[locationKey]! + 1;
@@ -373,7 +318,7 @@ class HomePageFunctions {
                         }
 
                         // Adjust the position slightly to avoid marker overlap
-                        double offset = 0.001 * (locationCount[locationKey]! - 1);
+                        double offset = 0.00001 * (locationCount[locationKey]! - 1);
                         LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
 
                         String? displayName = userData['fullName'];
@@ -392,7 +337,7 @@ class HomePageFunctions {
                         }
                         print('Adding marker for user: $displayName');
                         markers.removeWhere((marker) => marker.markerId.value == participantId);
-                        onlineMarkers.add(
+                        waitingMarkers.add(
                             Marker(
                                 markerId: markerId,
                                 position: adjustedPosition,
@@ -405,97 +350,9 @@ class HomePageFunctions {
             }
 
             // Update the markers in real-time using the callback
-            updateMarkers(onlineMarkers);
+            updateMarkers(waitingMarkers);
         });
     }
-
-    static Future<void> fetchWaitingParticipants(
-    FirebaseAuth auth,
-    FirebaseFirestore firestore,
-    Function(Set<Marker>) updateMarkers,
-    LatLng? currentPosition,
-    Set<Marker> markers,
-    String rideId,  // New rideId parameter to fetch participants for the specific ride
-) async {
-    User? currentUser = auth.currentUser;
-    if (currentUser == null || rideId.isEmpty) return;
-
-    // Query the rides collection to get participants for the specified ride
-    firestore.collection('rides').doc(rideId).snapshots().listen((DocumentSnapshot rideDoc) async {
-        if (!rideDoc.exists) return;  // If no such ride, exit early
-
-        Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
-        List<dynamic> participants = rideData['participants'] ?? [];
-
-        Set<Marker> waitingMarkers = {};
-        Map<String, int> locationCount = {};
-        final DateTime now = DateTime.now();
-
-        // Iterate through the list of participants in the ride
-        for (String participantId in participants) {
-            // Skip the current user
-            //if (participantId == currentUser.uid) continue;
-
-            // Get the participant's document from the 'users' collection
-            DocumentSnapshot userDoc = await firestore.collection('users').doc(participantId).get();
-            if (!userDoc.exists) continue;
-
-            var userData = userDoc.data() as Map<String, dynamic>;
-
-            // Check if the user has a valid lastPickupLocation and is marked as 'ready' in readyStatus
-            if (userData['lastPickupLocation'] != null && rideData['readyStatus'][participantId] == false) {
-                GeoPoint location = userData['lastPickupLocation'];
-
-                LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
-
-                // Add the marker (without proximity check as per your note)
-                print('Adding marker for user: $participantId');
-                String locationKey = '${location.latitude},${location.longitude}';
-                if (locationCount.containsKey(locationKey)) {
-                    locationCount[locationKey] = locationCount[locationKey]! + 1;
-                } else {
-                    locationCount[locationKey] = 1;
-                }
-
-                // Adjust the position slightly to avoid marker overlap
-                double offset = 0.00001 * (locationCount[locationKey]! - 1);
-                LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
-
-                String? displayName = userData['fullName'];
-                String? profileImageUrl = userData['imageUrl'];
-
-                MarkerId markerId = MarkerId(participantId);
-
-                // Check if the profileImageUrl is null or empty, and handle it accordingly
-                BitmapDescriptor markerIcon;
-                if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
-                    // Use the profile image if available
-                    markerIcon = await createCustomMarkerWithImage(profileImageUrl);
-                } else {
-                    // Fallback to the default asset if no profile picture is available
-                    markerIcon = await createCustomMarkerFromAsset();
-                }
-                print('Adding marker for user: $displayName');
-                markers.removeWhere((marker) => marker.markerId.value == participantId);
-                waitingMarkers.add(
-                    Marker(
-                        markerId: markerId,
-                        position: adjustedPosition,
-                        icon: markerIcon,
-                        infoWindow: InfoWindow(title: displayName),
-                    ),
-                );
-            }
-        }
-
-        // Update the markers in real-time using the callback
-        updateMarkers(waitingMarkers);
-    });
-}
-
-
-
-
 
     // Update User Location in Firestore
     static Future<void> updateUserLocationInFirestore(
@@ -627,7 +484,7 @@ class HomePageFunctions {
   return true;
 }
 
-    static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
+static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
   Map<String, dynamic> userPrefs = currentUserData['preferences'];
 
   int userMinAge = userPrefs['ageRange']['min'];
@@ -682,5 +539,122 @@ class HomePageFunctions {
         const double maxDistance = 500; // 500 meters (we can change later)
         double distance = HomePageFunctions.calculateDistance(location1, location2);
         return distance <= maxDistance;
+    }
+
+    // Add the 'fetchOnlineUsers' function back into 'HomePageFunctions':
+    static Future<void> fetchOnlineUsers(
+    FirebaseAuth auth,
+    FirebaseFirestore firestore,
+    Function(Set<Marker>) updateMarkers,
+    LatLng? currentPosition,
+    Set<Marker> markers,
+    String visibilityOption,
+    ) async {
+        print('Fetching online users');
+        User? currentUser = auth.currentUser;
+        print('Current user: ${currentUser?.uid}');
+        Set<Marker> onlineMarkers = {};
+        if (currentUser == null) return;
+
+        DocumentSnapshot curUserData = await firestore.collection('users').doc(currentUser.uid).get();
+
+        // Query users based on their visibility settings
+        QuerySnapshot usersSnapshot = await firestore.collection('users').get();
+
+        Map<String, int> locationCount = {};
+
+        Set<Marker> newMarkers = {};
+
+        for (var doc in usersSnapshot.docs) {
+            print('Checking user: ${doc.id}');
+            // print('Checking user: ${doc.id}');
+            String userId = doc.id;
+            var userData = doc.data() as Map<String, dynamic>;
+
+            // Ignore current user
+            if (userId == currentUser.uid) continue;
+
+            // Retrieve goOnline as String
+            dynamic otherUserVisibility = userData['goOnline'] ?? 'offline';
+            if (otherUserVisibility is bool) {
+                otherUserVisibility = otherUserVisibility ? 'online' : 'offline';
+            } else if (otherUserVisibility is! String) {
+                otherUserVisibility = 'offline';
+            }
+            Map<String, dynamic>? positionData = userData['currentPosition'];
+            String? username = userData['fullName'];
+
+            // Determine if the current user should see this user based on visibility settings
+            bool shouldDisplay = await _shouldDisplayUser(
+                userId,
+                auth,
+                currentUserData: curUserData,
+                otherUserData: doc,
+                currentUserVisibility: visibilityOption,
+                otherUserVisibility: otherUserVisibility,
+            );
+            print('Should display: $shouldDisplay | Visibility: $otherUserVisibility');
+            // print('Username is: $username | Should display: $shouldDisplay | Visibility: $otherUserVisibility');
+
+            if (shouldDisplay) {
+                // Check if the user has a valid lastPickupLocation and lastPickupTime
+                if (userData['lastPickupLocation'] != null) {
+                    //print('User has a valid lastPickupLocation');
+                    GeoPoint location = userData['lastPickupLocation'];
+                    Timestamp lastPickupTime = userData['lastPickupTime'];
+
+                    // Check if the last pickup time is within the last 15 minutes
+                    // DateTime pickupTime = lastPickupTime.toDate();
+                    // if (now.difference(pickupTime).inMinutes > 15) {
+                    //     continue; // Skip users with old pickup times
+                    // }
+
+                    LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+
+                    // Check proximity (5000 miles in meters)
+                    // double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition); distance < (8046720 * 20)
+                    if (true) {
+                        //print('User is within 5 miles, adding marker');
+                        String locationKey = '${location.latitude},${location.longitude}';
+                        if (locationCount.containsKey(locationKey)) {
+                            locationCount[locationKey] = locationCount[locationKey]! + 1;
+                        } else {
+                            locationCount[locationKey] = 1;
+                        }
+
+                        // Adjust the position slightly to avoid marker overlap
+                        double offset = 0.001 * (locationCount[locationKey]! - 1);
+                        LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
+
+                        String? displayName = userData['fullName'];
+                        String? profileImageUrl = userData['imageUrl'];
+
+                        MarkerId markerId = MarkerId(doc.id);
+
+                        // Check if the profileImageUrl is null or empty, and handle it accordingly
+                        BitmapDescriptor markerIcon;
+                        if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+                            // Use the profile image if available
+                            markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+                        } else {
+                            // Fallback to the default asset if no profile picture is available
+
+                            markerIcon = await createCustomMarkerFromAsset();
+                        }
+                        //print('MarkerId: ${doc.id}');
+                        markers.removeWhere((marker) => marker.markerId.value == doc.id);
+                        onlineMarkers.add(
+                            Marker(
+                            markerId: markerId,
+                            position: adjustedPosition,
+                            icon: markerIcon,
+                            infoWindow: InfoWindow(title: displayName),
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+        updateMarkers(onlineMarkers);
     }
 }

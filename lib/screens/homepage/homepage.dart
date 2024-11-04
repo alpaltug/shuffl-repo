@@ -9,6 +9,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:my_flutter_app/firestore_service.dart';
@@ -26,8 +27,12 @@ import 'package:my_flutter_app/screens/user_rides_page/user_rides_page.dart';
 import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/screens/pdf_viewer/pdf_viewer.dart';
 import 'package:my_flutter_app/services/notification_service.dart';
+import 'package:my_flutter_app/screens/enter_referral_code/enter_referral_code_screen.dart';
+
+
 
 import 'package:my_flutter_app/widgets/find_ride_widget.dart';
+
 
 
 import 'package:my_flutter_app/functions/homepage_functions.dart'; 
@@ -39,7 +44,16 @@ import 'package:my_flutter_app/widgets/create_custom_marker.dart';
 
 import 'package:http/http.dart' as http;
 
+
+import 'package:flutter/cupertino.dart';
+
+
+
+
+
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
+
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -62,7 +76,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   DateTime? _selectedRideTime;
   String? _selectedPickupLocation;
   int _uniqueMessageSenderCount = 0;
-  bool goOnline = false;
+  String goOnline = 'offline'; // Default value
   String rideId = '0';
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
   StreamSubscription<Position>? _positionStreamSubscription;
@@ -123,7 +137,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   // Callback to update 'goOnline' state
-  void updateGoOnlineState(bool newGoOnline) {
+  void updateGoOnlineState(String newGoOnline) {
     setState(() {
       goOnline = newGoOnline;
     });
@@ -162,8 +176,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   // Toggle 'goOnline' and update necessary state variables
-  void _toggleGoOnline(bool value) async {
-    await HomePageFunctions.toggleGoOnline(
+  Future<void> _toggleGoOnline(String value) async {
+    await HomePageFunctions.toggleVisibilityOption(
       value,
       currentPosition,
       _auth,
@@ -176,13 +190,13 @@ class _HomePageState extends State<HomePage> with RouteAware {
       markers,
       updateMarkers,
       "0",
-      "0"
+      "0",
     );
   }
 
   // Fetch online users and update markers
-  void _fetchOnlineUsers() {
-    HomePageFunctions.fetchOnlineUsers(
+  Future<void> _fetchOnlineUsers() async {
+    await HomePageFunctions.fetchOnlineUsers(
       _auth,
       _firestore,
       updateMarkers,   // Use the callback function for currentPosition
@@ -195,42 +209,18 @@ class _HomePageState extends State<HomePage> with RouteAware {
   void _loadUserProfile() async {
     User? user = _auth.currentUser;
     if (user != null) {
-      try {
-        DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
+      DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-        if (userProfile.exists) {
-          Map<String, dynamic>? data = userProfile.data() as Map<String, dynamic>?;
+      setState(() {
+        _profileImageUrl = userProfile['imageUrl'];
+        _username = userProfile['username'];
+        _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
+        goOnline = userProfile['goOnline'] ?? 'offline';
+      });
 
-          if (data != null) {
-            if (mounted) {
-              setState(() {
-                _profileImageUrl = data['imageUrl'] ?? '';
-                _username = data['username'] ?? '';
-                _fullName = data['fullName'] ?? 'Shuffl User';
-                goOnline = data['goOnline'] ?? false;
-              });
-            }
-          } else {
-            print('User profile data is null.');
-            // Handle the case when data is null
-          }
-        } else {
-          print('User profile document does not exist.');
-          // Handle the case when the user document does not exist
-        }
-      } on FirebaseException catch (e) {
-        print('FirebaseException fetching user profile: $e');
-        // Handle Firebase-specific exceptions
-      } catch (e) {
-        print('Unknown error fetching user profile: $e');
-        // Handle any other exceptions
-      }
-
-      // Optionally, call fetchGoOnlineStatus or any other methods
-      // await HomePageFunctions.fetchGoOnlineStatus();
+      //await HomePageFunctions.fetchGoOnlineStatus();
     }
   }
-
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
@@ -938,6 +928,16 @@ Widget build(BuildContext context) {
               }
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.card_giftcard),
+            title: const Text('Referral Codes'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const EnterReferralCodeScreen()),
+              );
+            },
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.privacy_tip),
@@ -1047,14 +1047,67 @@ Widget build(BuildContext context) {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Go Online', style: TextStyle(color: Colors.black)),
-              Switch(
-                value: goOnline,
-                onChanged: (value) {
-                  _toggleGoOnline(value);
+              const Text('Visibility Options', style: TextStyle(color: CupertinoColors.black)),
+              CupertinoButton(
+                child: Text(
+                  goOnline,
+                  style: const TextStyle(color: CupertinoColors.activeBlue),
+                ),
+                onPressed: () async {
+                  final selectedOption = await showCupertinoModalPopup<String>(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return CupertinoActionSheet(
+                        title: const Text('Select Visibility Option'),
+                        actions: <CupertinoActionSheetAction>[
+                          CupertinoActionSheetAction(
+                            child: const Text('Everyone'),
+                            onPressed: () {
+                              Navigator.pop(context, 'everyone');
+                            },
+                          ),
+                          CupertinoActionSheetAction(
+                            child: const Text('Friends'),
+                            onPressed: () {
+                              Navigator.pop(context, 'friends');
+                            },
+                          ),
+                          CupertinoActionSheetAction(
+                            child: const Text('Tags'),
+                            onPressed: () {
+                              Navigator.pop(context, 'tags');
+                            },
+                          ),
+                          CupertinoActionSheetAction(
+                            child: const Text('Offline'),
+                            onPressed: () {
+                              Navigator.pop(context, 'offline');
+                            },
+                          ),
+                          CupertinoActionSheetAction(
+                            child: const Text('Friend and Tags'),
+                            onPressed: () {
+                              Navigator.pop(context, 'friend_and_tags');
+                            },
+                          ),
+                        ],
+                        cancelButton: CupertinoActionSheetAction(
+                          child: const Text('Cancel'),
+                          onPressed: () {
+                            Navigator.pop(context, null);
+                          },
+                        ),
+                      );
+                    },
+                  );
+
+                  if (selectedOption != null) {
+                    setState(() {
+                      goOnline = selectedOption;
+                    });
+                    await _toggleGoOnline(selectedOption);
+                  }
                 },
-                activeColor: Colors.yellow,
-                activeTrackColor: Colors.yellowAccent,
               ),
             ],
           ),
@@ -1079,4 +1132,31 @@ Widget build(BuildContext context) {
     ),
   );
 }
+
+// Define updateVisibilityOption method
+void updateVisibilityOption(String newVisibilityOption) {
+  setState(() {
+    goOnline = newVisibilityOption;
+  });
+}
+
+// Define fetchOnlineUsers method
+void fetchOnlineUsers(
+  FirebaseAuth auth,
+  FirebaseFirestore firestore,
+  Function(Set<Marker>) updateMarkers,
+  LatLng currentPosition,
+  Set<Marker> markers,
+  String visibilityOption,
+) {
+  HomePageFunctions.fetchOnlineUsers(
+    auth,
+    firestore,
+    updateMarkers,
+    currentPosition,
+    markers,
+    visibilityOption,
+  );
+}
+
 }

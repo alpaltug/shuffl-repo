@@ -18,6 +18,8 @@ import 'package:my_flutter_app/functions/homepage_functions.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
+
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
@@ -39,6 +41,7 @@ class _WaitingPageState extends State<WaitingPage> {
   List<DocumentSnapshot> _users = [];
   List<LatLng> _pickupLocations = [];
   Map<String, bool> _readyStatus = {};
+  String goOnline = 'offline'; // Default value
   int _participantsCount = 0;
   LatLng loc = LatLng(0, 0);
   final LatLng _center = const LatLng(37.8715, -122.2730);
@@ -57,7 +60,6 @@ class _WaitingPageState extends State<WaitingPage> {
   String? _fullName;
 
   Set<Marker> markers = {};
-  bool goOnline = false;
 
   List<String> _participantIds = [];     // List for storing participant IDs
 
@@ -80,7 +82,16 @@ class _WaitingPageState extends State<WaitingPage> {
       // print('Listening to online participants...');
       _listenToParticipants();
       _listenToReadyStatus();
-      _fetchWaitingParticipants();
+      _fetchOnlineParticipants(
+        _auth,
+        _firestore,
+        updateMarkers,
+        currentPosition,
+        markers,
+        widget.rideId,
+        "1",
+        goOnline,
+      );
       // print('Listened to online participants. here are the markers: $markers');
       // print('Loading markers...');
       //_loadMarkers();
@@ -136,13 +147,12 @@ void updatePosition(LatLng newPosition) {
 }
 
 // Callback to update 'goOnline' state
-void updateGoOnlineState(bool newGoOnline) {
-  if (mounted) {
-    setState(() {
-      goOnline = newGoOnline;
-    });
-  }
+void updateVisibilityOption(String newVisibilityOption) {
+  setState(() {
+    goOnline = newVisibilityOption;
+  });
 }
+
 
 // Update state with a function, only if mounted
 void updateState(Function updateFn) {
@@ -193,35 +203,44 @@ void updateMarkers(Set<Marker> newMarkers) async {
 
 
   // Toggle 'goOnline' and update necessary state variables
-  void _toggleGoOnline(bool value) async {
-    await HomePageFunctions.toggleGoOnline(
-      value,
+  Future<void> _toggleGoOnline(String newVisibilityOption) async {
+    await HomePageFunctions.toggleVisibilityOption(
+      goOnline,
       currentPosition,
       _auth,
       _firestore,
-      updateState,          // Use the callback function for setState
-      updatePosition,        // Use the callback function for currentPosition
-      updateGoOnlineState,   // Use the callback function for goOnline state
-      HomePageFunctions.fetchOnlineParticipants,
+      updateState,
+      updatePosition,
+      updateVisibilityOption,
+      _fetchOnlineParticipants,
       _positionStreamSubscription,
       markers,
       updateMarkers,
       widget.rideId,
-      "1",
+      "1"
     );
   }
 
   // Fetch online users and update markers
-  void _fetchWaitingParticipants() {
-    HomePageFunctions.fetchOnlineParticipants(
-      _auth,
-      _firestore,
-      updateMarkers,   // Use the callback function for currentPosition
+  Future<void> _fetchOnlineParticipants (
+    FirebaseAuth auth,
+    FirebaseFirestore firestore,
+    Function(Set<Marker>) updateMarkers,
+    LatLng? currentPosition,
+    Set<Marker> markers,
+    String rideId,
+    String isActiveRide,
+    String visibilityOption,
+  ) async {
+    await HomePageFunctions.fetchOnlineParticipants(
+      auth,
+      firestore,
+      updateMarkers,
       currentPosition,
       markers,
-      widget.rideId,
-      "1",
-      goOnline,
+      rideId,
+      isActiveRide,
+      visibilityOption,
     );
   }
 
@@ -421,7 +440,7 @@ Future<void> _updateDirections() async {
     }
 
     var userData = userDoc.data() as Map<String, dynamic>;
-    if (userData['lastPickupLocation'] == null || userData['goOnline'] == false) {
+    if (userData['lastPickupLocation'] == null || userData['goOnline'] == 'offline') {
       print('Last pickup location is null or user is not online');
       return;
     } else {
@@ -461,7 +480,7 @@ Future<void> _updateDirections() async {
         .doc(participantId)
         .get();
 
-    if (participantSnapshot.exists && participantSnapshot['lastPickupLocation'] != null && participantSnapshot['goOnline'] == true) {
+    if (participantSnapshot.exists && participantSnapshot['lastPickupLocation'] != null && participantSnapshot['goOnline'] == 'offline') {
       print('Fetching route for participant: $participantId');
       GeoPoint lastPickupLocation = participantSnapshot['lastPickupLocation'];
       LatLng participantLocation = LatLng(lastPickupLocation.latitude, lastPickupLocation.longitude);
@@ -529,7 +548,14 @@ Future<void> _updateDirections() async {
           _profileImageUrl = userProfile['imageUrl'];
           _username = userProfile['username'];
           _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-          goOnline = userProfile['goOnline'] ?? false;; //changed this line
+          var visibilityOptionData = userProfile['goOnline'];
+          if (visibilityOptionData is bool) {
+            goOnline = visibilityOptionData ? 'online' : 'offline';
+          } else if (visibilityOptionData is String) {
+            goOnline = visibilityOptionData;
+          } else {
+            goOnline = 'offline';
+          }
         });
       }
       //await HomePageFunctions.fetchGoOnlineStatus();
@@ -954,15 +980,65 @@ Widget build(BuildContext context) {
                   },
                 ),
               ),
-              const Text('Go Online', style: TextStyle(color: Colors.black)),
-                Switch(
-                  value: goOnline,
-                  onChanged: (value) {
-                    _toggleGoOnline(value);
-                  },
-                  activeColor: Colors.yellow, 
-                  activeTrackColor: Colors.yellowAccent, 
-                ),
+              const Text('Visibility Options', style: TextStyle(color: CupertinoColors.black)),
+              CupertinoButton(
+                child: Text(goOnline, style: const TextStyle(color: CupertinoColors.activeBlue)),
+                onPressed: () async {
+                  await showCupertinoModalPopup(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return CupertinoActionSheet(
+                        title: const Text('Select Visibility Option'),
+                        actions: <CupertinoActionSheetAction>[
+                          CupertinoActionSheetAction(
+                            child: const Text('Everyone'),
+                            onPressed: () {
+                              Navigator.pop(context, 'everyone');
+                            },
+                          ),
+                          CupertinoActionSheetAction(
+                            child: const Text('Friends'),
+                            onPressed: () {
+                              Navigator.pop(context, 'friends');
+                            },
+                          ),
+                          CupertinoActionSheetAction(
+                            child: const Text('Tags'),
+                            onPressed: () {
+                              Navigator.pop(context, 'tags');
+                            },
+                          ),
+                          CupertinoActionSheetAction(
+                            child: const Text('Offline'),
+                            onPressed: () {
+                              Navigator.pop(context, 'offline');
+                            },
+                          ),
+                          CupertinoActionSheetAction(
+                            child: const Text('Friend and Tags'),
+                            onPressed: () {
+                              Navigator.pop(context, 'friend_and_tags');
+                            },
+                          ),
+                        ],
+                        cancelButton: CupertinoActionSheetAction(
+                          child: const Text('Cancel'),
+                          onPressed: () {
+                            Navigator.pop(context, null);
+                          },
+                        ),
+                      );
+                    },
+                  ).then((value) async {
+                    if (value != null) {
+                      setState(() {
+                        goOnline = value;
+                      });
+                      await _toggleGoOnline(value);
+                    }
+                  });
+                },
+              ),
               if (_rideTime != null)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -1084,4 +1160,4 @@ Widget build(BuildContext context) {
       setState(() {});
     }
   }
-} 
+}
