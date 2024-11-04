@@ -11,9 +11,7 @@ import 'package:my_flutter_app/screens/waiting_page/waiting_page.dart';
 import 'package:my_flutter_app/widgets/ride_card.dart';
 import 'package:my_flutter_app/widgets/ride_details_popup.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
-
 import 'package:my_flutter_app/widgets/find_ride_widget.dart';
-
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
@@ -70,13 +68,52 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
     User? user = _auth.currentUser;
     if (user == null) return;
 
+    LatLng newPickupLatLng = await _getLatLngFromAddress(pickupLocation);
+    LatLng newDropoffLatLng = await _getLatLngFromAddress(dropoffLocation);
+
+    DocumentSnapshot rideDoc = await _firestore.collection('rides').doc(rideId).get();
+    Map<String, dynamic> rideData = rideDoc.data() as Map<String, dynamic>;
+
+    Map<String, dynamic> pickupLocationsMap = rideData['pickupLocations'] ?? {};
+    Map<String, dynamic> dropoffLocationsMap = rideData['dropoffLocations'] ?? {};
+
+    List<LatLng> existingPickups = [];
+    for (var location in pickupLocationsMap.values) {
+      LatLng latLng = await _getLatLngFromAddress(location);
+      existingPickups.add(latLng);
+    }
+
+    List<LatLng> existingDropoffs = [];
+    for (var location in dropoffLocationsMap.values) {
+      LatLng latLng = await _getLatLngFromAddress(location);
+      existingDropoffs.add(latLng);
+    }
+
+    bool isValid = await _isValidRoute(
+      existingPickups,
+      existingDropoffs,
+      newPickupLatLng,
+      newDropoffLatLng,
+    );
+
+    if (!isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Your pickup/dropoff location is too far, enter closer values or schedule a ride of your own.')),
+      );
+      return;
+    }
+
     if (!participants.contains(user.uid)) {
       participants.add(user.uid);
 
       await _firestore.collection('rides').doc(rideId).update({
         'participants': participants,
-        if (pickupLocation.isNotEmpty) 'pickupLocations.${user.uid}': pickupLocation,
-        if (dropoffLocation.isNotEmpty) 'dropoffLocations.${user.uid}': dropoffLocation,
+        if (pickupLocation.isNotEmpty)
+          'pickupLocations.${user.uid}': pickupLocation,
+        if (dropoffLocation.isNotEmpty)
+          'dropoffLocations.${user.uid}': dropoffLocation,
         'readyStatus.${user.uid}': false,
       });
 
@@ -89,6 +126,73 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       context,
       MaterialPageRoute(builder: (context) => WaitingPage(rideId: rideId)),
     );
+  }
+
+  Future<bool> _isValidRoute(
+    List<LatLng> existingPickups,
+    List<LatLng> existingDropoffs,
+    LatLng newPickup,
+    LatLng newDropoff,
+  ) async {
+    print(
+        'Validating route with existingPickups: $existingPickups, existingDropoffs: $existingDropoffs, newPickup: $newPickup, newDropoff: $newDropoff');
+
+    List<LatLng> originalRoute = [...existingPickups, ...existingDropoffs];
+
+    List<LatLng> newRoute = [...existingPickups, newPickup, ...existingDropoffs, newDropoff];
+
+    double originalRouteDistance = await _getRouteDistance(originalRoute);
+    double newRouteDistance = await _getRouteDistance(newRoute);
+
+    print(
+        'Original route distance: $originalRouteDistance, New route distance: $newRouteDistance');
+
+    const double maxAllowedIncrease = 0.2; 
+    if (newRouteDistance <= originalRouteDistance * (1 + maxAllowedIncrease)) {
+      print('Route is valid, distance increase is within allowed range.');
+      return true;
+    }
+
+    print('Route is invalid, distance increase exceeds allowed range.');
+    return false;
+  }
+
+  Future<double> _getRouteDistance(List<LatLng> waypoints) async {
+    if (waypoints.length < 2) return 0.0;
+
+    String origin = '${waypoints.first.latitude},${waypoints.first.longitude}';
+    String destination =
+        '${waypoints.last.latitude},${waypoints.last.longitude}';
+
+    String waypointsParam = '';
+    if (waypoints.length > 2) {
+      waypointsParam = '&waypoints=optimize:true|' +
+          waypoints
+              .sublist(1, waypoints.length - 1)
+              .map((latLng) => '${latLng.latitude},${latLng.longitude}')
+              .join('|');
+    }
+
+    String url =
+        'https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination$waypointsParam&key=$google_maps_api_key';
+
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['routes'] != null && data['routes'].isNotEmpty) {
+        return data['routes'][0]['legs']
+            .map<double>((leg) {
+              var distanceValue = leg['distance']['value'];
+              if (distanceValue != null && distanceValue is num) {
+                return distanceValue.toDouble();
+              }
+              return 0.0;
+            })
+            .fold(0.0, (sum, value) => sum + value);
+      }
+    }
+
+    throw Exception('Failed to fetch directions');
   }
 
   void _showRideDetailsPopup(BuildContext context, DocumentSnapshot ride, List<Map<String, String>> participants) {
@@ -127,8 +231,6 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
       ),
     );
   }
-
-
 
   Widget _buildFilterSection() {
     return Padding(
