@@ -159,6 +159,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   // Callback to update 'markers'
   void updateMarkers(Set<Marker> newMarkers) async {
     if (mounted) {
+      print('Updating markers for markers with length: ${newMarkers.length}');
       setState(() {
         // Calculate markers to remove (present in markers but not in newMarkers)
         Set<Marker> markersToRemove = markers.difference(newMarkers);
@@ -211,14 +212,42 @@ class _HomePageState extends State<HomePage> with RouteAware {
     if (user != null) {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
+      LatLng currentPosition;
+      if (userProfile['currentPosition'] != null) {
+        // Fetch position from Firestore
+        GeoPoint geoPoint = userProfile['currentPosition'];
+        currentPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
+      } else {
+        try {
+          // Get user's current position
+          Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+          currentPosition = LatLng(position.latitude, position.longitude);
+
+          // Save to Firestore
+          await _firestore.collection('users').doc(user.uid).update({
+            'currentPosition': GeoPoint(position.latitude, position.longitude),
+          });
+        } catch (e) {
+          // Default position if unable to get current location
+          currentPosition = LatLng(37.8715, -122.2730); // Our campus
+        }
+      }
+
       setState(() {
         _profileImageUrl = userProfile['imageUrl'];
         _username = userProfile['username'];
         _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
         goOnline = userProfile['goOnline'] ?? 'offline';
+        currentPosition = currentPosition;
       });
 
       //await HomePageFunctions.fetchGoOnlineStatus();
+    } else {
+      // Default position if user is null
+      LatLng currentPosition = LatLng(37.8715, -122.2730); // Our campus
+      setState(() {
+        currentPosition = currentPosition;
+      });
     }
   }
 

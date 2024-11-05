@@ -10,9 +10,16 @@ import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_flutter_app/widgets/create_custom_marker.dart';
 
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+
 final googleMapsApiKey = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
 class HomePageFunctions {
+
+    static const Color friendColor = Colors.green;
+    static const Color tagColor = Colors.purple;
+    static const Color normalUserColor = Colors.grey;
 
     // Toggle Visibility Option
     static Future<void> toggleVisibilityOption(
@@ -68,6 +75,46 @@ class HomePageFunctions {
         }
     }
 
+    static bool _isFriend(FirebaseAuth auth, DocumentSnapshot currentUserData, DocumentSnapshot otherUserData) {
+        try {
+            User? user = auth.currentUser;
+            if (user == null) return false;
+
+            List<String> currentUserFriends = List<String>.from(currentUserData['friends'] ?? []);
+            //print('Current user friends: $currentUserFriends');
+
+            return currentUserFriends.contains(otherUserData.id);
+        } catch (e) {
+            print('Error checking if the user is a friend: $e');
+            return false;
+        }
+    }
+
+    static bool _isTag(FirebaseAuth auth, DocumentSnapshot currentUserData, DocumentSnapshot otherUserData) {
+        try {
+            User? user = auth.currentUser;
+            if (user == null) return false;
+
+            // Safely get and filter the tags lists, ensuring no null or empty strings are present
+            List<String> currentUserTags = List<String>.from(currentUserData['tags'] ?? []).where((tag) => tag.isNotEmpty).toList();
+            
+            // Cast data to Map<String, dynamic> to check for keys safely
+            Map<String, dynamic>? otherUserDataMap = otherUserData.data() as Map<String, dynamic>?;
+            List<String> otherUserTags = otherUserDataMap != null && otherUserDataMap.containsKey('tags') 
+                ? List<String>.from(otherUserDataMap['tags']).where((tag) => tag.isNotEmpty).toList() 
+                : [];
+
+            // print('Current user tags: $currentUserTags, Other user tags: $otherUserTags');
+
+            if (currentUserTags.isEmpty || otherUserTags.isEmpty) return false;
+            return currentUserTags.any((tag) => otherUserTags.contains(tag));
+        } catch (e) {
+            print('Error checking if the user is a tag: $e');
+            return false;
+        }
+    }
+
+
     static Future<bool> _shouldDisplayUser(
     String otherUserId,
     FirebaseAuth auth,
@@ -90,17 +137,27 @@ class HomePageFunctions {
         if (otherUserVisibility == 'everyone') return true;
 
         // Fetch friends and tags for both users
-        List<String> currentUserFriends = List<String>.from(currentUserData['friends'] ?? []);
-        List<String> otherUserFriends = List<String>.from(otherUserData['friends'] ?? []);
+        List<String> currentUserFriends = (currentUserData.data() as Map<String, dynamic>).containsKey('friends')
+            ? List<String>.from(currentUserData['friends'])
+            : [];
 
-        List<String> currentUserTags = List<String>.from(currentUserData['tags'] ?? []);
-        List<String> otherUserTags = List<String>.from(otherUserData['tags'] ?? []);
+        List<String> otherUserFriends = (otherUserData.data() as Map<String, dynamic>).containsKey('friends')
+            ? List<String>.from(otherUserData['friends'])
+            : [];
 
-        if (otherUserVisibility == 'friends' && otherUserFriends.contains(user.uid)) {
+        List<String> currentUserTags = (currentUserData.data() as Map<String, dynamic>).containsKey('tags')
+            ? List<String>.from(currentUserData['tags'])
+            : [];
+
+        List<String> otherUserTags = (otherUserData.data() as Map<String, dynamic>).containsKey('tags')
+            ? List<String>.from(otherUserData['tags'])
+            : [];
+
+        if (otherUserVisibility == 'friends' && _isFriend(auth, currentUserData, otherUserData)) {
             return true;
         }
 
-        if (otherUserVisibility == 'tags' && currentUserTags.any((tag) => otherUserTags.contains(tag))) {
+        if (otherUserVisibility == 'tags' && _isTag(auth, currentUserData, otherUserData)) {
             return true;
         }
 
@@ -284,7 +341,7 @@ class HomePageFunctions {
                 // Retrieve goOnline as String
                 dynamic otherUserVisibility = userData['goOnline'] ?? 'offline';
                 if (otherUserVisibility is bool) {
-                    otherUserVisibility = otherUserVisibility ? 'online' : 'offline';
+                    otherUserVisibility = otherUserVisibility ? 'everyone' : 'offline';
                 } else if (otherUserVisibility is! String) {
                     otherUserVisibility = 'offline';
                 }
@@ -309,7 +366,7 @@ class HomePageFunctions {
                         LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
 
                         // Add the marker (without proximity check as per your note)
-                        print('Adding marker for user: $participantId');
+                        // print('Adding marker for user: $participantId');
                         String locationKey = '${location.latitude},${location.longitude}';
                         if (locationCount.containsKey(locationKey)) {
                             locationCount[locationKey] = locationCount[locationKey]! + 1;
@@ -335,7 +392,7 @@ class HomePageFunctions {
                             // Fallback to the default asset if no profile picture is available
                             markerIcon = await createCustomMarkerFromAsset();
                         }
-                        print('Adding marker for user: $displayName');
+                        // print('Adding marker for user: $displayName');
                         markers.removeWhere((marker) => marker.markerId.value == participantId);
                         waitingMarkers.add(
                             Marker(
@@ -484,6 +541,17 @@ class HomePageFunctions {
   return true;
 }
 
+static double _getMarkerHue(Color color) {
+  if (color == friendColor) {
+    return BitmapDescriptor.hueGreen;
+  } else if (color == tagColor) {
+    return 270.0; // Custom hue value for purple
+  } else {
+    return BitmapDescriptor.hueYellow;
+  }
+}
+
+
 static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<String, dynamic> targetData, int currentGroupSize) {
   Map<String, dynamic> userPrefs = currentUserData['preferences'];
 
@@ -550,72 +618,58 @@ static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<S
     Set<Marker> markers,
     String visibilityOption,
     ) async {
-        print('Fetching online users');
         User? currentUser = auth.currentUser;
-        print('Current user: ${currentUser?.uid}');
-        Set<Marker> onlineMarkers = {};
         if (currentUser == null) return;
 
-        DocumentSnapshot curUserData = await firestore.collection('users').doc(currentUser.uid).get();
+        DocumentSnapshot curUserDoc = await firestore.collection('users').doc(currentUser.uid).get();
+        Map<String, dynamic> curUserData = curUserDoc.data() as Map<String, dynamic>;
 
-        // Query users based on their visibility settings
-        QuerySnapshot usersSnapshot = await firestore.collection('users').get();
-
+        QuerySnapshot userDocs = await firestore.collection('users').get();
         Map<String, int> locationCount = {};
 
         Set<Marker> newMarkers = {};
 
-        for (var doc in usersSnapshot.docs) {
-            print('Checking user: ${doc.id}');
-            // print('Checking user: ${doc.id}');
+        for (var doc in userDocs.docs) {
+            Map<String, dynamic> userData = doc.data() as Map<String, dynamic>;
             String userId = doc.id;
-            var userData = doc.data() as Map<String, dynamic>;
-
-            // Ignore current user
-            if (userId == currentUser.uid) continue;
 
             // Retrieve goOnline as String
             dynamic otherUserVisibility = userData['goOnline'] ?? 'offline';
             if (otherUserVisibility is bool) {
-                otherUserVisibility = otherUserVisibility ? 'online' : 'offline';
+                otherUserVisibility = otherUserVisibility ? 'everyone' : 'offline';
             } else if (otherUserVisibility is! String) {
                 otherUserVisibility = 'offline';
             }
-            Map<String, dynamic>? positionData = userData['currentPosition'];
-            String? username = userData['fullName'];
 
             // Determine if the current user should see this user based on visibility settings
             bool shouldDisplay = await _shouldDisplayUser(
                 userId,
                 auth,
-                currentUserData: curUserData,
+                currentUserData: curUserDoc,
                 otherUserData: doc,
                 currentUserVisibility: visibilityOption,
                 otherUserVisibility: otherUserVisibility,
             );
-            print('Should display: $shouldDisplay | Visibility: $otherUserVisibility');
-            // print('Username is: $username | Should display: $shouldDisplay | Visibility: $otherUserVisibility');
+            // print('Should display: $shouldDisplay | Visibility: $otherUserVisibility');
 
             if (shouldDisplay) {
                 // Check if the user has a valid lastPickupLocation and lastPickupTime
                 if (userData['lastPickupLocation'] != null) {
-                    //print('User has a valid lastPickupLocation');
-                    GeoPoint location = userData['lastPickupLocation'];
-                    Timestamp lastPickupTime = userData['lastPickupTime'];
+                    // print('Processing user: $userId');
+                    try {
+                        GeoPoint location = userData['lastPickupLocation'];
+                        Timestamp lastPickupTime = userData['lastPickupTime'];
 
-                    // Check if the last pickup time is within the last 15 minutes
-                    // DateTime pickupTime = lastPickupTime.toDate();
-                    // if (now.difference(pickupTime).inMinutes > 15) {
-                    //     continue; // Skip users with old pickup times
-                    // }
+                        // Check if the last pickup time is within the last 15 minutes
+                        // DateTime pickupTime = lastPickupTime.toDate();
+                        // if (DateTime.now().difference(pickupTime).inMinutes > 15) {
+                        // continue; // Skip users with old pickup times
+                        // }
 
-                    LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
+                        LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
 
-                    // Check proximity (5000 miles in meters)
-                    // double distance = HomePageFunctions.calculateDistance(currentPosition, otherUserPosition); distance < (8046720 * 20)
-                    if (true) {
-                        //print('User is within 5 miles, adding marker');
                         String locationKey = '${location.latitude},${location.longitude}';
+
                         if (locationCount.containsKey(locationKey)) {
                             locationCount[locationKey] = locationCount[locationKey]! + 1;
                         } else {
@@ -627,7 +681,20 @@ static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<S
                         LatLng adjustedPosition = LatLng(location.latitude + offset, location.longitude + offset);
 
                         String? displayName = userData['fullName'];
+                        String? username = userData['username'];
                         String? profileImageUrl = userData['imageUrl'];
+
+                        // Determine marker color based on user type
+                        Color markerColor = normalUserColor;
+                        // print('user color: $markerColor');
+                        if (_isFriend(auth, curUserDoc, doc)) {
+                            markerColor = friendColor;
+                        } else if (_isTag(auth, curUserDoc, doc)) {
+                            markerColor = tagColor;
+                        } else {
+                            markerColor = normalUserColor; // Default
+                        }
+                        // print('user color: $markerColor');
 
                         MarkerId markerId = MarkerId(doc.id);
 
@@ -635,26 +702,31 @@ static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<S
                         BitmapDescriptor markerIcon;
                         if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
                             // Use the profile image if available
-                            markerIcon = await createCustomMarkerWithImage(profileImageUrl);
+                            markerIcon = await createCustomMarkerWithImage(profileImageUrl, borderColor: markerColor);
                         } else {
                             // Fallback to the default asset if no profile picture is available
-
-                            markerIcon = await createCustomMarkerFromAsset();
+                            markerIcon = await createCustomMarkerFromAsset(borderColor: markerColor);
                         }
-                        //print('MarkerId: ${doc.id}');
-                        markers.removeWhere((marker) => marker.markerId.value == doc.id);
-                        onlineMarkers.add(
-                            Marker(
+
+
+                        // Create marker
+                        Marker marker = Marker(
                             markerId: markerId,
                             position: adjustedPosition,
-                            icon: markerIcon,
-                            infoWindow: InfoWindow(title: displayName),
+                            infoWindow: InfoWindow(
+                                title: (markerColor == normalUserColor) ? null : username, // Show username only for friends or tags
                             ),
+                            icon: markerIcon,
                         );
+
+                        newMarkers.add(marker);
+                    } catch (e) {
+                        print('Error processing user $userId: $e');
+                        continue; // Skip to the next user if there's an error
                     }
                 }
             }
         }
-        updateMarkers(onlineMarkers);
+        updateMarkers(newMarkers);
     }
 }
