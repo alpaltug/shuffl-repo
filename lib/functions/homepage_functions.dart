@@ -347,17 +347,17 @@ class HomePageFunctions {
                 }
 
                 // Determine if the current user should see this user based on visibility settings
-                bool shouldDisplay = await _shouldDisplayUser(
-                    participantId,
-                    auth,
-                    currentUserData: curUserData,
-                    otherUserData: doc,
-                    currentUserVisibility: visibilityOption,
-                    otherUserVisibility: otherUserVisibility,
-                );
+                // bool shouldDisplay = await _shouldDisplayUser(
+                //     participantId,
+                //     auth,
+                //     currentUserData: curUserData,
+                //     otherUserData: doc,
+                //     currentUserVisibility: visibilityOption,
+                //     otherUserVisibility: otherUserVisibility,
+                // );
                 // print('Username is: $username | Should display: $shouldDisplay | Visibility: $otherUserVisibility');
 
-                if (shouldDisplay) {
+                if (true) {
 
                     // Check if the user has a valid lastPickupLocation and is marked as 'ready' in readyStatus
                     if (userData['lastPickupLocation'] != null && rideData['readyStatus'][participantId] == false) {
