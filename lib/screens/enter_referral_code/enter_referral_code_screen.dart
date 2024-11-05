@@ -1,7 +1,7 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:my_flutter_app/constants.dart';
 
 class EnterReferralCodeScreen extends StatefulWidget {
   const EnterReferralCodeScreen({Key? key}) : super(key: key);
@@ -36,16 +36,17 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
 
         if (user != null) {
           try {
-            // Get the 'members' array from the document, or an empty list if it doesn't exist
-            List<dynamic> members = [];
+            // Fetch the current user's display name
+            DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+            String displayName = userDoc['username'] ?? 'A user';
+
+            List<dynamic> participants = [];
             var data = doc.data() as Map<String, dynamic>;
-            if (data.containsKey('members')) {
-              members = data['members'];
+            if (data.containsKey('participants')) {
+              participants = data['participants'];
             }
 
-            // Check if the user is already a member
-            if (members.contains(user.uid)) {
-              // User is already a member
+            if (participants.contains(user.uid)) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content:
@@ -56,18 +57,140 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
                 _isSubmitting = false;
               });
             } else {
-              // Add the user to the 'members' array in the 'referral_codes' document
+
               await _firestore
                   .collection('referral_codes')
                   .doc(referralCode)
                   .set({
-                'members': FieldValue.arrayUnion([user.uid]),
+                'participants': FieldValue.arrayUnion([user.uid]),
               }, SetOptions(merge: true));
 
-              // Add the organization name to the user's 'tags'
               await _firestore.collection('users').doc(user.uid).set({
                 'tags': FieldValue.arrayUnion([orgName]),
               }, SetOptions(merge: true));
+
+              DocumentSnapshot updatedDoc = await _firestore
+                  .collection('referral_codes')
+                  .doc(referralCode)
+                  .get();
+              List<dynamic> updatedMembers = updatedDoc['participants'] ?? [];
+
+              Map<String, dynamic>? updatedData = updatedDoc.data() as Map<String, dynamic>?;
+              String? groupChatId = updatedData != null && updatedData.containsKey('group_chat_id')
+                  ? updatedData['group_chat_id']
+                  : null;
+
+              if (updatedMembers.length >= 2) {
+                if (groupChatId == null) {
+                  String newGroupChatId = _firestore.collection('group_chats').doc().id;
+
+                  await _firestore
+                      .collection('referral_codes')
+                      .doc(referralCode)
+                      .set({
+                    'group_chat_id': newGroupChatId,
+                  }, SetOptions(merge: true));
+
+                  Map<String, dynamic> chatData = {
+                    'participants': updatedMembers,
+                    'isGroupChat': true,
+                    'groupTitle': orgName,
+                    'isReferralGroup': true,
+                    'lastMessage': {
+                      'content': '@system Group chat created',
+                      'timestamp': FieldValue.serverTimestamp(),
+                    },
+                  };
+
+                  for (String memberId in updatedMembers) {
+                    await _firestore
+                        .collection('users')
+                        .doc(memberId)
+                        .collection('chats')
+                        .doc(newGroupChatId)
+                        .set(chatData);
+
+                    await _firestore
+                        .collection('users')
+                        .doc(memberId)
+                        .collection('chats')
+                        .doc(newGroupChatId)
+                        .collection('messages')
+                        .add({
+                      'senderId': 'system',
+                      'content': '@system Group chat created',
+                      'timestamp': FieldValue.serverTimestamp(),
+                    });
+                  }
+                } else {
+                  for (String memberId in updatedMembers) {
+                    DocumentReference chatDocRef = _firestore
+                        .collection('users')
+                        .doc(memberId)
+                        .collection('chats')
+                        .doc(groupChatId);
+
+                    if (memberId == user.uid) {
+                      Map<String, dynamic> chatData = {
+                        'participants': updatedMembers,
+                        'isGroupChat': true,
+                        'groupTitle': orgName,
+                        'isReferralGroup': true,
+                        'lastMessage': {
+                          'content': '@system Welcome to the group chat',
+                          'timestamp': FieldValue.serverTimestamp(),
+                        },
+                      };
+                      await chatDocRef.set(chatData);
+
+                      await _firestore
+                          .collection('users')
+                          .doc(memberId)
+                          .collection('chats')
+                          .doc(groupChatId)
+                          .collection('messages')
+                          .add({
+                        'senderId': 'system',
+                        'content': '@system Welcome to the group chat',
+                        'timestamp': FieldValue.serverTimestamp(),
+                      });
+                    } else {
+                      await chatDocRef.update({
+                        'participants': updatedMembers,
+                      });
+                    }
+                  }
+
+                  String systemMessageContent =
+                      '@$displayName has joined the group';
+
+                  for (String memberId in updatedMembers) {
+                    await _firestore
+                        .collection('users')
+                        .doc(memberId)
+                        .collection('chats')
+                        .doc(groupChatId)
+                        .collection('messages')
+                        .add({
+                      'senderId': 'system',
+                      'content': systemMessageContent,
+                      'timestamp': FieldValue.serverTimestamp(),
+                    });
+
+                    await _firestore
+                        .collection('users')
+                        .doc(memberId)
+                        .collection('chats')
+                        .doc(groupChatId)
+                        .update({
+                      'lastMessage': {
+                        'content': systemMessageContent,
+                        'timestamp': FieldValue.serverTimestamp(),
+                      },
+                    });
+                  }
+                }
+              }
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -83,6 +206,11 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
               _isSubmitting = false;
             });
           }
+        } else {
+          setState(() {
+            _errorMessage = 'Invalid referral code.';
+            _isSubmitting = false;
+          });
         }
       } else {
         setState(() {
@@ -106,32 +234,48 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Enter Referral Code'),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Enter Referral Code',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: kBackgroundColor,
       ),
-      child: SafeArea(
+      backgroundColor: kBackgroundColor,
+      body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              CupertinoTextField(
+              TextField(
                 controller: _referralCodeController,
-                placeholder: 'Referral Code',
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const InputDecoration(
+                  labelText: 'Referral Code',
+                  labelStyle: TextStyle(color: Colors.black),
+                  border: OutlineInputBorder(),
+                ),
+                style: const TextStyle(color: Colors.black),
               ),
               const SizedBox(height: 16),
               if (_errorMessage != null)
                 Text(
                   _errorMessage!,
-                  style: const TextStyle(color: CupertinoColors.systemRed),
+                  style: const TextStyle(color: Colors.red),
                 ),
               const SizedBox(height: 16),
-              CupertinoButton.filled(
+              ElevatedButton(
                 onPressed: _isSubmitting ? null : _submitReferralCode,
                 child: _isSubmitting
-                    ? const CupertinoActivityIndicator()
-                    : const Text('Submit'),
+                    ? const CircularProgressIndicator()
+                    : const Text('Submit', style: TextStyle(color: Colors.black)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.yellow,
+                  minimumSize: const Size(double.infinity, 50),
+                ),
               ),
             ],
           ),

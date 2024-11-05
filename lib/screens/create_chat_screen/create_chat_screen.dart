@@ -18,7 +18,6 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   List<String> _selectedFriends = [];
   String? _groupTitle;
 
-  // Fetch friends only once to avoid unnecessary refreshes
   Future<List<Map<String, dynamic>>> _getFriends() async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) return [];
@@ -53,7 +52,6 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   if (currentUser == null) return;
 
   if (_selectedFriends.length == 1) {
-    // Handle one-on-one chat creation (keep existing logic)
     String friendUid = _selectedFriends[0];
     String chatId = _getChatId(currentUser.uid, friendUid);
 
@@ -77,7 +75,6 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       );
     }
   } else {
-    // Create a new group chat
     if (_groupTitle == null || _groupTitle!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a group title.')),
@@ -86,7 +83,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
     }
 
     List<String> participants = [currentUser.uid, ..._selectedFriends];
-    String chatId = DateTime.now().millisecondsSinceEpoch.toString(); // Generate a unique chatId
+    String chatId = DateTime.now().millisecondsSinceEpoch.toString(); 
 
     Map<String, dynamic> newChatData = {
       'participants': participants,
@@ -98,10 +95,6 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       },
     };
 
-    // Create the group chat document in Firestore
-    await _firestore.collection('group_chats').doc(chatId).set(newChatData);
-
-    // Add the chat to each participant's chats collection
     for (String uid in participants) {
       await _firestore
           .collection('users')
@@ -109,6 +102,20 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
           .collection('chats')
           .doc(chatId)
           .set(newChatData);
+    }
+
+    for (String uid in participants) {
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .add({
+        'senderId': 'system',
+        'content': 'Group created',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
     }
 
     Navigator.pushReplacement(
