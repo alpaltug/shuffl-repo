@@ -4,26 +4,28 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   Future<void> addUser(String uid, String email, {String? name}) async {
-    String domain = _extractDomainFromEmail(email);
-    bool isStudent = domain.endsWith('.edu');
+  String domain = _extractDomainFromEmail(email);
+  bool isStudent = domain.endsWith('.edu');
 
-    await _db.collection('users').doc(uid).set({
-      'email': email,
-      'name': name ?? '', 
-      'createdAt': FieldValue.serverTimestamp(),
-      'domain': domain,
-      'isStudent': isStudent,
-      'rating': null,
-      'numRides': 0,
-      'preferences': {
-        'ageRange': {'min': 18, 'max': 80},
-        'schoolToggle': false,
-        'sameGenderToggle': false,
-        'minCarCapacity': 2,
-        'maxCarCapacity': 5,
-      },
-    });
-  }
+  await _db.collection('users').doc(uid).set({
+    'email': email,
+    'name': name ?? '', 
+    'createdAt': FieldValue.serverTimestamp(),
+    'domain': domain,
+    'isStudent': isStudent,
+    'rating': null,
+    'numRides': 0,
+    'preferences': {
+      'ageRange': {'min': 18, 'max': 80},
+      'schoolToggle': false,
+      'sameGenderToggle': false,
+      'minCarCapacity': 2,
+      'maxCarCapacity': 5,
+    },
+    'friends': [], 
+    'tags': [], 
+  });
+}
 
   Future<void> updateUserProfile(
     String uid,
