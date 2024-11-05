@@ -214,41 +214,24 @@ class _HomePageState extends State<HomePage> with RouteAware {
       // Fetch the user's profile document from Firestore
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-      // Retrieve the 'goOnline' status
-      String goOnlineStatus = userProfile['goOnline'] ?? 'offline';
-
-      // Initialize a variable to hold the loaded position
-      LatLng? loadedPosition;
-
-      if (goOnlineStatus != 'offline') {
-        // If the user is online, attempt to load their lastPickupLocation
-        if (userProfile['lastPickupLocation'] != null) {
-          // If 'lastPickupLocation' exists in Firestore, use it
-          GeoPoint geoPoint = userProfile['lastPickupLocation'];
-          loadedPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
-        } else {
-          // If 'lastPickupLocation' is null, attempt to fetch it using Geolocator
-          try {
-            Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-            loadedPosition = LatLng(position.latitude, position.longitude);
-
-            // Update Firestore with the fetched position as 'lastPickupLocation'
-            await _firestore.collection('users').doc(user.uid).update({
-              'lastPickupLocation': GeoPoint(position.latitude, position.longitude),
-            });
-          } catch (e) {
-            // If fetching fails, set a default position (e.g., campus location)
-            loadedPosition = LatLng(37.8715, -122.2730); // Berkeley campus
-          }
-        }
+      LatLng currentPosition;
+      if (userProfile['lastPickupLocation'] != null) {
+        // Fetch position from Firestore
+        GeoPoint geoPoint = userProfile['lastPickupLocation'];
+        currentPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
       } else {
-        // If the user is offline, attempt to use 'lastPickupLocation'
-        if (userProfile['lastPickupLocation'] != null) {
-          GeoPoint geoPoint = userProfile['lastPickupLocation'];
-          loadedPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
-        } else {
-          // If 'lastPickupLocation' is also null, set to default location
-          loadedPosition = LatLng(37.8715, -122.2730); // Berkeley campus
+        try {
+          // Get user's current position
+          Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+          currentPosition = LatLng(position.latitude, position.longitude);
+
+          // Save to Firestore
+          await _firestore.collection('users').doc(user.uid).update({
+            'lastPickupLocation': GeoPoint(position.latitude, position.longitude),
+          });
+        } catch (e) {
+          // Default position if unable to get current location
+          currentPosition = LatLng(37.8715, -122.2730); // Our campus
         }
       }
 

@@ -48,7 +48,7 @@ class HomePageFunctions {
         // Update the user's visibility option in Firestore
         await firestore.collection('users').doc(user.uid).update({
         'visibilityOption': visibilityOption,
-        'currentPosition': currentPosition != null
+        'lastPickupLocation': currentPosition != null
             ? GeoPoint(currentPosition.latitude, currentPosition.longitude)
             : null,
         });
@@ -59,7 +59,7 @@ class HomePageFunctions {
         } else {
         // If offline, cancel position updates and remove location from Firestore
         await firestore.collection('users').doc(user.uid).update({
-            'currentPosition': null,
+            'lastPickupLocation': null,
         });
         await positionStreamSubscription?.cancel();
         positionStreamSubscription = null;
