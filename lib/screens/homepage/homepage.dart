@@ -213,9 +213,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
       LatLng currentPosition;
-      if (userProfile['currentPosition'] != null) {
+      if (userProfile['lastPickupLocation'] != null) {
         // Fetch position from Firestore
-        GeoPoint geoPoint = userProfile['currentPosition'];
+        GeoPoint geoPoint = userProfile['lastPickupLocation'];
         currentPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
       } else {
         try {
@@ -225,7 +225,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
           // Save to Firestore
           await _firestore.collection('users').doc(user.uid).update({
-            'currentPosition': GeoPoint(position.latitude, position.longitude),
+            'lastPickupLocation': GeoPoint(position.latitude, position.longitude),
           });
         } catch (e) {
           // Default position if unable to get current location
