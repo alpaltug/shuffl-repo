@@ -208,10 +208,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   void _loadUserProfile() async {
-  User? user = _auth.currentUser;
-  if (user != null) {
-    try {
-      // Fetch the user's profile document from Firestore
+    User? user = _auth.currentUser;
+    if (user != null) {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
       LatLng currentPosition;
@@ -235,39 +233,23 @@ class _HomePageState extends State<HomePage> with RouteAware {
         }
       }
 
-      // Update the state with the fetched profile information
       setState(() {
         _profileImageUrl = userProfile['imageUrl'];
         _username = userProfile['username'];
         _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-        goOnline = goOnlineStatus;
-        this.currentPosition = loadedPosition; // Assign to the class member
+        goOnline = userProfile['goOnline'] ?? 'offline';
+        currentPosition = currentPosition;
       });
-    } catch (e) {
-      // Handle any errors during profile loading
-      print('Error loading user profile: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading profile: $e')),
-      );
-      
-      // Optionally, set default values even if there's an error
+
+      //await HomePageFunctions.fetchGoOnlineStatus();
+    } else {
+      // Default position if user is null
+      LatLng currentPosition = LatLng(37.8715, -122.2730); // Our campus
       setState(() {
-        _profileImageUrl = null;
-        _username = null;
-        _fullName = 'Shuffl User';
-        goOnline = 'offline';
-        currentPosition = null;
+        currentPosition = currentPosition;
       });
     }
-  } else {
-    // If the user is not logged in, set default position
-    LatLng defaultPosition = LatLng(37.8715, -122.2730); // Berkeley campus
-    setState(() {
-      currentPosition = defaultPosition;
-      _fullName = 'Shuffl User';
-    });
   }
-}
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
