@@ -208,48 +208,83 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   void _loadUserProfile() async {
-    User? user = _auth.currentUser;
-    if (user != null) {
+  User? user = _auth.currentUser;
+  if (user != null) {
+    try {
+      // Fetch the user's profile document from Firestore
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-      LatLng currentPosition;
-      if (userProfile['currentPosition'] != null) {
-        // Fetch position from Firestore
-        GeoPoint geoPoint = userProfile['currentPosition'];
-        currentPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
-      } else {
-        try {
-          // Get user's current position
-          Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-          currentPosition = LatLng(position.latitude, position.longitude);
+      // Retrieve the 'goOnline' status
+      String goOnlineStatus = userProfile['goOnline'] ?? 'offline';
 
-          // Save to Firestore
-          await _firestore.collection('users').doc(user.uid).update({
-            'currentPosition': GeoPoint(position.latitude, position.longitude),
-          });
-        } catch (e) {
-          // Default position if unable to get current location
-          currentPosition = LatLng(37.8715, -122.2730); // Our campus
+      // Initialize a variable to hold the loaded position
+      LatLng? loadedPosition;
+
+      if (goOnlineStatus != 'offline') {
+        // If the user is online, attempt to load their lastPickupLocation
+        if (userProfile['lastPickupLocation'] != null) {
+          // If 'lastPickupLocation' exists in Firestore, use it
+          GeoPoint geoPoint = userProfile['lastPickupLocation'];
+          loadedPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
+        } else {
+          // If 'lastPickupLocation' is null, attempt to fetch it using Geolocator
+          try {
+            Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+            loadedPosition = LatLng(position.latitude, position.longitude);
+
+            // Update Firestore with the fetched position as 'lastPickupLocation'
+            await _firestore.collection('users').doc(user.uid).update({
+              'lastPickupLocation': GeoPoint(position.latitude, position.longitude),
+            });
+          } catch (e) {
+            // If fetching fails, set a default position (e.g., campus location)
+            loadedPosition = LatLng(37.8715, -122.2730); // Berkeley campus
+          }
+        }
+      } else {
+        // If the user is offline, attempt to use 'lastPickupLocation'
+        if (userProfile['lastPickupLocation'] != null) {
+          GeoPoint geoPoint = userProfile['lastPickupLocation'];
+          loadedPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
+        } else {
+          // If 'lastPickupLocation' is also null, set to default location
+          loadedPosition = LatLng(37.8715, -122.2730); // Berkeley campus
         }
       }
 
+      // Update the state with the fetched profile information
       setState(() {
         _profileImageUrl = userProfile['imageUrl'];
         _username = userProfile['username'];
         _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-        goOnline = userProfile['goOnline'] ?? 'offline';
-        currentPosition = currentPosition;
+        goOnline = goOnlineStatus;
+        this.currentPosition = loadedPosition; // Assign to the class member
       });
-
-      //await HomePageFunctions.fetchGoOnlineStatus();
-    } else {
-      // Default position if user is null
-      LatLng currentPosition = LatLng(37.8715, -122.2730); // Our campus
+    } catch (e) {
+      // Handle any errors during profile loading
+      print('Error loading user profile: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading profile: $e')),
+      );
+      
+      // Optionally, set default values even if there's an error
       setState(() {
-        currentPosition = currentPosition;
+        _profileImageUrl = null;
+        _username = null;
+        _fullName = 'Shuffl User';
+        goOnline = 'offline';
+        currentPosition = null;
       });
     }
+  } else {
+    // If the user is not logged in, set default position
+    LatLng defaultPosition = LatLng(37.8715, -122.2730); // Berkeley campus
+    setState(() {
+      currentPosition = defaultPosition;
+      _fullName = 'Shuffl User';
+    });
   }
+}
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;

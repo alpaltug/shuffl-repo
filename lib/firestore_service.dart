@@ -35,7 +35,7 @@ class FirestoreService {
     String? imageUrl,
     String sexAssignedAtBirth,
     int age, {
-    bool goOnline = false,
+    String goOnline = "offline",
   }) async {
     await _db.collection('users').doc(uid).update({
       'fullName': fullName,

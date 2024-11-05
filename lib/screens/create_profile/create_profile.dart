@@ -142,7 +142,7 @@ class _CreateProfileState extends State<CreateProfile> {
           _imageUrl,
           _sexAssignedAtBirth!,
           age,
-          goOnline: false,
+          goOnline: "offline",
         );
         Navigator.pushReplacement(
           context,
