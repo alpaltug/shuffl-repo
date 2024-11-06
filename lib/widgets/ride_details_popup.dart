@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// Ensure to import LocationSearchPage if it's in a separate file
+// import 'package:my_flutter_app/screens/location_search_page.dart';
 
 class RideDetailsPopup extends StatefulWidget {
   final List<Map<String, String>> participants;
@@ -40,7 +42,7 @@ class _RideDetailsPopupState extends State<RideDetailsPopup> {
                 _dropoffController.text = address;
                 _dropoffError = null; // Clear error on selection
               }
-            });
+            }); 
           },
         ),
       ),
@@ -82,18 +84,24 @@ class _RideDetailsPopupState extends State<RideDetailsPopup> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildLocationPicker("Pickup Location (Optional)", _pickupController, true),
+          _buildLocationPicker("Pickup Location (Required)", _pickupController, true),
           if (_pickupError != null)
-            Text(
-              _pickupError!,
-              style: const TextStyle(color: Colors.red, fontSize: 12),
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                _pickupError!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
             ),
           const SizedBox(height: 10),
-          _buildLocationPicker("Dropoff Location (Optional)", _dropoffController, false),
+          _buildLocationPicker("Dropoff Location (Required)", _dropoffController, false),
           if (_dropoffError != null)
-            Text(
-              _dropoffError!,
-              style: const TextStyle(color: Colors.red, fontSize: 12),
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                _dropoffError!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
             ),
           const SizedBox(height: 20),
           _buildParticipantsList(),
@@ -204,3 +212,4 @@ class LocationSearchPage extends StatelessWidget {
     );
   }
 }
+

@@ -91,6 +91,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   void initState() {
     super.initState();
     _loadUserProfile();
+    _loadVisibilityOption();
 
     // Listen to the current position and update it
     HomePageFunctions.determinePosition(
@@ -176,8 +177,21 @@ class _HomePageState extends State<HomePage> with RouteAware {
     }
   }
 
+  void _loadVisibilityOption() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
+      if (userProfile.exists) {
+        setState(() {
+          goOnline = userProfile['visibilityOption'] ?? 'offline';
+        });
+      }
+    }
+  }
+
   // Toggle 'goOnline' and update necessary state variables
   Future<void> _toggleGoOnline(String value) async {
+    goOnline = value;
     await HomePageFunctions.toggleVisibilityOption(
       value,
       currentPosition,
@@ -209,11 +223,12 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   void _loadUserProfile() async {
     User? user = _auth.currentUser;
+    LatLng defaultPosition = LatLng(37.8715, -122.2730); // Default to Berkeley
+
     if (user != null) {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-      LatLng currentPosition;
-      if (userProfile['lastPickupLocation'] != null) {
+      if (userProfile.exists && userProfile['lastPickupLocation'] != null) {
         // Fetch position from Firestore
         GeoPoint geoPoint = userProfile['lastPickupLocation'];
         currentPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
@@ -228,8 +243,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
             'lastPickupLocation': GeoPoint(position.latitude, position.longitude),
           });
         } catch (e) {
-          // Default position if unable to get current location
-          currentPosition = LatLng(37.8715, -122.2730); // Our campus
+          // Use default position if unable to get current location
+          currentPosition = defaultPosition;
         }
       }
 
@@ -237,16 +252,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
         _profileImageUrl = userProfile['imageUrl'];
         _username = userProfile['username'];
         _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-        goOnline = userProfile['goOnline'] ?? 'offline';
-        currentPosition = currentPosition;
       });
-
-      //await HomePageFunctions.fetchGoOnlineStatus();
     } else {
-      // Default position if user is null
-      LatLng currentPosition = LatLng(37.8715, -122.2730); // Our campus
+      // Use default position if user is null
       setState(() {
-        currentPosition = currentPosition;
+        currentPosition = defaultPosition;
       });
     }
   }
@@ -653,10 +663,8 @@ void _navigateToLocationSearch(bool isPickup, {Function(String)? onSelectAddress
         currentPosition: currentPosition,
         onSelectAddress: (address) {
           if (onSelectAddressCallback != null) {
-            // Use the callback if provided (for the scheduled ride case)
             onSelectAddressCallback(address);
           } else {
-            // Otherwise, update the appropriate text controller (for the immediate ride case)
             if (isPickup) {
               _pickupController.text = address;
             } else {
@@ -687,7 +695,18 @@ void _findRideWithLocations(String pickupLocation, String dropoffLocation) {
 
 
 void _locationSearchWrapper(bool isPickup, Function(String) onSelectAddressCallback) {
-  _navigateToLocationSearch(isPickup, onSelectAddressCallback: onSelectAddressCallback);
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => LocationSearchScreen(
+        isPickup: isPickup,
+        currentPosition: currentPosition,
+        onSelectAddress: (address) {
+          onSelectAddressCallback(address);
+        },
+      ),
+    ),
+  );
 }
 
 void _findRide() async {

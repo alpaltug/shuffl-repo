@@ -41,8 +41,7 @@ class HomePageFunctions {
         if (user == null) return;
 
         updateState(() {
-        // Update the visibility option state
-        updateVisibilityOption(visibilityOption);
+            updateVisibilityOption(visibilityOption);
         });
 
         // Update the user's visibility option in Firestore

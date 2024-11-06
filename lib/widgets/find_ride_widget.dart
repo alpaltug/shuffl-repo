@@ -21,6 +21,8 @@ class RideWidget extends StatefulWidget {
 class _RideWidgetState extends State<RideWidget> {
   String? _pickupLocation;
   String? _dropoffLocation;
+  String? _pickupError;
+  String? _dropoffError;
 
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropoffController = TextEditingController();
@@ -48,9 +50,19 @@ class _RideWidgetState extends State<RideWidget> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildLocationPicker("Pick-up Location (Optional)", _pickupController, true),
+          _buildLocationPicker("Pick-up Location", _pickupController, true),
+          if (_pickupError != null)
+            Text(
+              _pickupError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
           const SizedBox(height: 10),
-          _buildLocationPicker("Drop-off Location (Optional)", _dropoffController, false),
+          _buildLocationPicker("Drop-off Location", _dropoffController, false),
+          if (_dropoffError != null)
+            Text(
+              _dropoffError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
           const SizedBox(height: 20),
           if (widget.isJoinRide && widget.participants != null) _buildParticipantsList(),
           const SizedBox(height: 20),
@@ -67,8 +79,10 @@ class _RideWidgetState extends State<RideWidget> {
           controller.text = address;
           if (isPickup) {
             _pickupLocation = address;
+            _pickupError = null; // Clear error on valid input
           } else {
             _dropoffLocation = address;
+            _dropoffError = null; // Clear error on valid input
           }
         });
       }),
@@ -152,11 +166,16 @@ class _RideWidgetState extends State<RideWidget> {
   }
 
   void _onSubmitPressed() {
-    // Check if either location is provided and call the onSubmit with only the non-null values
-    final pickupLocation = _pickupLocation ?? '';
-    final dropoffLocation = _dropoffLocation ?? '';
+    // Validate inputs
+    setState(() {
+      _pickupError = _pickupLocation == null ? 'Please select a pickup location' : null;
+      _dropoffError = _dropoffLocation == null ? 'Please select a dropoff location' : null;
+    });
 
-    widget.onSubmit(pickupLocation, dropoffLocation);
-    Navigator.pop(context);
+    // Proceed only if both locations are provided
+    if (_pickupLocation != null && _dropoffLocation != null) {
+      widget.onSubmit(_pickupLocation!, _dropoffLocation!);
+      Navigator.pop(context);
+    }
   }
 }
