@@ -9,6 +9,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_flutter_app/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
+import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
+import 'package:my_flutter_app/screens/verification/verification_screen.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -16,7 +18,6 @@ final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   print("Handling a background message: ${message.messageId}");
-  // You can add additional handling for background messages here
 }
 
 void main() async {
@@ -28,17 +29,6 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   final notificationService = NotificationService();
   await notificationService.init();
-
-  // Debug current user
-  User? currentUser = FirebaseAuth.instance.currentUser;
-  if (currentUser != null) {
-    print('Current user UID at app start: ${currentUser.uid}');
-    print('Current user email at app start: ${currentUser.email}');
-    String? token = await currentUser.getIdToken(true);
-    print('Current user token at app start: ${token?.substring(0, 10)}...'); 
-  } else {
-    print('No user is currently signed in at app start');
-  }
 
   runApp(const MyApp());
 }
@@ -54,6 +44,7 @@ class _MyAppState extends State<MyApp> {
   bool _isRemembered = false;
   bool _isLoading = true;
   User? _user;
+  bool _isProfileComplete = false;
 
   @override
   void initState() {
@@ -63,11 +54,45 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initializeApp() async {
     await _checkRememberMe();
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
-      setState(() {
-        _user = user;
-        _isLoading = false;
-      });
+    FirebaseAuth.instance.authStateChanges().listen((User? user) async {
+      if (user != null) {
+        if (!user.emailVerified) {
+          setState(() {
+            _user = user;
+            _isProfileComplete = false;
+            _isLoading = false;
+          });
+          return;
+        }
+
+        DocumentSnapshot userDoc =
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          Map<String, dynamic> data = userDoc.data() as Map<String, dynamic>;
+          bool hasRequiredFields = data.containsKey('fullName') &&
+              data.containsKey('username') &&
+              data.containsKey('description') &&
+              data.containsKey('age') &&
+              data.containsKey('sexAssignedAtBirth');
+          setState(() {
+            _user = user;
+            _isProfileComplete = hasRequiredFields;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _user = user;
+            _isProfileComplete = false;
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _user = null;
+          _isProfileComplete = false;
+          _isLoading = false;
+        });
+      }
     });
   }
 
@@ -92,17 +117,78 @@ class _MyAppState extends State<MyApp> {
       );
     }
 
-    return MaterialApp(
-      navigatorObservers: [routeObserver],
-      debugShowCheckedModeBanner: false,
-      title: 'Shuffl',
-      theme: ThemeData(
-        scaffoldBackgroundColor: kBackgroundColor,
-        primaryColor: kPrimaryColor,
-        textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+    if (_user != null) {
+      if (_isProfileComplete) {
+        return MaterialApp(
+          navigatorObservers: [routeObserver],
+          debugShowCheckedModeBanner: false,
+          title: 'Shuffl',
+          theme: ThemeData(
+            scaffoldBackgroundColor: kBackgroundColor,
+            primaryColor: kPrimaryColor,
+            textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
+            visualDensity: VisualDensity.adaptivePlatformDensity,
+          ),
+          home: const HomePage(),
+        );
+      } else {
+        return MaterialApp(
+          navigatorObservers: [routeObserver],
+          debugShowCheckedModeBanner: false,
+          title: 'Shuffl',
+          theme: ThemeData(
+            scaffoldBackgroundColor: kBackgroundColor,
+            primaryColor: kPrimaryColor,
+            textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
+            visualDensity: VisualDensity.adaptivePlatformDensity,
+          ),
+          home: CreateProfileRedirect(),
+        );
+      }
+    } else {
+      return MaterialApp(
+        navigatorObservers: [routeObserver],
+        debugShowCheckedModeBanner: false,
+        title: 'Shuffl',
+        theme: ThemeData(
+          scaffoldBackgroundColor: kBackgroundColor,
+          primaryColor: kPrimaryColor,
+          textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        home: const Login(),
+      );
+    }
+  }
+}
+
+class CreateProfileRedirect extends StatefulWidget {
+  const CreateProfileRedirect({Key? key}) : super(key: key);
+
+  @override
+  _CreateProfileRedirectState createState() => _CreateProfileRedirectState();
+}
+
+class _CreateProfileRedirectState extends State<CreateProfileRedirect> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const CreateProfile(),
+        ),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
       ),
-      home: _user != null ? const HomePage() : const Login(),
     );
   }
 }
