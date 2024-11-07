@@ -1,3 +1,4 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/login/login.dart';
@@ -45,6 +46,7 @@ class _MyAppState extends State<MyApp> {
   bool _isLoading = true;
   User? _user;
   bool _isProfileComplete = false;
+  bool _isEmailPasswordUser = false; 
 
   @override
   void initState() {
@@ -56,17 +58,26 @@ class _MyAppState extends State<MyApp> {
     await _checkRememberMe();
     FirebaseAuth.instance.authStateChanges().listen((User? user) async {
       if (user != null) {
-        if (!user.emailVerified) {
+        // Determine if the user signed in with email/password
+        List<UserInfo> providers = user.providerData;
+        _isEmailPasswordUser =
+            providers.any((provider) => provider.providerId == 'password');
+
+        if (_isEmailPasswordUser && !user.emailVerified) {
+          // User signed in with email/password and hasn't verified email
           setState(() {
             _user = user;
             _isProfileComplete = false;
             _isLoading = false;
           });
-          return;
+          return; // Exit early to stay on VerificationScreen
         }
 
-        DocumentSnapshot userDoc =
-            await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        // For Google, Apple, or email/password users with verified email, check Firestore
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         if (userDoc.exists) {
           Map<String, dynamic> data = userDoc.data() as Map<String, dynamic>;
           bool hasRequiredFields = data.containsKey('fullName') &&
@@ -132,18 +143,33 @@ class _MyAppState extends State<MyApp> {
           home: const HomePage(),
         );
       } else {
-        return MaterialApp(
-          navigatorObservers: [routeObserver],
-          debugShowCheckedModeBanner: false,
-          title: 'Shuffl',
-          theme: ThemeData(
-            scaffoldBackgroundColor: kBackgroundColor,
-            primaryColor: kPrimaryColor,
-            textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
-            visualDensity: VisualDensity.adaptivePlatformDensity,
-          ),
-          home: CreateProfileRedirect(),
-        );
+        if (_isEmailPasswordUser) {
+          return MaterialApp(
+            navigatorObservers: [routeObserver],
+            debugShowCheckedModeBanner: false,
+            title: 'Shuffl',
+            theme: ThemeData(
+              scaffoldBackgroundColor: kBackgroundColor,
+              primaryColor: kPrimaryColor,
+              textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
+              visualDensity: VisualDensity.adaptivePlatformDensity,
+            ),
+            home: const VerificationScreen(),
+          );
+        } else {
+          return MaterialApp(
+            navigatorObservers: [routeObserver],
+            debugShowCheckedModeBanner: false,
+            title: 'Shuffl',
+            theme: ThemeData(
+              scaffoldBackgroundColor: kBackgroundColor,
+              primaryColor: kPrimaryColor,
+              textTheme: Theme.of(context).textTheme.apply(bodyColor: kTextColor),
+              visualDensity: VisualDensity.adaptivePlatformDensity,
+            ),
+            home: CreateProfileRedirect(),
+          );
+        }
       }
     } else {
       return MaterialApp(
