@@ -18,6 +18,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
   bool isEmailVerified = false;
   bool isChecking = false;
 
+  Timer? emailCheckTimer;
+
   bool canResendEmail = true;
   int resendCooldown = 0; 
   Timer? resendTimer;
@@ -28,10 +30,15 @@ class _VerificationScreenState extends State<VerificationScreen> {
     user = _auth.currentUser;
     isChecking = true;
     checkEmailVerified();
+
+    emailCheckTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      checkEmailVerified();
+    });
   }
 
   @override
   void dispose() {
+    emailCheckTimer?.cancel();
     resendTimer?.cancel();
     super.dispose();
   }
@@ -43,6 +50,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       setState(() {
         isEmailVerified = true;
       });
+      emailCheckTimer?.cancel();
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const CreateProfile()),
@@ -75,8 +83,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
       setState(() {
         canResendEmail = false;
-        resendCooldown = 30; 
+        resendCooldown = 60; 
       });
+
 
       resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
@@ -100,14 +109,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBackgroundColor, // Set the background color
+      backgroundColor: kBackgroundColor, 
       appBar: AppBar(
-        backgroundColor: kBackgroundColor, // Match the AppBar background color
+        backgroundColor: kBackgroundColor, 
         title: const Text(
           'Email Verification',
           style: TextStyle(
-            color: Colors.white, // Set the text color to white
-            fontWeight: FontWeight.bold, // Make the text bold
+            color: Colors.white, 
+            fontWeight: FontWeight.bold, 
           ),
         ),
       ),
@@ -138,14 +147,19 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       onPressed:
                           canResendEmail ? _resendVerificationEmail : null,
                       style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.black, backgroundColor: Colors.white, 
                         padding: const EdgeInsets.symmetric(
                             horizontal: 24, vertical: 12),
                         textStyle: const TextStyle(fontSize: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: canResendEmail
                           ? const Text('Resend Verification Email')
                           : Text(
-                              'Resend Verification Email (${resendCooldown}s)',
+                              'Resend in ${resendCooldown}s',
+                              style: const TextStyle(color: Colors.black),
                             ),
                     ),
                     if (!canResendEmail)
@@ -156,21 +170,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
                           style: const TextStyle(color: Colors.red),
                         ),
                       ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          isChecking = true;
-                        });
-                        checkEmailVerified();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 12),
-                        textStyle: const TextStyle(fontSize: 16),
-                      ),
-                      child: const Text('I have verified my email'),
-                    ),
                   ],
                 ),
             ],
