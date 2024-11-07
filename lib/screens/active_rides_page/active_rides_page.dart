@@ -493,7 +493,7 @@ void _loadUserProfile() async {
       
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
-        print('Response body: $jsonResponse');
+        //print('Response body: $jsonResponse');
         
         if (jsonResponse['routes'].isNotEmpty) {
           final route = jsonResponse['routes'][0];

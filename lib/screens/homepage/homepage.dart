@@ -183,7 +183,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
       if (userProfile.exists) {
         setState(() {
-          goOnline = userProfile['visibilityOption'] ?? 'offline';
+          goOnline = userProfile['goOnline'] ?? 'offline';
         });
       }
     }
@@ -222,44 +222,47 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   void _loadUserProfile() async {
-    User? user = _auth.currentUser;
-    LatLng defaultPosition = LatLng(37.8715, -122.2730); // Default to Berkeley
+  User? user = _auth.currentUser;
+  LatLng defaultPosition = LatLng(37.8715, -122.2730); // Default to Berkeley
 
-    if (user != null) {
-      DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
+  if (user != null) {
+    DocumentSnapshot userProfile = await _firestore.collection('users').doc(user.uid).get();
 
-      if (userProfile.exists && userProfile['lastPickupLocation'] != null) {
-        // Fetch position from Firestore
-        GeoPoint geoPoint = userProfile['lastPickupLocation'];
-        currentPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
-      } else {
-        try {
-          // Get user's current position
-          Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-          currentPosition = LatLng(position.latitude, position.longitude);
+    // Access the data map from the document snapshot
+    Map<String, dynamic>? data = userProfile.data() as Map<String, dynamic>?;
 
-          // Save to Firestore
-          await _firestore.collection('users').doc(user.uid).update({
-            'lastPickupLocation': GeoPoint(position.latitude, position.longitude),
-          });
-        } catch (e) {
-          // Use default position if unable to get current location
-          currentPosition = defaultPosition;
-        }
-      }
-
-      setState(() {
-        _profileImageUrl = userProfile['imageUrl'];
-        _username = userProfile['username'];
-        _fullName = userProfile['fullName'] ?? 'Shuffl User'; 
-      });
+    if (userProfile.exists && data != null && data.containsKey('lastPickupLocation') && data['lastPickupLocation'] != null) {
+      // Fetch position from Firestore
+      GeoPoint geoPoint = data['lastPickupLocation'];
+      currentPosition = LatLng(geoPoint.latitude, geoPoint.longitude);
     } else {
-      // Use default position if user is null
-      setState(() {
+      try {
+        // Get user's current position
+        Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        currentPosition = LatLng(position.latitude, position.longitude);
+
+        // Save to Firestore
+        await _firestore.collection('users').doc(user.uid).update({
+          'lastPickupLocation': GeoPoint(position.latitude, position.longitude),
+        });
+      } catch (e) {
+        // Use default position if unable to get current location
         currentPosition = defaultPosition;
-      });
+      }
     }
+
+    setState(() {
+      _profileImageUrl = data?['imageUrl'];
+      _username = data?['username'];
+      _fullName = data?['fullName'] ?? 'Shuffl User'; 
+    });
+  } else {
+    // Use default position if user is null
+    setState(() {
+      currentPosition = defaultPosition;
+    });
   }
+}
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;

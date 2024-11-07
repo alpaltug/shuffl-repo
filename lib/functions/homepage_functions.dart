@@ -328,6 +328,7 @@ class HomePageFunctions {
 
             // Iterate through the list of participants in the ride
             for (String participantId in participants) {
+                print('Processing participant: $participantId');
                 DocumentSnapshot doc = await firestore.collection('users').doc(participantId).get();
                 // Get the participant's document from the 'users' collection
                 if (!doc.exists) continue;
@@ -344,6 +345,9 @@ class HomePageFunctions {
                 } else if (otherUserVisibility is! String) {
                     otherUserVisibility = 'offline';
                 }
+                print('Other user visibility: $otherUserVisibility');
+
+
 
                 // Determine if the current user should see this user based on visibility settings
                 // bool shouldDisplay = await _shouldDisplayUser(
@@ -356,11 +360,12 @@ class HomePageFunctions {
                 // );
                 // print('Username is: $username | Should display: $shouldDisplay | Visibility: $otherUserVisibility');
 
-                if (true) {
+                if (otherUserVisibility != 'offline') {
 
                     // Check if the user has a valid lastPickupLocation and is marked as 'ready' in readyStatus
-                    if (userData['lastPickupLocation'] != null && rideData['readyStatus'][participantId] == false) {
+                    if (userData['lastPickupLocation'] != null) {
                         GeoPoint location = userData['lastPickupLocation'];
+                        print('Location: $location');
 
                         LatLng otherUserPosition = LatLng(location.latitude, location.longitude);
 
