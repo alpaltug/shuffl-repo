@@ -38,14 +38,15 @@ class _TutorialComponentState extends State<TutorialComponent> {
         "• Friends",
         "• Tags (Organizations)",
         "• Offline",
+        "• Tags and Friends",
       ],
       icon: CupertinoIcons.eye,
     ),
     TutorialStep(
       title: "Finding a Ride",
       content: [
-        "Toggle 'Go Online' to start searching for rides.",
-        "Enter pickup and drop-off locations to match with others going your way.",
+        "Schedule a ride in advance or find one instantly based on your preferences.",
+        "Simply enter your pickup and drop-off locations to match with others heading in the same direction.",
       ],
       icon: CupertinoIcons.search,
     ),
