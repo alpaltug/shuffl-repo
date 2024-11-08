@@ -30,6 +30,9 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
   String? _pickupFilter;
   String? _dropoffFilter;
 
+  LatLng? _pickupCoordinates;
+  LatLng? _dropoffCoordinates;
+
   late Future<List<DocumentSnapshot>> _filteredRidesFuture;
 
   final TextEditingController _pickupController = TextEditingController();
@@ -326,38 +329,89 @@ class _FilteredRidesPageState extends State<FilteredRidesPage> {
 
       DateTime now = DateTime.now();
       QuerySnapshot snapshot = await _firestore.collection('rides').orderBy('timeOfRide').get();
-      List<DocumentSnapshot> filteredRides = [];
+      List<Map<String, dynamic>> rideDataList = [];
 
-      for (var ride in snapshot.docs) {
+      for (var rideDoc in snapshot.docs) {
+        Map<String, dynamic> ride = rideDoc.data() as Map<String, dynamic>;
+
         bool isComplete = ride['isComplete'] ?? false;
         List<String> participants = List<String>.from(ride['participants']);
         bool containsBlockedUser = participants.any((participant) => blockedUsers.contains(participant) || blockedBy.contains(participant));
 
         if (!isComplete && !participants.contains(currentUser.uid) && !containsBlockedUser) {
-          if (_pickupFilter != null || _dropoffFilter != null) {
-            bool pickupMatch = await _matchesLocation(_pickupFilter, ride['pickupLocations']);
-            bool dropoffMatch = await _matchesLocation(_dropoffFilter, ride['dropoffLocations']);
-            if ((_pickupFilter == null || pickupMatch) && (_dropoffFilter == null || dropoffMatch)) {
-              filteredRides.add(ride);
-            }
-          } else {
-            filteredRides.add(ride);
+          double totalDistance = 0;
+
+          // Calculate distance to user's pickup location
+          if (_pickupFilter != null && _pickupFilter!.isNotEmpty) {
+            double distance = await _calculateMinimumDistance(
+              _pickupFilter!,
+              ride['pickupLocations'].values.toList(),
+            );
+            totalDistance += distance;
           }
+
+          // Calculate distance to user's dropoff location
+          if (_dropoffFilter != null && _dropoffFilter!.isNotEmpty) {
+            double distance = await _calculateMinimumDistance(
+              _dropoffFilter!,
+              ride['dropoffLocations'].values.toList(),
+            );
+            totalDistance += distance;
+          }
+
+          // Add totalDistance to ride data
+          ride['totalDistance'] = totalDistance;
+          ride['documentReference'] = rideDoc.reference;
+          rideDataList.add(ride);
         }
       }
 
-      for (var ride in snapshot.docs) {
-        DateTime timeOfRide = ride['timeOfRide'].toDate();
+      // Sort the rides by totalDistance
+      rideDataList.sort((a, b) {
+        return (a['totalDistance'] as double).compareTo(b['totalDistance'] as double);
+      });
+
+      // Remove old rides from the database
+      for (var rideDoc in snapshot.docs) {
+        DateTime timeOfRide = rideDoc['timeOfRide'].toDate();
         if (timeOfRide.isBefore(now.subtract(const Duration(hours: 24)))) {
-          await ride.reference.delete();
+          await rideDoc.reference.delete();
         }
       }
 
-      return filteredRides;
+      // Convert rideDataList back to List<DocumentSnapshot>
+      List<DocumentSnapshot> sortedRideDocs = [];
+      for (var rideData in rideDataList) {
+        DocumentSnapshot rideDoc = await rideData['documentReference'].get();
+        sortedRideDocs.add(rideDoc);
+      }
+
+      return sortedRideDocs;
     } catch (e) {
       print('Error fetching rides: $e');
       return [];
     }
+  }
+
+
+  Future<double> _calculateMinimumDistance(String address, List<dynamic> rideLocations) async {
+    LatLng addressLatLng = await _getLatLngFromAddress(address);
+    double minDistance = double.infinity;
+
+    for (var location in rideLocations) {
+      LatLng rideLatLng = await _getLatLngFromAddress(location.toString());
+      double distanceInMeters = Geolocator.distanceBetween(
+        addressLatLng.latitude,
+        addressLatLng.longitude,
+        rideLatLng.latitude,
+        rideLatLng.longitude,
+      );
+      if (distanceInMeters < minDistance) {
+        minDistance = distanceInMeters;
+      }
+    }
+
+    return minDistance / 1000; // Convert to kilometers
   }
 
   Future<bool> _matchesLocation(String? filter, Map<String, dynamic> locations) async {

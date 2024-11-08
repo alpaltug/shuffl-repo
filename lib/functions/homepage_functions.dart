@@ -46,7 +46,7 @@ class HomePageFunctions {
 
         // Update the user's visibility option in Firestore
         await firestore.collection('users').doc(user.uid).update({
-        'visibilityOption': visibilityOption,
+        'goOnline': visibilityOption,
         'lastPickupLocation': currentPosition != null
             ? GeoPoint(currentPosition.latitude, currentPosition.longitude)
             : null,
