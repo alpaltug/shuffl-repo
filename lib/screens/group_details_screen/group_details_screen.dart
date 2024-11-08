@@ -9,12 +9,15 @@ import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart'
 
 class GroupDetailScreen extends StatefulWidget {
   final String chatId;
+  final String chatType; 
   final bool isReferralGroup;
 
-  GroupDetailScreen({
+  const GroupDetailScreen({
     required this.chatId,
+    required this.chatType,
     required this.isReferralGroup,
-  });
+    Key? key,
+  }) : super(key: key);
 
   @override
   _GroupDetailScreenState createState() => _GroupDetailScreenState();
@@ -44,9 +47,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
     try {
       DocumentSnapshot chatDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('chats')
+          .collection('${widget.chatType}_chats')
           .doc(widget.chatId)
           .get();
 
@@ -63,7 +64,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       List<String> participantUids = List<String>.from(chatDoc['participants'] ?? []);
 
       List<DocumentSnapshot> participantDocs = [];
-      const int batchSize = 10; 
+      const int batchSize = 10;
 
       for (int i = 0; i < participantUids.length; i += batchSize) {
         final batch = participantUids.skip(i).take(batchSize).toList();
@@ -84,7 +85,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading group details: $e')),
+        SnackBar(content: Text('Error loading participants: $e')),
       );
     }
   }
@@ -94,87 +95,132 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     if (currentUser == null) return;
 
     try {
-      DocumentSnapshot userChatDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('chats')
+      DocumentSnapshot chatDoc = await _firestore
+          .collection('${widget.chatType}_chats')
           .doc(widget.chatId)
           .get();
 
-      if (!userChatDoc.exists) {
+      if (!chatDoc.exists) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Chat does not exist.')),
         );
         return;
       }
 
-      List<String> participants = List<String>.from(userChatDoc['participants'] ?? []);
+      List<String> participants = List<String>.from(chatDoc['participants'] ?? []);
 
       participants.remove(currentUser.uid);
 
+      String displayName = 'A user'; 
+
       DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-      String displayName = userDoc['username'] ?? 'A user';
+      if (userDoc.exists) {
+        displayName = userDoc['username'] ?? 'A user';
+      }
 
-      for (String uid in participants) {
-        DocumentReference chatRef = _firestore
+      if (participants.length <= 1) {
+        await _firestore.collection('${widget.chatType}_chats').doc(widget.chatId).delete();
+
+        if (participants.isNotEmpty) {
+          String remainingUserUid = participants.first;
+          await _firestore
+              .collection('users')
+              .doc(remainingUserUid)
+              .collection('userChats')
+              .doc(widget.chatId)
+              .delete();
+        }
+
+        await _firestore
             .collection('users')
-            .doc(uid)
-            .collection('chats')
-            .doc(widget.chatId);
+            .doc(currentUser.uid)
+            .collection('userChats')
+            .doc(widget.chatId)
+            .delete();
 
-        DocumentSnapshot chatSnapshot = await chatRef.get();
-        if (chatSnapshot.exists) {
-          await chatRef.update({
-            'participants': participants,
-            'lastMessage': {
-              'content': '@$displayName has left the group',
-              'timestamp': FieldValue.serverTimestamp(),
-            },
-          });
+        // If it's a referral group, handle additional logic
+        if (widget.isReferralGroup && widget.chatType == 'referral') {
+          QuerySnapshot referralQuery = await _firestore
+              .collection('referral_codes')
+              .where('group_chat_id', isEqualTo: widget.chatId)
+              .get();
 
-          await chatRef.collection('messages').add({
+          if (referralQuery.docs.isNotEmpty) {
+            DocumentSnapshot referralDoc = referralQuery.docs.first;
+            await referralDoc.reference.delete();
+          } else {
+            print('No referral_codes document found for chatId: ${widget.chatId}');
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Group chat deleted as it has only one participant left.')),
+        );
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (Route<dynamic> route) => false,
+        );
+
+        return;
+      } else {
+        await _firestore
+            .collection('${widget.chatType}_chats')
+            .doc(widget.chatId)
+            .update({
+          'participants': participants,
+          'lastMessage': {
             'content': '@$displayName has left the group',
             'timestamp': FieldValue.serverTimestamp(),
-            'senderId': 'system',
-          });
-        }
-      }
+          },
+        });
 
-      if (widget.isReferralGroup) {
-        QuerySnapshot referralQuery = await _firestore
-            .collection('referral_codes')
-            .where('group_chat_id', isEqualTo: widget.chatId)
-            .get();
+        await _firestore
+            .collection('${widget.chatType}_chats')
+            .doc(widget.chatId)
+            .collection('messages')
+            .add({
+          'senderId': 'system',
+          'content': '@$displayName has left the group',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
 
-        if (referralQuery.docs.isNotEmpty) {
-          DocumentSnapshot referralDoc = referralQuery.docs.first;
-          List<dynamic> referralParticipants = referralDoc['participants'] ?? [];
+        await _firestore
+            .collection('users')
+            .doc(currentUser.uid)
+            .collection('userChats')
+            .doc(widget.chatId)
+            .delete();
 
-          referralParticipants.remove(currentUser.uid);
+        if (widget.isReferralGroup && widget.chatType == 'referral') {
+          QuerySnapshot referralQuery = await _firestore
+              .collection('referral_codes')
+              .where('group_chat_id', isEqualTo: widget.chatId)
+              .get();
 
-          await referralDoc.reference.update({
-            'participants': referralParticipants,
-          });
+          if (referralQuery.docs.isNotEmpty) {
+            DocumentSnapshot referralDoc = referralQuery.docs.first;
+            List<dynamic> referralParticipants = referralDoc['participants'] ?? [];
 
-          if (referralParticipants.isEmpty) {
-            await referralDoc.reference.delete();
+            referralParticipants.remove(currentUser.uid);
+
+            await referralDoc.reference.update({
+              'participants': referralParticipants,
+            });
+
+            if (referralParticipants.isEmpty) {
+              await referralDoc.reference.delete();
+            }
+          } else {
+            print('No referral_codes document found for chatId: ${widget.chatId}');
           }
-        } else {
-          print('No referral_codes document found for chatId: ${widget.chatId}');
         }
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (Route<dynamic> route) => false,
+        );
       }
-
-      await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('chats')
-          .doc(widget.chatId)
-          .delete();
-
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomePage()),
-        (Route<dynamic> route) => false,
-      );
     } catch (e) {
       print('Error leaving group: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -184,10 +230,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   }
 
   ImageProvider<Object> _getProfileImage(String? imageUrl) {
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return const AssetImage('assets/icons/ShuffleLogo.jpeg');
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return NetworkImage(imageUrl);
     }
-    return NetworkImage(imageUrl);
+    return const AssetImage('assets/icons/ShuffleLogo.jpeg');
   }
 
   @override
@@ -208,7 +254,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         elevation: 1,
         title: const Text(
           'Group Details',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
         actions: [
           if (!widget.isReferralGroup)
@@ -220,6 +270,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   MaterialPageRoute(
                     builder: (context) => AddUsersToGroupScreen(
                       chatId: widget.chatId,
+                      chatType: widget.chatType,
                       currentParticipants: _participants,
                     ),
                   ),
@@ -277,7 +328,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                minimumSize: const Size(double.infinity, 50), 
+                minimumSize: const Size(double.infinity, 50),
               ),
               child: const Text(
                 'Leave Group',

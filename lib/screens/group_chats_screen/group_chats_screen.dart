@@ -9,8 +9,9 @@ import 'package:my_flutter_app/widgets/loading_widget.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String chatId;
+  final String chatType; 
 
-  GroupChatScreen({required this.chatId});
+  const GroupChatScreen({required this.chatId, required this.chatType, Key? key}) : super(key: key);
 
   @override
   _GroupChatScreenState createState() => _GroupChatScreenState();
@@ -20,95 +21,25 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _controller = TextEditingController();
-  
+
   List<DocumentSnapshot> _participants = [];
   String? currentUserImageUrl;
   String? groupTitle;
   bool _isLoading = true;
-  bool _isParticipantsLoaded = false;
   bool _isReferralGroup = false;
 
   @override
   void initState() {
     super.initState();
+    _loadGroupDetails();
     _loadParticipants();
     _loadCurrentUserImage();
-    _loadGroupDetails();
-  }
-
-  Future<void> _loadParticipants() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
-    try {
-      DocumentSnapshot chatDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('chats')
-          .doc(widget.chatId)
-          .get();
-
-      if (!chatDoc.exists) {
-        setState(() {
-          _isParticipantsLoaded = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Chat does not exist.')),
-        );
-        return;
-      }
-
-      List<String> participantUids = List<String>.from(chatDoc['participants']);
-
-      List<DocumentSnapshot> participantDocs = [];
-      for (String uid in participantUids) {
-        DocumentSnapshot userDoc = await _firestore.collection('users').doc(uid).get();
-        if (userDoc.exists) {
-          participantDocs.add(userDoc);
-        }
-      }
-
-      setState(() {
-        _participants = participantDocs;
-        _isParticipantsLoaded = true;
-      });
-    } catch (e) {
-      print('Error loading participants: $e');
-      setState(() {
-        _isParticipantsLoaded = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading group details: $e')),
-      );
-    }
-  }
-
-  Future<void> _loadCurrentUserImage() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser != null) {
-      try {
-        DocumentSnapshot currentUserDoc =
-            await _firestore.collection('users').doc(currentUser.uid).get();
-        if (currentUserDoc.exists) {
-          setState(() {
-            currentUserImageUrl = currentUserDoc['imageUrl'];
-          });
-        }
-      } catch (e) {
-        print('Error loading current user image: $e');
-      }
-    }
   }
 
   Future<void> _loadGroupDetails() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
     try {
       DocumentSnapshot chatDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('chats')
+          .collection('${widget.chatType}_chats')
           .doc(widget.chatId)
           .get();
 
@@ -117,7 +48,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
         setState(() {
           groupTitle = chatData?['groupTitle'] ?? 'Group Chat';
-          _isReferralGroup = chatData?['isReferralGroup'] ?? false;
+          _isReferralGroup = widget.chatType == 'referral';
           _isLoading = false;
         });
       } else {
@@ -139,6 +70,68 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
+  Future<void> _loadParticipants() async {
+    try {
+      DocumentSnapshot chatDoc = await _firestore
+          .collection('${widget.chatType}_chats')
+          .doc(widget.chatId)
+          .get();
+
+      if (!chatDoc.exists) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chat does not exist.')),
+        );
+        return;
+      }
+
+      List<String> participantUids = List<String>.from(chatDoc['participants'] ?? []);
+
+      List<DocumentSnapshot> participantDocs = [];
+      const int batchSize = 10;
+
+      for (int i = 0; i < participantUids.length; i += batchSize) {
+        final batch = participantUids.skip(i).take(batchSize).toList();
+        QuerySnapshot querySnapshot = await _firestore
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+        participantDocs.addAll(querySnapshot.docs);
+      }
+
+      setState(() {
+        _participants = participantDocs;
+      });
+    } catch (e) {
+      print('Error loading participants: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading participants: $e')),
+      );
+    }
+  }
+
+  Future<void> _loadCurrentUserImage() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      try {
+        DocumentSnapshot currentUserDoc =
+            await _firestore.collection('users').doc(currentUser.uid).get();
+        if (currentUserDoc.exists) {
+          setState(() {
+            currentUserImageUrl = currentUserDoc['imageUrl'];
+          });
+        }
+      } catch (e) {
+        print('Error loading current user image: $e');
+      }
+    }
+  }
+
   void _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
 
@@ -148,33 +141,25 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     String messageContent = _controller.text.trim();
 
     try {
-      for (String uid in _participants.map((doc) => doc.id)) {
-        await _firestore
-            .collection('users')
-            .doc(uid)
-            .collection('chats')
-            .doc(widget.chatId)
-            .collection('messages')
-            .add({
-          'senderId': currentUser.uid,
+      await _firestore
+          .collection('${widget.chatType}_chats')
+          .doc(widget.chatId)
+          .collection('messages')
+          .add({
+        'senderId': currentUser.uid,
+        'content': messageContent,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      await _firestore
+          .collection('${widget.chatType}_chats')
+          .doc(widget.chatId)
+          .update({
+        'lastMessage': {
           'content': messageContent,
           'timestamp': FieldValue.serverTimestamp(),
-        });
-      }
-
-      for (String uid in _participants.map((doc) => doc.id)) {
-        await _firestore
-            .collection('users')
-            .doc(uid)
-            .collection('chats')
-            .doc(widget.chatId)
-            .update({
-          'lastMessage': {
-            'content': messageContent,
-            'timestamp': FieldValue.serverTimestamp(),
-          },
-        });
-      }
+        },
+      });
 
       _controller.clear();
     } catch (e) {
@@ -194,7 +179,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || !_isParticipantsLoaded) {
+    if (_isLoading || _participants.isEmpty) {
       return Scaffold(
         backgroundColor: kBackgroundColor,
         body: const Center(
@@ -219,6 +204,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               MaterialPageRoute(
                 builder: (context) => GroupDetailScreen(
                   chatId: widget.chatId,
+                  chatType: widget.chatType,
                   isReferralGroup: _isReferralGroup,
                 ),
               ),
@@ -255,133 +241,118 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _participants.isEmpty
-                ? const Center(child: Text('No participants found.'))
-                : StreamBuilder<QuerySnapshot>(
-                    stream: _firestore
-                        .collection('users')
-                        .doc(_auth.currentUser!.uid)
-                        .collection('chats')
-                        .doc(widget.chatId)
-                        .collection('messages')
-                        .orderBy('timestamp', descending: true)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const Center(
-                          child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'),
-                        );
-                      }
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('${widget.chatType}_chats')
+                  .doc(widget.chatId)
+                  .collection('messages')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'),
+                  );
+                }
 
-                      var messages = snapshot.data!.docs;
-                      User? currentUser = _auth.currentUser;
+                var messages = snapshot.data!.docs;
+                User? currentUser = _auth.currentUser;
 
-                      return ListView.builder(
-                        reverse: true,
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          var message = messages[index];
-                          var senderId = message['senderId'] ?? '';
-                          var content = message['content'] ?? '';
-                          var isMe = senderId == currentUser?.uid;
+                return ListView.builder(
+                  reverse: true,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    var message = messages[index];
+                    var senderId = message['senderId'] ?? '';
+                    var content = message['content'] ?? '';
+                    var isMe = senderId == currentUser?.uid;
 
-                          if (senderId == 'system') {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                              child: Center(
-                                child: Text(
-                                  content,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
-                            );
-                          } else {
-                            List<DocumentSnapshot> matchingParticipants = _participants
-                                .where((p) => p.id == senderId)
-                                .toList();
-
-                            String senderName;
-                            String? senderImageUrl;
-
-                            if (matchingParticipants.isNotEmpty) {
-                              var sender = matchingParticipants.first;
-                              senderName = sender['username'] ?? 'User';
-                              senderImageUrl = sender['imageUrl'];
-                            } else {
-                              // Handle the case where the sender is not found
-                              senderName = 'User';
-                              senderImageUrl = null;
-                            }
-
-                            return ListTile(
-                              contentPadding:
-                                  const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                              title: !isMe
-                                  ? Text(
-                                      senderName,
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.black54),
-                                    )
-                                  : null,
-                              trailing: isMe
-                                  ? GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => const UserProfile(),
-                                          ),
-                                        );
-                                      },
-                                      child: CircleAvatar(
-                                        backgroundImage: _getProfileImage(currentUserImageUrl),
-                                      ),
-                                    )
-                                  : null,
-                              leading: !isMe
-                                  ? GestureDetector(
-                                      onTap: () {
-                                        if (matchingParticipants.isNotEmpty) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  ViewUserProfile(uid: senderId),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      child: CircleAvatar(
-                                        backgroundImage: _getProfileImage(senderImageUrl),
-                                      ),
-                                    )
-                                  : null,
-                              subtitle: Align(
-                                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: isMe ? Colors.blue : Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    content,
-                                    style: TextStyle(color: isMe ? Colors.white : Colors.black),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                        },
+                    if (senderId == 'system') {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                        child: Center(
+                          child: Text(
+                            content,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
                       );
-                    },
-                  ),
+                    } else {
+                      String? senderName;
+                      String? senderImageUrl;
+
+                      _firestore.collection('users').doc(senderId).get().then((senderDoc) {
+                        if (senderDoc.exists) {
+                          setState(() {
+                            senderName = senderDoc['username'] ?? 'User';
+                            senderImageUrl = senderDoc['imageUrl'];
+                          });
+                        } else {
+                          setState(() {
+                            senderName = 'User';
+                            senderImageUrl = null;
+                          });
+                        }
+                      });
+
+                      return ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                        title: Align(
+                          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isMe ? Colors.blue : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey),
+                            ),
+                            child: Text(
+                              content,
+                              style: TextStyle(color: isMe ? Colors.white : Colors.black),
+                            ),
+                          ),
+                        ),
+                        trailing: isMe
+                            ? GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const UserProfile(),
+                                    ),
+                                  );
+                                },
+                                child: CircleAvatar(
+                                  backgroundImage: _getProfileImage(currentUserImageUrl),
+                                ),
+                              )
+                            : null,
+                        leading: !isMe
+                            ? GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ViewUserProfile(uid: senderId),
+                                    ),
+                                  );
+                                },
+                                child: CircleAvatar(
+                                  backgroundImage: _getProfileImage(senderImageUrl),
+                                ),
+                              )
+                            : null,
+                      );
+                    }
+                  },
+                );
+              },
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(20.0),

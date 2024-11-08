@@ -4,9 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/group_chats_screen/group_chats_screen.dart';
 import 'package:my_flutter_app/screens/friend_chat_screen/friend_chat_screen.dart';
+import 'package:my_flutter_app/widgets/loading_widget.dart';
 
 class CreateChatScreen extends StatefulWidget {
-  const CreateChatScreen({super.key});
+  const CreateChatScreen({Key? key}) : super(key: key);
 
   @override
   _CreateChatScreenState createState() => _CreateChatScreenState();
@@ -17,6 +18,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<String> _selectedFriends = [];
   String? _groupTitle;
+  bool _isCreatingChat = false;
 
   Future<List<Map<String, dynamic>>> _getFriends() async {
     User? currentUser = _auth.currentUser;
@@ -41,117 +43,145 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   }
 
   Future<void> _createChat() async {
-  if (_selectedFriends.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please select at least one friend to create a chat.')),
-    );
-    return;
-  }
-
-  User? currentUser = _auth.currentUser;
-  if (currentUser == null) return;
-
-  if (_selectedFriends.length == 1) {
-    String friendUid = _selectedFriends[0];
-    String chatId = _getChatId(currentUser.uid, friendUid);
-
-    DocumentSnapshot chatSnapshot = await _firestore
-        .collection('users')
-        .doc(currentUser.uid)
-        .collection('chats')
-        .doc(chatId)
-        .get();
-
-    if (chatSnapshot.exists) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => ChatScreen(friendUid: friendUid)),
-      );
-    } else {
-      await _createOneOnOneChat(currentUser.uid, friendUid, chatId);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => ChatScreen(friendUid: friendUid)),
-      );
-    }
-  } else {
-    if (_groupTitle == null || _groupTitle!.isEmpty) {
+    if (_selectedFriends.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a group title.')),
+        const SnackBar(content: Text('Please select at least one friend to create a chat.')),
       );
       return;
     }
 
-    List<String> participants = [currentUser.uid, ..._selectedFriends];
-    String chatId = DateTime.now().millisecondsSinceEpoch.toString(); 
+    setState(() {
+      _isCreatingChat = true;
+    });
 
-    Map<String, dynamic> newChatData = {
-      'participants': participants,
-      'groupTitle': _groupTitle,
-      'isGroupChat': true,
-      'lastMessage': {
-        'content': 'Group created',
-        'timestamp': FieldValue.serverTimestamp(),
-      },
-    };
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
 
-    for (String uid in participants) {
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('chats')
-          .doc(chatId)
-          .set(newChatData);
-    }
+    if (_selectedFriends.length == 1) {
+      String friendUid = _selectedFriends[0];
+      String chatId = _getChatId(currentUser.uid, friendUid);
+      String chatType = 'user'; 
 
-    for (String uid in participants) {
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .add({
+      DocumentSnapshot chatSnapshot = await _firestore.collection('user_chats').doc(chatId).get();
+
+      if (chatSnapshot.exists) {
+        setState(() {
+          _isCreatingChat = false;
+        });
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              chatId: chatId,
+              chatType: chatType,
+            ),
+          ),
+        );
+      } else {
+        await _createOneOnOneChat(currentUser.uid, friendUid, chatId, chatType);
+        setState(() {
+          _isCreatingChat = false;
+        });
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              chatId: chatId,
+              chatType: chatType,
+            ),
+          ),
+        );
+      }
+    } else {
+      if (_groupTitle == null || _groupTitle!.isEmpty) {
+        setState(() {
+          _isCreatingChat = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a group title.')),
+        );
+        return;
+      }
+
+      List<String> participants = [currentUser.uid, ..._selectedFriends];
+      String chatId = _firestore.collection('user_chats').doc().id;
+      String chatType = 'user'; 
+
+      Map<String, dynamic> chatData = {
+        'participants': participants,
+        'isGroupChat': true,
+        'groupTitle': _groupTitle,
+        'isReferralChat': false,
+        'lastMessage': {
+          'content': 'Group created',
+          'timestamp': FieldValue.serverTimestamp(),
+        },
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection('user_chats').doc(chatId).set(chatData);
+
+      WriteBatch batch = _firestore.batch();
+      for (String uid in participants) {
+        DocumentReference userChatRef = _firestore
+            .collection('users')
+            .doc(uid)
+            .collection('userChats')
+            .doc(chatId);
+        batch.set(userChatRef, {'chatId': chatId, 'chatType': chatType});
+      }
+      await batch.commit();
+
+      await _firestore.collection('user_chats').doc(chatId).collection('messages').add({
         'senderId': 'system',
         'content': 'Group created',
         'timestamp': FieldValue.serverTimestamp(),
       });
-    }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => GroupChatScreen(chatId: chatId)),
-    );
+      setState(() {
+        _isCreatingChat = false;
+      });
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GroupChatScreen(
+            chatId: chatId,
+            chatType: chatType,
+          ),
+        ),
+      );
+    }
   }
-}
 
   String _getChatId(String uid1, String uid2) {
     return uid1.hashCode <= uid2.hashCode ? '$uid1-$uid2' : '$uid2-$uid1';
   }
 
-  Future<void> _createOneOnOneChat(String currentUserUid, String friendUid, String chatId) async {
+  Future<void> _createOneOnOneChat(String currentUserUid, String friendUid, String chatId, String chatType) async {
     Map<String, dynamic> chatData = {
       'participants': [currentUserUid, friendUid],
       'isGroupChat': false,
+      'isReferralChat': false,
       'lastMessage': {
         'content': '',
         'timestamp': FieldValue.serverTimestamp(),
       },
+      'createdAt': FieldValue.serverTimestamp(),
     };
 
-    await _firestore
-        .collection('users')
-        .doc(currentUserUid)
-        .collection('chats')
-        .doc(chatId)
-        .set(chatData);
+    await _firestore.collection('user_chats').doc(chatId).set(chatData);
 
-    await _firestore
-        .collection('users')
-        .doc(friendUid)
-        .collection('chats')
-        .doc(chatId)
-        .set(chatData);
+    WriteBatch batch = _firestore.batch();
+    batch.set(_firestore.collection('users').doc(currentUserUid).collection('userChats').doc(chatId), {
+      'chatId': chatId,
+      'chatType': chatType,
+    });
+    batch.set(_firestore.collection('users').doc(friendUid).collection('userChats').doc(chatId), {
+      'chatId': chatId,
+      'chatType': chatType,
+    });
+    await batch.commit();
   }
 
   @override
@@ -172,7 +202,19 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _getFriends(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          if (!snapshot.hasData && !snapshot.hasError) {
+            return const Center(
+              child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          }
+
+          if (snapshot.hasData && snapshot.data!.isEmpty) {
             return const Center(child: Text('No friends found.'));
           }
 
@@ -185,7 +227,9 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                   padding: const EdgeInsets.all(16.0),
                   child: TextField(
                     onChanged: (value) {
-                      _groupTitle = value;
+                      setState(() {
+                        _groupTitle = value;
+                      });
                     },
                     style: const TextStyle(color: Colors.black),
                     decoration: InputDecoration(
@@ -244,7 +288,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: ElevatedButton(
-                  onPressed: _createChat,
+                  onPressed: _isCreatingChat ? null : _createChat,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey,
                     foregroundColor: Colors.black,
@@ -253,7 +297,11 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 15),
                   ),
-                  child: const Text('Create Chat'),
+                  child: _isCreatingChat
+                      ? const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                        )
+                      : const Text('Create Chat'),
                 ),
               ),
             ],

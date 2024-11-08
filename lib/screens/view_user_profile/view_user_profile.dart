@@ -43,22 +43,32 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
   void _loadUserProfile() async {
     try {
       userProfile = await _firestore.collection('users').doc(widget.uid).get();
-      if (userProfile != null) {
+      if (userProfile != null && userProfile!.exists) {
         setState(() {
           _displayName = userProfile!['fullName'] ?? '';
           _username = userProfile!['username'] ?? '';
           _description = userProfile!['description'] ?? '';
           _imageUrl = userProfile!.data().toString().contains('imageUrl') ? userProfile!['imageUrl'] : null;
-          _averageRating = userProfile!['rating'] ?? 0.0;
+          _averageRating = userProfile!['rating'] != null ? (userProfile!['rating'] as num).toDouble() : 0.0;
           _numRides = userProfile!['numRides'] ?? 0;
           isLoading = false;
         });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User profile does not exist.')),
+        );
       }
     } catch (e) {
       print('Error loading user profile: $e');
       setState(() {
         isLoading = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading profile: $e')),
+      );
     }
   }
 
@@ -104,119 +114,122 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
   }
 
   void _addFriend() async {
-  User? currentUser = _auth.currentUser;
+    User? currentUser = _auth.currentUser;
 
-  if (currentUser == null) {
-    print('Current user is null in _addFriend');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('You need to be logged in to send a friend request.')),
-    );
-    return;
-  }
-
-  try {
-    // Add a notification document to the recipient's 'notifications' subcollection
-    await _firestore.collection('users').doc(widget.uid).collection('notifications').add({
-      'type': 'friend_request',
-      'fromUid': currentUser.uid,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-
-    setState(() {
-      isFriendRequestSent = true;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Friend request sent')),
-    );
-  } catch (e) {
-    print('Error sending friend request in _addFriend: $e');
-    String errorMessage = 'Failed to send friend request. Please try again.';
-    if (e is FirebaseException) {
-      print('Firebase Error Code: ${e.code}');
-      print('Firebase Error Message: ${e.message}');
-      if (e.code == 'unauthenticated') {
-        errorMessage = 'You need to be logged in to send a friend request. Please log out and log back in.';
-      }
+    if (currentUser == null) {
+      print('Current user is null in _addFriend');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You need to be logged in to send a friend request.')),
+      );
+      return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(errorMessage)),
-    );
+
+    try {
+      // Add a notification document to the recipient's 'notifications' subcollection
+      await _firestoreService.sendFriendRequest(currentUser.uid, widget.uid);
+
+      setState(() {
+        isFriendRequestSent = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Friend request sent')),
+      );
+    } catch (e) {
+      print('Error sending friend request in _addFriend: $e');
+      String errorMessage = 'Failed to send friend request. Please try again.';
+      if (e is FirebaseException) {
+        print('Firebase Error Code: ${e.code}');
+        print('Firebase Error Message: ${e.message}');
+        if (e.code == 'unauthenticated') {
+          errorMessage = 'You need to be logged in to send a friend request. Please log out and log back in.';
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    }
   }
-}
 
   Future<void> _unfriend() async {
     User? currentUser = _auth.currentUser;
 
     if (currentUser != null) {
-      await _firestore.collection('users').doc(currentUser.uid).update({
-        'friends': FieldValue.arrayRemove([widget.uid])
-      });
-      await _firestore.collection('users').doc(widget.uid).update({
-        'friends': FieldValue.arrayRemove([currentUser.uid])
-      });
+      try {
+        await _firestore.collection('users').doc(currentUser.uid).update({
+          'friends': FieldValue.arrayRemove([widget.uid])
+        });
+        await _firestore.collection('users').doc(widget.uid).update({
+          'friends': FieldValue.arrayRemove([currentUser.uid])
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unfriended successfully')),
-      );
-
-      setState(() {
-        isAlreadyFriend = false;
-      });
-    }
-  }
-
-  Future<void> _toggleBlockUser() async {
-  User? currentUser = _auth.currentUser;
-  if (currentUser != null) {
-    try {
-      DocumentReference currentUserRef = _firestore.collection('users').doc(currentUser.uid);
-      DocumentReference targetUserRef = _firestore.collection('users').doc(widget.uid);
-      
-      if (isBlocked) {
-        // Unblock user
-        await currentUserRef.update({
-          'blockedUsers': FieldValue.arrayRemove([widget.uid])
-        });
-        await targetUserRef.update({
-          'blockedBy': FieldValue.arrayRemove([currentUser.uid])
-        });
-        if (mounted) {
-          setState(() {
-            isBlocked = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('User unblocked successfully')),
-          );
-        }
-      } else {
-        // Block user
-        await currentUserRef.update({
-          'blockedUsers': FieldValue.arrayUnion([widget.uid])
-        });
-        await targetUserRef.update({
-          'blockedBy': FieldValue.arrayUnion([currentUser.uid])
-        });
-        if (mounted) {
-          setState(() {
-            isBlocked = true;
-          });
-          _unfriend();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('User blocked successfully')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        print('Error toggling block status: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update block status. Please try again.')),
+          const SnackBar(content: Text('Unfriended successfully')),
+        );
+
+        setState(() {
+          isAlreadyFriend = false;
+        });
+      } catch (e) {
+        print('Error unfriending: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to unfriend. Please try again.')),
         );
       }
     }
   }
-}
+
+  Future<void> _toggleBlockUser() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      try {
+        DocumentReference currentUserRef = _firestore.collection('users').doc(currentUser.uid);
+        DocumentReference targetUserRef = _firestore.collection('users').doc(widget.uid);
+        
+        if (isBlocked) {
+          // Unblock user
+          await currentUserRef.update({
+            'blockedUsers': FieldValue.arrayRemove([widget.uid])
+          });
+          await targetUserRef.update({
+            'blockedBy': FieldValue.arrayRemove([currentUser.uid])
+          });
+          if (mounted) {
+            setState(() {
+              isBlocked = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('User unblocked successfully')),
+            );
+          }
+        } else {
+          // Block user
+          await currentUserRef.update({
+            'blockedUsers': FieldValue.arrayUnion([widget.uid])
+          });
+          await targetUserRef.update({
+            'blockedBy': FieldValue.arrayUnion([currentUser.uid])
+          });
+          if (mounted) {
+            setState(() {
+              isBlocked = true;
+            });
+            await _unfriend();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('User blocked successfully')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          print('Error toggling block status: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update block status. Please try again.')),
+          );
+        }
+      }
+    }
+  }
 
   void _showUnfriendConfirmationDialog() {
     showDialog(
@@ -245,13 +258,40 @@ class _ViewUserProfileState extends State<ViewUserProfile> {
     );
   }
 
-  void _navigateToChat() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChatScreen(friendUid: widget.uid),
-      ),
-    );
+  void _navigateToChat() async {
+    User? currentUser = _auth.currentUser;
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You need to be logged in to chat.')),
+      );
+      return;
+    }
+
+    try {
+      // Generate chatId using FirestoreService
+      String chatId = _firestoreService.getChatID(currentUser.uid, widget.uid);
+      String chatType = 'user'; // Since it's a friend chat
+
+      // Create chat if it doesn't exist
+      await _firestoreService.createChat(currentUser.uid, widget.uid, chatType);
+
+      // Navigate to ChatScreen with required parameters
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatScreen(
+            chatId: chatId,
+            chatType: chatType,
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error navigating to chat: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open chat. Please try again.')),
+      );
+    }
   }
 
   void _showReportDialog(BuildContext context) {

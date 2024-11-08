@@ -3,29 +3,34 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<void> addUser(String uid, String email, {String? name}) async {
-  String domain = _extractDomainFromEmail(email);
-  bool isStudent = domain.endsWith('.edu');
+  static const String CHAT_TYPE_USER = 'user';
+  static const String CHAT_TYPE_REFERRAL = 'referral';
 
-  await _db.collection('users').doc(uid).set({
-    'email': email,
-    'name': name ?? '', 
-    'createdAt': FieldValue.serverTimestamp(),
-    'domain': domain,
-    'isStudent': isStudent,
-    'rating': null,
-    'numRides': 0,
-    'preferences': {
-      'ageRange': {'min': 18, 'max': 80},
-      'schoolToggle': false,
-      'sameGenderToggle': false,
-      'minCarCapacity': 2,
-      'maxCarCapacity': 5,
-    },
-    'friends': [], 
-    'tags': [], 
-  });
-}
+  Future<void> addUser(String uid, String email, {String? name}) async {
+    String domain = _extractDomainFromEmail(email);
+    bool isStudent = domain.endsWith('.edu');
+
+    await _db.collection('users').doc(uid).set({
+      'email': email,
+      'name': name ?? '',
+      'createdAt': FieldValue.serverTimestamp(),
+      'domain': domain,
+      'isStudent': isStudent,
+      'rating': null,
+      'numRides': 0,
+      'preferences': {
+        'ageRange': {'min': 18, 'max': 80},
+        'schoolToggle': false,
+        'sameGenderToggle': false,
+        'minCarCapacity': 2,
+        'maxCarCapacity': 5,
+      },
+      'friends': [],
+      'tags': [],
+      'blockedUsers': [],
+      'blockedBy': [],
+    });
+  }
 
   Future<void> updateUserProfile(
     String uid,
@@ -54,14 +59,12 @@ class FirestoreService {
   }
 
   Future<bool> checkIfUsernameExists(String username) async {
-    final result =
-        await _db.collection('users').where('username', isEqualTo: username).get();
+    final result = await _db.collection('users').where('username', isEqualTo: username).get();
     return result.docs.isNotEmpty;
   }
 
   Future<bool> checkIfEmailExists(String email) async {
-    final result =
-        await _db.collection('users').where('email', isEqualTo: email).get();
+    final result = await _db.collection('users').where('email', isEqualTo: email).get();
     return result.docs.isNotEmpty;
   }
 
@@ -107,15 +110,11 @@ class FirestoreService {
     return participants.join('_');
   }
 
-  Future<void> createChat(String currentUserId, String friendUserId) async {
+  Future<void> createChat(String currentUserId, String friendUserId, String chatType) async {
     String chatId = getChatID(currentUserId, friendUserId);
+    String chatCollection = _getChatCollection(chatType);
 
-    DocumentReference chatDocRef = _db
-        .collection('users')
-        .doc(currentUserId)
-        .collection('chats')
-        .doc(chatId);
-
+    DocumentReference chatDocRef = _db.collection(chatCollection).doc(chatId);
     DocumentSnapshot chatDoc = await chatDocRef.get();
     if (!chatDoc.exists) {
       Map<String, dynamic> chatData = {
@@ -124,51 +123,65 @@ class FirestoreService {
           'content': '',
           'timestamp': FieldValue.serverTimestamp(),
         },
+        'chatType': chatType,
       };
 
       await chatDocRef.set(chatData);
+    }
 
-      await _db
-          .collection('users')
-          .doc(friendUserId)
-          .collection('chats')
-          .doc(chatId)
-          .set(chatData);
+    await _db.collection('users').doc(currentUserId).collection('userChats').doc(chatId).set({
+      'chatId': chatId,
+      'chatType': chatType,
+      'lastMessage': {
+        'content': '',
+        'timestamp': FieldValue.serverTimestamp(),
+      },
+      'participants': [currentUserId, friendUserId],
+    }, SetOptions(merge: true));
+
+    await _db.collection('users').doc(friendUserId).collection('userChats').doc(chatId).set({
+      'chatId': chatId,
+      'chatType': chatType,
+      'lastMessage': {
+        'content': '',
+        'timestamp': FieldValue.serverTimestamp(),
+      },
+      'participants': [currentUserId, friendUserId],
+    }, SetOptions(merge: true));
+  }
+
+  String _getChatCollection(String chatType) {
+    switch (chatType) {
+      case CHAT_TYPE_REFERRAL:
+        return 'referral_chats';
+      case CHAT_TYPE_USER:
+      default:
+        return 'user_chats';
     }
   }
 
   Future<void> sendMessage(
     String chatId,
+    String chatType,
     String currentUserId,
     String friendUserId,
     String messageContent,
     FieldValue timestamp,
   ) async {
+    String chatCollection = _getChatCollection(chatType);
+
     final messageData = {
       'content': messageContent,
       'timestamp': timestamp,
       'senderId': currentUserId,
-      'read': currentUserId == friendUserId,
+      'read': false,
     };
 
     await _db
-        .collection('users')
-        .doc(currentUserId)
-        .collection('chats')
+        .collection(chatCollection)
         .doc(chatId)
         .collection('messages')
         .add(messageData);
-
-    await _db
-        .collection('users')
-        .doc(friendUserId)
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .add({
-      ...messageData,
-      'read': false, 
-    });
 
     final lastMessageData = {
       'lastMessage': {
@@ -179,53 +192,76 @@ class FirestoreService {
     };
 
     await _db
-        .collection('users')
-        .doc(currentUserId)
-        .collection('chats')
+        .collection(chatCollection)
         .doc(chatId)
         .set(lastMessageData, SetOptions(merge: true));
 
     await _db
         .collection('users')
-        .doc(friendUserId)
-        .collection('chats')
+        .doc(currentUserId)
+        .collection('userChats')
         .doc(chatId)
-        .set(lastMessageData, SetOptions(merge: true));
+        .set({
+          'lastMessage': lastMessageData['lastMessage'],
+        }, SetOptions(merge: true));
+
+    await _db
+        .collection('users')
+        .doc(friendUserId)
+        .collection('userChats')
+        .doc(chatId)
+        .set({
+          'lastMessage': lastMessageData['lastMessage'],
+        }, SetOptions(merge: true));
   }
 
-  Future<void> markMessagesAsRead(String chatId, String userId) async {
+  Future<void> markMessagesAsRead(String chatId, String userId, String chatType) async {
+    String chatCollection = _getChatCollection(chatType);
+
     final unreadMessages = await _db
-        .collection('users')
-        .doc(userId)
-        .collection('chats')
+        .collection(chatCollection)
         .doc(chatId)
         .collection('messages')
         .where('read', isEqualTo: false)
+        .where('senderId', isNotEqualTo: userId)
         .get();
 
+    WriteBatch batch = _db.batch();
+
     for (var message in unreadMessages.docs) {
-      await message.reference.update({'read': true});
+      batch.update(message.reference, {'read': true});
     }
+
+    await batch.commit();
   }
 
   Future<int> getUnreadMessageSenderCount(String userId) async {
-    final chatsSnapshot = await _db
+    final userChatsSnapshot = await _db
         .collection('users')
         .doc(userId)
-        .collection('chats')
+        .collection('userChats')
         .get();
 
     Set<String> uniqueSenders = {};
-    for (var chatDoc in chatsSnapshot.docs) {
-      var messagesSnapshot = await chatDoc.reference
+
+    for (var userChatDoc in userChatsSnapshot.docs) {
+      String chatId = userChatDoc.id;
+      String chatType = userChatDoc['chatType'] ?? CHAT_TYPE_USER;
+      String chatCollection = _getChatCollection(chatType);
+
+      var messagesSnapshot = await _db
+          .collection(chatCollection)
+          .doc(chatId)
           .collection('messages')
           .where('read', isEqualTo: false)
           .where('senderId', isNotEqualTo: userId)
           .get();
+
       for (var message in messagesSnapshot.docs) {
         uniqueSenders.add(message['senderId']);
       }
     }
+
     return uniqueSenders.length;
   }
 
@@ -237,8 +273,7 @@ class FirestoreService {
     return result.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
   }
 
-  Future<List<Map<String, dynamic>>> getUsersByAgeRange(
-      int minAge, int maxAge) async {
+  Future<List<Map<String, dynamic>>> getUsersByAgeRange(int minAge, int maxAge) async {
     final result = await _db
         .collection('users')
         .where('age', isGreaterThanOrEqualTo: minAge)
@@ -260,7 +295,7 @@ class FirestoreService {
     return domain;
   }
 
-  Future<void> updateUserRating(String userId, double newRating) async {
+   Future<void> updateUserRating(String userId, double newRating) async {
     DocumentReference userRef = _db.collection('users').doc(userId);
     DocumentSnapshot userSnapshot = await userRef.get();
 
@@ -310,8 +345,7 @@ class FirestoreService {
     return usernames;
   }
 
-  Future<String?> getFirstParticipantImageUrl(
-      List<String> participants, String currentUserUid) async {
+  Future<String?> getFirstParticipantImageUrl(List<String> participants, String currentUserUid) async {
     for (String uid in participants) {
       if (uid != currentUserUid) {
         String? imageUrl = await getUserImageUrl(uid);

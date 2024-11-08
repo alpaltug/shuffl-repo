@@ -1,4 +1,3 @@
-// main.dart
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/login/login.dart';

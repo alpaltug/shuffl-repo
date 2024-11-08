@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
-import 'package:my_flutter_app/firestore_service.dart';
-import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
 
-
 class ChatScreen extends StatefulWidget {
-  final String friendUid;
+  final String chatId;
+  final String chatType; 
 
-  ChatScreen({required this.friendUid});
+  const ChatScreen({required this.chatId, required this.chatType, Key? key}) : super(key: key);
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -20,43 +18,52 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _controller = TextEditingController();
-  late String chatId;
+  bool _isSending = false;
+
+  String? friendUid;
   String? friendUsername;
   String? friendImageUrl;
   String? currentUserImageUrl;
-  bool _isSending = false;
-
 
   @override
   void initState() {
     super.initState();
-    _initializeChat();
-    _fetchProfiles();
+    _fetchChatInfo();
   }
 
-  void _initializeChat() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser != null) {
-      chatId = _getChatId(currentUser.uid, widget.friendUid);
-      _firestoreService.markMessagesAsRead(chatId, currentUser.uid);
-      setState(() {});
+  Future<void> _fetchChatInfo() async {
+    String collectionName = '${widget.chatType}_chats';
+    DocumentSnapshot chatDoc =
+        await _firestore.collection(collectionName).doc(widget.chatId).get();
+    if (chatDoc.exists) {
+      List<String> participants = List<String>.from(chatDoc['participants'] ?? []);
+      String currentUserUid = _auth.currentUser!.uid;
+      if (participants.length == 2) {
+        friendUid = participants.firstWhere((uid) => uid != currentUserUid, orElse: () => '');
+        if (friendUid != null && friendUid!.isNotEmpty) {
+          await _fetchProfiles();
+        }
+      }
     }
   }
 
-  void _fetchProfiles() async {
-    // Fetch friend profile
+  Future<void> _fetchProfiles() async {
+    if (friendUid == null || friendUid!.isEmpty) return;
+
     DocumentSnapshot friendProfile =
-        await _firestore.collection('users').doc(widget.friendUid).get();
+        await _firestore.collection('users').doc(friendUid).get();
     if (friendProfile.exists) {
       setState(() {
-        friendUsername = friendProfile['username'];
+        friendUsername = friendProfile['username'] ?? 'Unknown User';
         friendImageUrl = friendProfile['imageUrl'];
+      });
+    } else {
+      setState(() {
+        friendUsername = 'Unknown User';
       });
     }
 
-    // Fetch current user profile
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
       DocumentSnapshot currentUserProfile =
@@ -69,41 +76,45 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  String _getChatId(String uid1, String uid2) {
-    return uid1.hashCode <= uid2.hashCode ? '$uid1-$uid2' : '$uid2-$uid1';
-  }
-
   void _sendMessage() async {
-    if (_controller.text.isEmpty || _isSending) return;
+    if (_controller.text.trim().isEmpty || _isSending) return;
 
-    _isSending = true; // Disable sending temporarily
-
-    print("Sending message: ${_controller.text}");
+    setState(() {
+      _isSending = true;
+    });
 
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
-      // Get the server timestamp
-      final timestamp = FieldValue.serverTimestamp();
+      String messageContent = _controller.text.trim();
+      await _firestore
+          .collection('${widget.chatType}_chats')
+          .doc(widget.chatId)
+          .collection('messages')
+          .add({
+        'senderId': currentUser.uid,
+        'content': messageContent,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
 
-      // Pass the timestamp to the sendMessage method
-      await _firestoreService.sendMessage(
-          chatId, currentUser.uid, widget.friendUid, _controller.text, timestamp);
-
-      // Mark the message as read for the sender
-      await _firestoreService.markMessagesAsRead(chatId, currentUser.uid);
+      await _firestore.collection('${widget.chatType}_chats').doc(widget.chatId).update({
+        'lastMessage': {
+          'content': messageContent,
+          'timestamp': FieldValue.serverTimestamp(),
+        },
+      });
 
       _controller.clear();
     }
-    _isSending = false; // Enable sending
+
+    setState(() {
+      _isSending = false;
+    });
   }
 
-
   ImageProvider<Object> _getProfileImage(String? imageUrl) {
-    // Always use the imageUrl from Firestore.
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return NetworkImage(imageUrl);
     }
-    // Use the default Shuffle logo if imageUrl is invalid.
     return const AssetImage('assets/icons/ShuffleLogo.jpeg');
   }
 
@@ -111,66 +122,65 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: kBackgroundColor, // Set background color to yellow
         title: Row(
           children: [
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ViewUserProfile(uid: widget.friendUid),
-                  ),
-                );
-              },
-              child: CircleAvatar(
-                backgroundImage: _getProfileImage(friendImageUrl), // Use imageUrl from Firestore
+            if (friendImageUrl != null)
+              GestureDetector(
+                onTap: () {
+                  if (friendUid != null && friendUid!.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ViewUserProfile(uid: friendUid!),
+                      ),
+                    );
+                  }
+                },
+                child: CircleAvatar(
+                  backgroundImage: _getProfileImage(friendImageUrl),
+                ),
               ),
-            ),
             const SizedBox(width: 10),
-            Text(friendUsername ?? 'Shuffl User',
-                style: const TextStyle(color: Colors.black)), // Set text color to black
+            Text(
+              friendUsername ?? 'Unknown User',
+              style: const TextStyle(color: Colors.black),
+            ),
           ],
         ),
+        backgroundColor: kBackgroundColor,
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: Column(
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestore
-                  .collection('users')
-                  .doc(_auth.currentUser!.uid)
-                  .collection('chats')
-                  .doc(chatId)
+                  .collection('${widget.chatType}_chats')
+                  .doc(widget.chatId)
                   .collection('messages')
                   .orderBy('timestamp', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(
-                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'), // Add your logo path here
+                    child: LoadingWidget(logoPath: 'assets/icons/ShuffleLogo.jpeg'),
                   );
                 }
 
                 var messages = snapshot.data!.docs;
+                User? currentUser = _auth.currentUser;
 
                 return ListView.builder(
                   reverse: true,
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     var message = messages[index];
-                    var isMe = message['senderId'] == _auth.currentUser!.uid;
+                    var isMe = message['senderId'] == currentUser!.uid;
 
                     return ListTile(
                       trailing: isMe
                           ? GestureDetector(
                               onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const UserProfile(),
-                                  ),
-                                );
                               },
                               child: CircleAvatar(
                                 backgroundImage: _getProfileImage(currentUserImageUrl),
@@ -180,13 +190,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       leading: !isMe
                           ? GestureDetector(
                               onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        ViewUserProfile(uid: widget.friendUid),
-                                  ),
-                                );
+                                if (friendUid != null && friendUid!.isNotEmpty) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ViewUserProfile(uid: friendUid!),
+                                    ),
+                                  );
+                                }
                               },
                               child: CircleAvatar(
                                 backgroundImage: _getProfileImage(friendImageUrl),
@@ -198,8 +209,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isMe ? Colors.blue : Colors.grey[300],
+                            color: isMe ? Colors.blue : Colors.white,
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey),
                           ),
                           child: Text(
                             message['content'],
@@ -220,18 +232,30 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    style: const TextStyle(color: Colors.black), // Set the text color to black
+                    style: const TextStyle(color: Colors.black),
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',
                       hintStyle: TextStyle(color: Colors.black),
                       contentPadding:
-                          EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0), // Move the text up
+                          EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black, width: 1.0),
+                        borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black, width: 2.0),
+                        borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                      ),
                     ),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.send),
                   onPressed: _sendMessage,
+                  color: Colors.black,
                 ),
               ],
             ),

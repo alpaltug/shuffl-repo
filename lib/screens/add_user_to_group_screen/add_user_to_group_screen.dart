@@ -9,11 +9,13 @@ import 'package:my_flutter_app/widgets/loading_widget.dart';
 
 class AddUsersToGroupScreen extends StatefulWidget {
   final String chatId;
+  final String chatType; 
   final List<DocumentSnapshot> currentParticipants;
 
   const AddUsersToGroupScreen({
     Key? key,
     required this.chatId,
+    required this.chatType,
     required this.currentParticipants,
   }) : super(key: key);
 
@@ -26,6 +28,7 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<String> _selectedFriends = [];
   List<String> _excludedFriends = [];
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -44,11 +47,11 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
 
       print('Fetching user document for ${currentUser.uid}');
       DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser.uid).get().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw TimeoutException('Failed to fetch user document');
-        },
-      );
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw TimeoutException('Failed to fetch user document');
+            },
+          );
 
       List<String> friendUids = List<String>.from(userDoc['friends'] ?? []);
       print('All friend UIDs: $friendUids');
@@ -61,11 +64,11 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
         try {
           print('Fetching friend document for $uid');
           DocumentSnapshot friendDoc = await _firestore.collection('users').doc(uid).get().timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              throw TimeoutException('Failed to fetch friend document');
-            },
-          );
+                const Duration(seconds: 5),
+                onTimeout: () {
+                  throw TimeoutException('Failed to fetch friend document');
+                },
+              );
           if (friendDoc.exists) {
             friends.add({
               'uid': uid,
@@ -88,91 +91,117 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
     }
   }
 
- Future<void> _addSelectedFriendsToGroup() async {
-  try {
-    if (_selectedFriends.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select friends to add to the group.')),
-      );
-      return;
-    }
+  Future<void> _addSelectedFriendsToGroup() async {
+    setState(() {
+      _isSubmitting = true;
+    });
 
-    List<String> allParticipants = [
-      ...widget.currentParticipants.map((doc) => doc.id),
-      ..._selectedFriends,
-    ];
-
-    print('All participants: $allParticipants');
-
-    String chatId = widget.chatId;
-    bool isExistingGroupChat = false;
-    DocumentSnapshot? groupChatDoc;
-
-    // Check if this is already a group chat
     try {
-      groupChatDoc = await _firestore.collection('group_chats').doc(chatId).get();
-      isExistingGroupChat = groupChatDoc.exists;
-    } catch (e) {
-      print('Error checking existing group chat: $e');
-      isExistingGroupChat = false;
-    }
+      if (_selectedFriends.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select friends to add to the group.')),
+        );
+        setState(() {
+          _isSubmitting = false;
+        });
+        return;
+      }
 
-    if (isExistingGroupChat) {
-      // Update the existing group chat
-      await _firestore.collection('group_chats').doc(chatId).update({
+      List<String> allParticipants = [
+        ...widget.currentParticipants.map((doc) => doc.id),
+        ..._selectedFriends,
+      ];
+
+      print('All participants: $allParticipants');
+
+      String chatId = widget.chatId;
+      String chatType = widget.chatType;
+
+      DocumentReference chatRef = _firestore.collection('${chatType}_chats').doc(chatId);
+      DocumentSnapshot chatDoc = await chatRef.get();
+
+      if (!chatDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chat does not exist.')),
+        );
+        setState(() {
+          _isSubmitting = false;
+        });
+        return;
+      }
+
+      Map<String, dynamic> chatData = chatDoc.data() as Map<String, dynamic>;
+      String groupTitle = chatData['groupTitle'] ?? 'Group Chat';
+
+      await chatRef.update({
         'participants': allParticipants,
-      });
-      print('Updated existing group chat: $chatId');
-
-      // Fetch the updated document
-      groupChatDoc = await _firestore.collection('group_chats').doc(chatId).get();
-    } else {
-      // If the group does not exist, show an error message and stop further execution
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Group chat does not exist.')),
-      );
-      return;
-    }
-
-    Map<String, dynamic> groupChatData = groupChatDoc.data() as Map<String, dynamic>;
-    String groupTitle = groupChatData['groupTitle'] ?? 'Group Chat';
-
-    // Update or create chat documents for all participants
-    for (String uid in allParticipants) {
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('chats')
-          .doc(chatId)
-          .set({
-        'isGroupChat': true,
-        'groupTitle': groupTitle,
-        'participants': allParticipants,
-        'lastMessage': groupChatData['lastMessage'] ?? {
-          'content': 'Group updated',
+        'lastMessage': {
+          'content': 'Group updated with new members',
           'timestamp': FieldValue.serverTimestamp(),
         },
-      }, SetOptions(merge: true));
-      print('Updated chat document for user: $uid');
-    }
+      });
 
-    // Navigate directly to the homepage
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()), // Replace `HomePage` with your actual homepage widget
-        (route) => false,
-      );
-    }
-  } catch (e) {
-    print('Error in _addSelectedFriendsToGroup: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred: $e')),
-      );
+      await chatRef.collection('messages').add({
+        'senderId': 'system',
+        'content': 'New members have been added to the group',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      WriteBatch batch = _firestore.batch();
+
+      for (String uid in _selectedFriends) {
+        DocumentReference userChatRef = _firestore.collection('users').doc(uid).collection('userChats').doc(chatId);
+        batch.set(userChatRef, {
+          'chatId': chatId,
+          'chatType': chatType,
+          'groupTitle': groupTitle,
+          'participants': allParticipants,
+          'lastMessage': {
+            'content': 'Joined the group',
+            'timestamp': FieldValue.serverTimestamp(),
+          },
+        }, SetOptions(merge: true));
+      }
+
+      for (DocumentSnapshot doc in widget.currentParticipants) {
+        String uid = doc.id;
+        DocumentReference userChatRef = _firestore.collection('users').doc(uid).collection('userChats').doc(chatId);
+        batch.set(userChatRef, {
+          'participants': allParticipants,
+          'lastMessage': {
+            'content': 'Group updated with new members',
+            'timestamp': FieldValue.serverTimestamp(),
+          },
+        }, SetOptions(merge: true));
+      }
+
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Added ${_selectedFriends.length} friends to the group.')),
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()), 
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      print('Error in _addSelectedFriendsToGroup: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('An error occurred: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -246,7 +275,7 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ElevatedButton(
-          onPressed: _addSelectedFriendsToGroup,
+          onPressed: _isSubmitting ? null : _addSelectedFriendsToGroup,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.grey,
             padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -254,10 +283,19 @@ class _AddUsersToGroupScreenState extends State<AddUsersToGroupScreen> {
               borderRadius: BorderRadius.circular(30.0),
             ),
           ),
-          child: const Text(
-            'Add Friends',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          ),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                  ),
+                )
+              : const Text(
+                  'Add Friends',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                ),
         ),
       ),
     );

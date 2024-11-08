@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
+import 'package:my_flutter_app/screens/login/login.dart'; 
 
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
@@ -86,7 +87,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
         resendCooldown = 60; 
       });
 
-
       resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
           if (resendCooldown > 0) {
@@ -106,18 +106,32 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
   }
 
+  void _navigateToLogin() async {
+    await _auth.signOut();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const Login()),
+      (Route<dynamic> route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor, 
       appBar: AppBar(
-        backgroundColor: kBackgroundColor, 
+        backgroundColor: kBackgroundColor,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
         title: const Text(
           'Email Verification',
           style: TextStyle(
-            color: Colors.white, 
+            color: Colors.black, 
             fontWeight: FontWeight.bold, 
           ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _navigateToLogin, 
         ),
       ),
       body: Center(

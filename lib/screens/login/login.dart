@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:my_flutter_app/constants.dart';
 import 'package:my_flutter_app/firestore_service.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
@@ -10,8 +9,9 @@ import 'package:my_flutter_app/screens/verification/verification_screen.dart';
 import 'package:my_flutter_app/widgets/green_action_button.dart';
 import 'package:my_flutter_app/widgets/grey_text_field.dart';
 import 'package:my_flutter_app/widgets/logoless_appbar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'dart:io' show Platform;
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
@@ -30,8 +30,6 @@ class _LoginState extends State<Login> {
       TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService();
-  bool _rememberMe = false;
-
   String? _errorMessage;
 
   void _register() async {
@@ -62,30 +60,93 @@ class _LoginState extends State<Login> {
 
       await _firestoreService.addUser(user.uid, email);
 
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const VerificationScreen(),
         ),
       );
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        switch (e.code) {
-          case 'email-already-in-use':
+      if (e.code == 'email-already-in-use') {
+        try {
+          UserCredential userCredential =
+              await _auth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+
+          User user = userCredential.user!;
+          await user.reload();
+
+          if (!user.emailVerified) {
+            DocumentSnapshot userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+
+            bool profileComplete = false;
+            if (userDoc.exists) {
+              Map<String, dynamic> data =
+                  userDoc.data() as Map<String, dynamic>;
+              profileComplete = data.containsKey('fullName') &&
+                  data.containsKey('username') &&
+                  data.containsKey('description') &&
+                  data.containsKey('age') &&
+                  data.containsKey('sexAssignedAtBirth');
+            }
+
+            if (!profileComplete) {
+              await user.sendEmailVerification();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const VerificationScreen(),
+                ),
+              );
+              return;
+            } else {
+              setState(() {
+                _errorMessage =
+                    'An account with this email already exists. Please log in.';
+              });
+            }
+          } else {
+            setState(() {
+              _errorMessage =
+                  'An account with this email already exists. Please log in.';
+            });
+          }
+        } on FirebaseAuthException catch (signInError) {
+          if (signInError.code == 'wrong-password') {
+            setState(() {
+              _errorMessage =
+                  'An account with this email already exists. Please log in.';
+            });
+          } else {
+            setState(() {
+              _errorMessage =
+                  'An account with this email already exists. Please log in.';
+            });
+          }
+        } catch (e) {
+          setState(() {
             _errorMessage =
-                'The email address is already in use by another account.';
-            break;
-          case 'invalid-email':
-            _errorMessage = 'The email address is not valid.';
-            break;
-          case 'weak-password':
-            _errorMessage = 'The password is not strong enough.';
-            break;
-          default:
-            _errorMessage = 'Failed to register: ${e.message}';
-            break;
+                'An account with this email already exists. Please log in.';
+          });
         }
-      });
+      } else if (e.code == 'invalid-email') {
+        setState(() {
+          _errorMessage = 'The email address is not valid.';
+        });
+      } else if (e.code == 'weak-password') {
+        setState(() {
+          _errorMessage = 'The password is not strong enough.';
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to register: ${e.message}';
+        });
+      }
     }
   }
 

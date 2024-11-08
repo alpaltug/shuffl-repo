@@ -25,10 +25,7 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
 
     String referralCode = _referralCodeController.text.trim();
     if (referralCode.isNotEmpty) {
-      DocumentSnapshot doc = await _firestore
-          .collection('referral_codes')
-          .doc(referralCode)
-          .get();
+      DocumentSnapshot doc = await _firestore.collection('referral_codes').doc(referralCode).get();
 
       if (doc.exists) {
         String orgName = doc['org_name'] ?? 'Unknown';
@@ -36,13 +33,12 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
 
         if (user != null) {
           try {
-            // Fetch the current user's display name
             DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
             String displayName = userDoc['username'] ?? 'A user';
 
             List<dynamic> participants = [];
-            var data = doc.data() as Map<String, dynamic>;
-            if (data.containsKey('participants')) {
+            var data = doc.data() as Map<String, dynamic>?;
+            if (data != null && data.containsKey('participants')) {
               participants = data['participants'];
             }
 
@@ -57,7 +53,6 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
                 _isSubmitting = false;
               });
             } else {
-
               await _firestore
                   .collection('referral_codes')
                   .doc(referralCode)
@@ -76,119 +71,74 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
               List<dynamic> updatedMembers = updatedDoc['participants'] ?? [];
 
               Map<String, dynamic>? updatedData = updatedDoc.data() as Map<String, dynamic>?;
-              String? groupChatId = updatedData != null && updatedData.containsKey('group_chat_id')
+              String? referralChatId = updatedData != null && updatedData.containsKey('group_chat_id')
                   ? updatedData['group_chat_id']
                   : null;
 
               if (updatedMembers.length >= 2) {
-                if (groupChatId == null) {
-                  String newGroupChatId = _firestore.collection('group_chats').doc().id;
+                if (referralChatId == null) {
+                  String newReferralChatId = _firestore.collection('referral_chats').doc().id;
 
                   await _firestore
                       .collection('referral_codes')
                       .doc(referralCode)
                       .set({
-                    'group_chat_id': newGroupChatId,
+                    'group_chat_id': newReferralChatId,
                   }, SetOptions(merge: true));
 
                   Map<String, dynamic> chatData = {
                     'participants': updatedMembers,
                     'isGroupChat': true,
+                    'isReferralChat': true,
                     'groupTitle': orgName,
-                    'isReferralGroup': true,
                     'lastMessage': {
                       'content': '@system Group chat created',
                       'timestamp': FieldValue.serverTimestamp(),
                     },
+                    'createdAt': FieldValue.serverTimestamp(),
                   };
 
+                  WriteBatch batch = _firestore.batch();
                   for (String memberId in updatedMembers) {
-                    await _firestore
-                        .collection('users')
-                        .doc(memberId)
-                        .collection('chats')
-                        .doc(newGroupChatId)
-                        .set(chatData);
+                    DocumentReference referralChatRef = _firestore.collection('referral_chats').doc(newReferralChatId);
+                    batch.set(referralChatRef, chatData);
 
-                    await _firestore
-                        .collection('users')
-                        .doc(memberId)
-                        .collection('chats')
-                        .doc(newGroupChatId)
-                        .collection('messages')
-                        .add({
+                    batch.set(
+                      _firestore.collection('users').doc(memberId).collection('userChats').doc(newReferralChatId),
+                      {'chatId': newReferralChatId, 'chatType': 'referral'},
+                    );
+
+                    DocumentReference messageRef = referralChatRef.collection('messages').doc();
+                    batch.set(messageRef, {
                       'senderId': 'system',
                       'content': '@system Group chat created',
                       'timestamp': FieldValue.serverTimestamp(),
                     });
                   }
+                  await batch.commit();
                 } else {
-                  for (String memberId in updatedMembers) {
-                    DocumentReference chatDocRef = _firestore
-                        .collection('users')
-                        .doc(memberId)
-                        .collection('chats')
-                        .doc(groupChatId);
-
-                    if (memberId == user.uid) {
-                      Map<String, dynamic> chatData = {
-                        'participants': updatedMembers,
-                        'isGroupChat': true,
-                        'groupTitle': orgName,
-                        'isReferralGroup': true,
-                        'lastMessage': {
-                          'content': '@system Welcome to the group chat',
-                          'timestamp': FieldValue.serverTimestamp(),
-                        },
-                      };
-                      await chatDocRef.set(chatData);
-
-                      await _firestore
-                          .collection('users')
-                          .doc(memberId)
-                          .collection('chats')
-                          .doc(groupChatId)
-                          .collection('messages')
-                          .add({
-                        'senderId': 'system',
-                        'content': '@system Welcome to the group chat',
-                        'timestamp': FieldValue.serverTimestamp(),
-                      });
-                    } else {
-                      await chatDocRef.update({
-                        'participants': updatedMembers,
-                      });
-                    }
-                  }
-
-                  String systemMessageContent =
-                      '@$displayName has joined the group';
-
-                  for (String memberId in updatedMembers) {
-                    await _firestore
-                        .collection('users')
-                        .doc(memberId)
-                        .collection('chats')
-                        .doc(groupChatId)
-                        .collection('messages')
-                        .add({
-                      'senderId': 'system',
-                      'content': systemMessageContent,
+                  await _firestore.collection('referral_chats').doc(referralChatId).update({
+                    'participants': updatedMembers,
+                    'lastMessage': {
+                      'content': '@$displayName has joined the group',
                       'timestamp': FieldValue.serverTimestamp(),
-                    });
+                    },
+                  });
 
-                    await _firestore
-                        .collection('users')
-                        .doc(memberId)
-                        .collection('chats')
-                        .doc(groupChatId)
-                        .update({
-                      'lastMessage': {
-                        'content': systemMessageContent,
-                        'timestamp': FieldValue.serverTimestamp(),
-                      },
-                    });
+                  await _firestore.collection('referral_chats').doc(referralChatId).collection('messages').add({
+                    'senderId': 'system',
+                    'content': '@$displayName has joined the group',
+                    'timestamp': FieldValue.serverTimestamp(),
+                  });
+
+                  WriteBatch batch = _firestore.batch();
+                  for (String memberId in updatedMembers) {
+                    batch.set(
+                      _firestore.collection('users').doc(memberId).collection('userChats').doc(referralChatId),
+                      {'chatId': referralChatId, 'chatType': 'referral'},
+                    );
                   }
+                  await batch.commit();
                 }
               }
 
@@ -270,7 +220,9 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
               ElevatedButton(
                 onPressed: _isSubmitting ? null : _submitReferralCode,
                 child: _isSubmitting
-                    ? const CircularProgressIndicator()
+                    ? const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                      )
                     : const Text('Submit', style: TextStyle(color: Colors.black)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.yellow,
