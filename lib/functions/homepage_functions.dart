@@ -125,7 +125,7 @@ class HomePageFunctions {
         User? user = auth.currentUser;
         // print('1Checking if the user should be displayed, other user visibility: $otherUserVisibility');
         if (user == null) return false;
-        if (otherUserId == user.uid) return false;
+        if (otherUserId == user.uid) return true;
 
         // Ensure 'otherUserVisibility' is a string
         if (otherUserVisibility is! String) {
@@ -336,7 +336,7 @@ class HomePageFunctions {
                 var userData = doc.data() as Map<String, dynamic>;
 
                 // Ignore current user
-                if (participantId == currentUser.uid) continue;
+                // if (participantId == currentUser.uid) continue;
 
                 // Retrieve goOnline as String
                 dynamic otherUserVisibility = userData['goOnline'] ?? 'offline';
@@ -360,7 +360,7 @@ class HomePageFunctions {
                 // );
                 // print('Username is: $username | Should display: $shouldDisplay | Visibility: $otherUserVisibility');
 
-                if (otherUserVisibility != 'offline') {
+                if (participantId == currentUser.uid || otherUserVisibility != 'offline') {
 
                     // Check if the user has a valid lastPickupLocation and is marked as 'ready' in readyStatus
                     if (userData['lastPickupLocation'] != null) {
@@ -691,7 +691,9 @@ static bool doesUserMatchPreferences(Map<String, dynamic> currentUserData, Map<S
                         // Determine marker color based on user type
                         Color markerColor = normalUserColor;
                         // print('user color: $markerColor');
-                        if (_isFriend(auth, curUserDoc, doc)) {
+                        if (userId == currentUser.uid) {
+                            markerColor = Colors.red; // Current user
+                        } else if (_isFriend(auth, curUserDoc, doc)) {
                             markerColor = friendColor;
                         } else if (_isTag(auth, curUserDoc, doc)) {
                             markerColor = tagColor;
