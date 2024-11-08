@@ -440,7 +440,7 @@ Future<void> _updateDirections() async {
     }
 
     var userData = userDoc.data() as Map<String, dynamic>;
-    if (userData['lastPickupLocation'] == null || userData['goOnline'] == 'offline') {
+    if (userData['lastPickupLocation'] == null) {
       print('Last pickup location is null or user is not online');
       return;
     } else {
@@ -480,7 +480,7 @@ Future<void> _updateDirections() async {
         .doc(participantId)
         .get();
 
-    if (participantSnapshot.exists && participantSnapshot['lastPickupLocation'] != null && participantSnapshot['goOnline'] == 'offline') {
+    if (participantSnapshot.exists && participantSnapshot['lastPickupLocation'] != null && participantSnapshot['goOnline'] != 'offline') {
       print('Fetching route for participant: $participantId');
       GeoPoint lastPickupLocation = participantSnapshot['lastPickupLocation'];
       LatLng participantLocation = LatLng(lastPickupLocation.latitude, lastPickupLocation.longitude);

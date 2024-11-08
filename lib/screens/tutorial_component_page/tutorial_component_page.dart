@@ -1,5 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:my_flutter_app/constants.dart'; // Add this import for kBackgroundColor
+import 'package:my_flutter_app/constants.dart';
 
 class TutorialComponent extends StatefulWidget {
   const TutorialComponent({Key? key}) : super(key: key);
@@ -15,57 +16,74 @@ class _TutorialComponentState extends State<TutorialComponent> {
   final List<TutorialStep> _steps = [
     TutorialStep(
       title: "Welcome to Shuffl!",
-      content: "This brief instruction manual goes through the different features of the app and how to navigate our UI.",
-      icon: Icons.waving_hand,
+      content: [
+        "Discover and join rides with people from your club or organization.",
+        "This guide will help you navigate our main features.",
+      ],
+      icon: CupertinoIcons.car_detailed,
     ),
     TutorialStep(
-      title: "Searching for a Ride Right Now",
-      content: "1. Click the \"Go Online\" toggle\n2. Enter pick up address\n3. Enter drop-off address\n4. Click \"Find Ride Now\"\n5. Press \"Ready Now\" when ready",
-      icon: Icons.search,
+      title: "Profile Setup",
+      content: [
+        "Sign up and connect with your club or organization.",
+        "Set your ride preferences to match with preferred riders.",
+      ],
+      icon: CupertinoIcons.person_crop_circle,
     ),
     TutorialStep(
-      title: "Scheduling a ride in advance",
-      content: "1. Press \"Schedule In Advance\"\n2. Enter desired date and time\n3. Enter pick up and drop off locations\n4. Click Schedule Ride",
-      icon: Icons.calendar_today,
+      title: "Visibility Options",
+      content: [
+        "Choose who can see you online:",
+        "• Everyone",
+        "• Friends",
+        "• Tags (Organizations)",
+        "• Offline",
+      ],
+      icon: CupertinoIcons.eye,
     ),
     TutorialStep(
-      title: "Joining a Ride from the Marketplace",
-      content: "1. Open the drop down menu\n2. Click \"Ride Marketplace\"\n3. Browse upcoming rides\n4. Join a ride by clicking \"Join Ride\"\n5. Use filters for refined search",
-      icon: Icons.store,
+      title: "Finding a Ride",
+      content: [
+        "Toggle 'Go Online' to start searching for rides.",
+        "Enter pickup and drop-off locations to match with others going your way.",
+      ],
+      icon: CupertinoIcons.search,
     ),
     TutorialStep(
-      title: "User Search and Adding Friends",
-      content: "1. Open the drop down menu\n2. Click \"Search Users\"\n3. Enter username to search\n4. Click on a user to view profile\n5. Add friend, block, or report from profile",
-      icon: Icons.person_add,
+      title: "Ride Marketplace",
+      content: [
+        "Browse the marketplace to find and join rides.",
+        "Use filters to refine your search and join a ride that suits you.",
+      ],
+      icon: CupertinoIcons.bag_fill,
+    ),
+    TutorialStep(
+      title: "Riding with Friends",
+      content: [
+        "Connect with friends to ride together.",
+        "Add friends and set your visibility to 'Friends' to appear online to them.",
+      ],
+      icon: CupertinoIcons.group_solid,
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: kBackgroundColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Center(
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.6,
+        width: 350, // Increased width for better content fit
         padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kBackgroundColor, // Set dialog background color
+          borderRadius: BorderRadius.circular(20), // Rounded corners for a smooth look
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min, // Makes the dialog compact
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Tutorial',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.black),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.black),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
+            _buildHeader(),
             const SizedBox(height: 16),
-            Expanded(
+            SizedBox(
+              height: 300, // Adjusted height to prevent empty space
               child: PageView(
                 controller: _pageController,
                 onPageChanged: (int page) {
@@ -77,49 +95,139 @@ class _TutorialComponentState extends State<TutorialComponent> {
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: _currentPage > 0 ? () => _pageController.previousPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  ) : null,
-                  child: const Text('Previous', style: TextStyle(color: Colors.black)),
-                ),
-                Text('${_currentPage + 1}/${_steps.length}', style: const TextStyle(color: Colors.black)),
-                TextButton(
-                  onPressed: _currentPage < _steps.length - 1 ? () => _pageController.nextPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  ) : null,
-                  child: const Text('Next', style: TextStyle(color: Colors.black)),
-                ),
-              ],
-            ),
+            _buildFooter(),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Tutorial',
+          style: CupertinoTheme.of(context)
+              .textTheme
+              .navTitleTextStyle
+              ?.copyWith(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black, // Set title text color to black
+                decoration: TextDecoration.none, // Remove underline
+              ),
+        ),
+        CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.of(context).pop(),
+          child: Icon(
+            CupertinoIcons.clear_circled,
+            color: CupertinoColors.systemGrey,
+            size: 24,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFooter() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _currentPage > 0
+              ? () => _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  )
+              : null,
+          child: Text(
+            'Previous',
+            style: TextStyle(
+              color: _currentPage > 0
+                  ? CupertinoTheme.of(context).primaryColor
+                  : CupertinoColors.inactiveGray,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.none, // Remove underline
+            ),
+          ),
+        ),
+        Row(
+          children: List.generate(
+            _steps.length,
+            (index) => Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _currentPage == index
+                    ? CupertinoTheme.of(context).primaryColor
+                    : CupertinoColors.systemGrey,
+              ),
+            ),
+          ),
+        ),
+        CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _currentPage < _steps.length - 1
+              ? () => _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  )
+              : () => Navigator.of(context).pop(),
+          child: Text(
+            _currentPage < _steps.length - 1 ? 'Next' : 'Finish',
+            style: TextStyle(
+              color: CupertinoTheme.of(context).primaryColor,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.none, // Remove underline
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildStepContent(TutorialStep step) {
     return SingleChildScrollView(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(step.icon, size: 80, color: Colors.black),
-          const SizedBox(height: 24),
-          Text(
-            step.title,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.black),
-            textAlign: TextAlign.center,
+          Icon(
+            step.icon,
+            size: 60,
+            color: CupertinoTheme.of(context).primaryColor,
           ),
           const SizedBox(height: 16),
           Text(
-            step.content,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black),
-            textAlign: TextAlign.left,
+            step.title,
+            style: CupertinoTheme.of(context)
+                .textTheme
+                .navTitleTextStyle
+                ?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black, // Set title text color to black
+                  decoration: TextDecoration.none, // Remove underline
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          ...step.content.map(
+            (point) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                point,
+                style: TextStyle(
+                  color: Colors.black, // Set content text color to black
+                  fontSize: 16, // Ensures text is readable
+                  decoration: TextDecoration.none, // Remove underline
+                ),
+                textAlign: TextAlign.left,
+              ),
+            ),
           ),
         ],
       ),
@@ -129,8 +237,12 @@ class _TutorialComponentState extends State<TutorialComponent> {
 
 class TutorialStep {
   final String title;
-  final String content;
+  final List<String> content;
   final IconData icon;
 
-  TutorialStep({required this.title, required this.content, required this.icon});
+  TutorialStep({
+    required this.title,
+    required this.content,
+    required this.icon,
+  });
 }
