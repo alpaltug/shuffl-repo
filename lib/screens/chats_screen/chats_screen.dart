@@ -78,7 +78,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
               ),
             ),
           ),
-          // Chats List
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestore
@@ -104,7 +103,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   itemBuilder: (context, index) {
                     var userChat = userChats[index];
                     String chatId = userChat['chatId'];
-                    String chatType = userChat['chatType']; 
+                    String chatType = userChat['chatType'];
 
                     String collectionName =
                         chatType == 'referral' ? 'referral_chats' : 'user_chats';
@@ -112,21 +111,23 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     return FutureBuilder<DocumentSnapshot>(
                       future: _firestore.collection(collectionName).doc(chatId).get(),
                       builder: (context, chatSnapshot) {
-                        if (!chatSnapshot.hasData) {
-                          return const ListTile(title: Text('Loading...'));
+                        if (chatSnapshot.connectionState == ConnectionState.waiting) {
+                          // While loading, return an empty SizedBox to avoid showing 'Loading...'
+                          return const SizedBox.shrink();
+                        }
+
+                        if (!chatSnapshot.hasData || !chatSnapshot.data!.exists) {
+                          // If chat data is not available, skip this item
+                          return const SizedBox.shrink();
                         }
 
                         var chatDoc = chatSnapshot.data!;
-                        if (!chatDoc.exists) {
-                          return const ListTile(title: Text('Chat does not exist.'));
-                        }
-
                         var chatData = chatDoc.data() as Map<String, dynamic>;
 
                         bool isGroupChat = chatData['isGroupChat'] ?? false;
                         String chatName = isGroupChat
                             ? chatData['groupTitle'] ?? 'Group Chat'
-                            : 'Chat'; 
+                            : 'Chat';
 
                         String? profileImageUrl;
                         List<String> participants =
@@ -141,21 +142,22 @@ class _ChatsScreenState extends State<ChatsScreen> {
                             return FutureBuilder<DocumentSnapshot>(
                               future: _firestore.collection('users').doc(friendUid).get(),
                               builder: (context, friendSnapshot) {
-                                if (!friendSnapshot.hasData) {
-                                  return const ListTile(title: Text('Loading...'));
+                                if (friendSnapshot.connectionState == ConnectionState.waiting) {
+                                  // While loading, proceed to build the ListTile with default image
+                                  profileImageUrl = null;
+                                } else if (friendSnapshot.hasData && friendSnapshot.data!.exists) {
+                                  var friendDoc = friendSnapshot.data!;
+                                  var friendData = friendDoc.data() as Map<String, dynamic>;
+                                  String friendName = friendData['username'] ?? 'Unknown User';
+                                  String? friendImageUrl = friendData['imageUrl'];
+
+                                  chatName = friendName;
+                                  profileImageUrl = friendImageUrl;
+                                } else {
+                                  // If friend data is not available, use default values
+                                  chatName = 'Unknown User';
+                                  profileImageUrl = null;
                                 }
-
-                                var friendDoc = friendSnapshot.data!;
-                                if (!friendDoc.exists) {
-                                  return const ListTile(title: Text('User does not exist.'));
-                                }
-
-                                var friendData = friendDoc.data() as Map<String, dynamic>;
-                                String friendName = friendData['username'] ?? 'Unknown User';
-                                String? friendImageUrl = friendData['imageUrl'];
-
-                                chatName = friendName;
-                                profileImageUrl = friendImageUrl;
 
                                 if (_searchQuery.isNotEmpty &&
                                     !chatName.toLowerCase().contains(_searchQuery)) {
@@ -188,91 +190,88 @@ class _ChatsScreenState extends State<ChatsScreen> {
                             );
                           }
                         } else if (isGroupChat) {
-                          String? lastMessageSenderUid = chatData['lastMessage']?['senderId'];
+                          String? lastMessageSenderUid =
+                              chatData['lastMessage']?['senderId'];
 
-                          if (lastMessageSenderUid != null &&
-                              lastMessageSenderUid != 'system') {
-                            return FutureBuilder<DocumentSnapshot>(
-                              future: _firestore.collection('users').doc(lastMessageSenderUid).get(),
-                              builder: (context, senderSnapshot) {
-                                if (!senderSnapshot.hasData) {
-                                  return const ListTile(title: Text('Loading...'));
-                                }
-
-                                var senderDoc = senderSnapshot.data!;
-                                if (!senderDoc.exists) {
-                                  return const ListTile(title: Text('User does not exist.'));
-                                }
-
-                                var senderData = senderDoc.data() as Map<String, dynamic>;
-                                String? senderImageUrl = senderData['imageUrl'];
-
-                                profileImageUrl = senderImageUrl;
-
-                                chatName = chatData['groupTitle'] ?? 'Group Chat';
-
-                                if (_searchQuery.isNotEmpty &&
-                                    !chatName.toLowerCase().contains(_searchQuery)) {
-                                  return const SizedBox.shrink();
-                                }
-
-                                return ListTile(
-                                  leading: _buildAvatar(profileImageUrl),
-                                  title: Text(
-                                    chatName,
-                                    style: const TextStyle(color: Colors.black),
-                                  ),
-                                  subtitle: Text(
-                                    chatData['lastMessage']?['content'] ?? 'No message',
-                                    style: const TextStyle(color: Colors.black54),
-                                  ),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => GroupChatScreen(
-                                          chatId: chatId,
-                                          chatType: chatType,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            );
-                          } else {
-                            chatName = chatData['groupTitle'] ?? 'Group Chat';
-
-                            if (_searchQuery.isNotEmpty &&
-                                !chatName.toLowerCase().contains(_searchQuery)) {
-                              return const SizedBox.shrink();
+                          Future<String?> getProfileImageUrl() async {
+                            if (lastMessageSenderUid != null &&
+                                lastMessageSenderUid != 'system') {
+                              var senderDoc = await _firestore
+                                  .collection('users')
+                                  .doc(lastMessageSenderUid)
+                                  .get();
+                              if (senderDoc.exists) {
+                                var senderData =
+                                    senderDoc.data() as Map<String, dynamic>;
+                                return senderData['imageUrl'] as String?;
+                              }
                             }
 
-                            return ListTile(
-                              leading: _buildAvatar(profileImageUrl),
-                              title: Text(
-                                chatName,
-                                style: const TextStyle(color: Colors.black),
-                              ),
-                              subtitle: Text(
-                                chatData['lastMessage']?['content'] ?? 'No message',
-                                style: const TextStyle(color: Colors.black54),
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => GroupChatScreen(
-                                      chatId: chatId,
-                                      chatType: chatType,
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
+                            List<String> otherParticipants = participants
+                                .where((uid) =>
+                                    uid != currentUserUid && uid != 'system')
+                                .toList();
+
+                            if (otherParticipants.isNotEmpty) {
+                              String participantUid = otherParticipants.first;
+                              var participantDoc = await _firestore
+                                  .collection('users')
+                                  .doc(participantUid)
+                                  .get();
+                              if (participantDoc.exists) {
+                                var participantData =
+                                    participantDoc.data() as Map<String, dynamic>;
+                                return participantData['imageUrl'] as String?;
+                              }
+                            }
+
+                            return null;
                           }
+
+                          return FutureBuilder<String?>(
+                            future: getProfileImageUrl(),
+                            builder: (context, imageUrlSnapshot) {
+                              if (imageUrlSnapshot.connectionState == ConnectionState.waiting) {
+                                // While loading, proceed with default image
+                                profileImageUrl = null;
+                              } else {
+                                profileImageUrl = imageUrlSnapshot.data;
+                              }
+
+                              chatName = chatData['groupTitle'] ?? 'Group Chat';
+
+                              if (_searchQuery.isNotEmpty &&
+                                  !chatName.toLowerCase().contains(_searchQuery)) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return ListTile(
+                                leading: _buildAvatar(profileImageUrl),
+                                title: Text(
+                                  chatName,
+                                  style: const TextStyle(color: Colors.black),
+                                ),
+                                subtitle: Text(
+                                  chatData['lastMessage']?['content'] ?? 'No message',
+                                  style: const TextStyle(color: Colors.black54),
+                                ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => GroupChatScreen(
+                                        chatId: chatId,
+                                        chatType: chatType,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
                         }
-                        return const ListTile(title: Text('Chat'));
+                        // If none of the above, skip this chat
+                        return const SizedBox.shrink();
                       },
                     );
                   },
