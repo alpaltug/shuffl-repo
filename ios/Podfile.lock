@@ -1167,6 +1167,8 @@ PODS:
     - Firebase/Functions (= 11.2.0)
     - firebase_core
     - Flutter
+  - contacts_service (0.2.2):
+    - Flutter
   - device_info_plus (0.0.1):
     - Flutter
   - Firebase/Analytics (11.2.0):
@@ -1481,6 +1483,8 @@ PODS:
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - permission_handler_apple (9.1.1):
+    - Flutter
   - PromisesObjC (2.4.0)
   - RecaptchaInterop (100.0.0)
   - share_plus (0.0.1):
@@ -1499,6 +1503,7 @@ DEPENDENCIES:
   - app_tracking_transparency (from `.symlinks/plugins/app_tracking_transparency/ios`)
   - cloud_firestore (from `.symlinks/plugins/cloud_firestore/ios`)
   - cloud_functions (from `.symlinks/plugins/cloud_functions/ios`)
+  - contacts_service (from `.symlinks/plugins/contacts_service/ios`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - Firebase/Analytics (~> 11.2)
   - Firebase/Auth (~> 11.2)
@@ -1518,6 +1523,7 @@ DEPENDENCIES:
   - GoogleSignIn (~> 7.0)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/ios`)
@@ -1567,6 +1573,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/cloud_firestore/ios"
   cloud_functions:
     :path: ".symlinks/plugins/cloud_functions/ios"
+  contacts_service:
+    :path: ".symlinks/plugins/contacts_service/ios"
   device_info_plus:
     :path: ".symlinks/plugins/device_info_plus/ios"
   firebase_auth:
@@ -1593,6 +1601,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
+  permission_handler_apple:
+    :path: ".symlinks/plugins/permission_handler_apple/ios"
   share_plus:
     :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
@@ -1611,6 +1621,7 @@ SPEC CHECKSUMS:
   BoringSSL-GRPC: ca6a8e5d04812fce8ffd6437810c2d46f925eaeb
   cloud_firestore: 5cb927f1a8c9d748d6fdbf16c6b267956cb82c53
   cloud_functions: 071fdf2c9ae0932ea9eb8b7d8aef4b014112a8ab
+  contacts_service: 849e1f84281804c8bfbec1b4c3eedcb23c5d3eca
   device_info_plus: 97af1d7e84681a90d0693e63169a5d50e0839a0d
   Firebase: 98e6bf5278170668a7983e12971a66b2cd57fc8c
   firebase_auth: 0c77e299a8f2d1c74d1b1f6b78b3d4d802c19f47
@@ -1652,6 +1663,7 @@ SPEC CHECKSUMS:
   leveldb-library: e8eadf9008a61f9e1dde3978c086d2b6d9b9dc28
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
+  permission_handler_apple: e76247795d700c14ea09e3a2d8855d41ee80a2e6
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   RecaptchaInterop: 7d1a4a01a6b2cb1610a47ef3f85f0c411434cb21
   share_plus: 8b6f8b3447e494cca5317c8c3073de39b3600d1f

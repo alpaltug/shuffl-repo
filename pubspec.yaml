@@ -35,9 +35,12 @@ dependencies:
   # location: ^7.0.0 - BUGS OUT ANDROID - Your project requires a newer version of the Kotlin Gradle plugin. 
   #location: ^5.0.0  - this too 
   firebase_core: ^3.1.1
+  contacts_service: ^0.6.3
+  permission_handler: ^10.2.0
   firebase_auth: ^5.1.1
   cloud_firestore: ^5.0.2
   google_sign_in: ^6.2.1
+  url_launcher: ^6.1.7
   # https://pub.dev/packages/image_picker
   image_picker: ^1.1.2 
   cupertino_icons: ^1.0.6

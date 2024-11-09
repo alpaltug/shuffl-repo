@@ -10,6 +10,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:my_flutter_app/screens/invite_contacts_screen/invite_contacts_screen.dart';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:my_flutter_app/firestore_service.dart';
@@ -986,6 +988,26 @@ Widget build(BuildContext context) {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const EnterReferralCodeScreen()),
+              );
+            },
+          ),
+          // ListTile(
+          //   leading: const Icon(Icons.person_add),
+          //   title: const Text('Refer a Friend'),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       CupertinoPageRoute(builder: (context) => const ReferFriendScreen()),
+          //     );
+          //   },
+          // ),
+          ListTile(
+            leading: const Icon(Icons.contacts),
+            title: const Text('Invite Contacts'),
+            onTap: () {
+              Navigator.push(
+                context,
+                CupertinoPageRoute(builder: (context) => InviteContactsScreen()),
               );
             },
           ),
