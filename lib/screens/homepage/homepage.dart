@@ -996,7 +996,7 @@ Widget build(BuildContext context) {
           ),
           ListTile(
             leading: const Icon(Icons.card_giftcard),
-            title: const Text('Referral Codes'),
+            title: const Text('Group Codes'),
             onTap: () {
               Navigator.push(
                 context,

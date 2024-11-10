@@ -187,7 +187,7 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Enter Referral Code',
+          'Enter Group Code',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -204,7 +204,7 @@ class _EnterReferralCodeScreenState extends State<EnterReferralCodeScreen> {
               TextField(
                 controller: _referralCodeController,
                 decoration: const InputDecoration(
-                  labelText: 'Referral Code',
+                  labelText: 'Group Code',
                   labelStyle: TextStyle(color: Colors.black),
                   border: OutlineInputBorder(),
                 ),
