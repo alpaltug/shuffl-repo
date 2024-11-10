@@ -63,6 +63,7 @@ class _TutorialComponentState extends State<TutorialComponent> {
       content: [
         "Connect with friends to ride together.",
         "Add friends and set your visibility to 'Friends' to appear online to them.",
+        "You can also invite your friends from your contacts to ride together and earn special rewards! (Coming soon)",
       ],
       icon: CupertinoIcons.group_solid,
     ),

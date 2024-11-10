@@ -935,7 +935,7 @@ Widget build(BuildContext context) {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    _username ?? 'Unknown User',
+                    _username ?? 'Shuffl User',
                     style: const TextStyle(
                       color: Colors.black,
                       fontSize: 20,

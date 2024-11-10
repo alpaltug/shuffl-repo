@@ -207,6 +207,7 @@ class _CreateProfileState extends State<CreateProfile> {
         DocumentSnapshot userDoc =
             await _firestoreService.getUserDocument(user.uid);
         if (!userDoc.exists) {
+          print('User document does not exist.');
           setState(() {
             _errorMessage = 'User document does not exist.';
           });
