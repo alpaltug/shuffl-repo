@@ -87,7 +87,8 @@ class FirestoreService {
   }
 
   Future<bool> checkIfUsernameExists(String username) async {
-    final result = await _db.collection('users').where('username', isEqualTo: username).get();
+    final result =
+        await _db.collection('users').where('username', isEqualTo: username).get();
     return result.docs.isNotEmpty;
   }
 
@@ -96,12 +97,22 @@ class FirestoreService {
     return result.docs.isNotEmpty;
   }
 
-  Future<void> sendFriendRequest(String fromUid, String toUid) async {
-    DocumentReference notificationRef = await _db
+  // Add the getUidByUsername method here
+  Future<String?> getUidByUsername(String username) async {
+    final querySnapshot = await _db
         .collection('users')
-        .doc(toUid)
-        .collection('notifications')
-        .add({
+        .where('username', isEqualTo: username)
+        .limit(1)
+        .get();
+    if (querySnapshot.docs.isNotEmpty) {
+      return querySnapshot.docs.first.id;
+    }
+    return null;
+  }
+
+  Future<void> sendFriendRequest(String fromUid, String toUid) async {
+    DocumentReference notificationRef =
+        await _db.collection('users').doc(toUid).collection('notifications').add({
       'type': 'friend_request',
       'fromUid': fromUid,
       'timestamp': FieldValue.serverTimestamp(),
@@ -138,7 +149,8 @@ class FirestoreService {
     return participants.join('_');
   }
 
-  Future<void> createChat(String currentUserId, String friendUserId, String chatType) async {
+  Future<void> createChat(
+      String currentUserId, String friendUserId, String chatType) async {
     String chatId = getChatID(currentUserId, friendUserId);
     String chatCollection = _getChatCollection(chatType);
 
@@ -157,7 +169,12 @@ class FirestoreService {
       await chatDocRef.set(chatData);
     }
 
-    await _db.collection('users').doc(currentUserId).collection('userChats').doc(chatId).set({
+    await _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('userChats')
+        .doc(chatId)
+        .set({
       'chatId': chatId,
       'chatType': chatType,
       'lastMessage': {
@@ -167,7 +184,12 @@ class FirestoreService {
       'participants': [currentUserId, friendUserId],
     }, SetOptions(merge: true));
 
-    await _db.collection('users').doc(friendUserId).collection('userChats').doc(chatId).set({
+    await _db
+        .collection('users')
+        .doc(friendUserId)
+        .collection('userChats')
+        .doc(chatId)
+        .set({
       'chatId': chatId,
       'chatType': chatType,
       'lastMessage': {
@@ -230,8 +252,8 @@ class FirestoreService {
         .collection('userChats')
         .doc(chatId)
         .set({
-          'lastMessage': lastMessageData['lastMessage'],
-        }, SetOptions(merge: true));
+      'lastMessage': lastMessageData['lastMessage'],
+    }, SetOptions(merge: true));
 
     await _db
         .collection('users')
@@ -239,11 +261,12 @@ class FirestoreService {
         .collection('userChats')
         .doc(chatId)
         .set({
-          'lastMessage': lastMessageData['lastMessage'],
-        }, SetOptions(merge: true));
+      'lastMessage': lastMessageData['lastMessage'],
+    }, SetOptions(merge: true));
   }
 
-  Future<void> markMessagesAsRead(String chatId, String userId, String chatType) async {
+  Future<void> markMessagesAsRead(
+      String chatId, String userId, String chatType) async {
     String chatCollection = _getChatCollection(chatType);
 
     final unreadMessages = await _db
@@ -294,14 +317,13 @@ class FirestoreService {
   }
 
   Future<List<Map<String, dynamic>>> getUsersBySex(String sex) async {
-    final result = await _db
-        .collection('users')
-        .where('sexAssignedAtBirth', isEqualTo: sex)
-        .get();
+    final result =
+        await _db.collection('users').where('sexAssignedAtBirth', isEqualTo: sex).get();
     return result.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
   }
 
-  Future<List<Map<String, dynamic>>> getUsersByAgeRange(int minAge, int maxAge) async {
+  Future<List<Map<String, dynamic>>> getUsersByAgeRange(
+      int minAge, int maxAge) async {
     final result = await _db
         .collection('users')
         .where('age', isGreaterThanOrEqualTo: minAge)
@@ -323,7 +345,7 @@ class FirestoreService {
     return domain;
   }
 
-   Future<void> updateUserRating(String userId, double newRating) async {
+  Future<void> updateUserRating(String userId, double newRating) async {
     DocumentReference userRef = _db.collection('users').doc(userId);
     DocumentSnapshot userSnapshot = await userRef.get();
 
@@ -350,7 +372,8 @@ class FirestoreService {
 
   Future<String?> getUserImageUrl(String uid) async {
     DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
-    String? imageUrl = (userDoc.data() as Map<String, dynamic>)['imageUrl'] as String?;
+    String? imageUrl =
+        (userDoc.data() as Map<String, dynamic>)['imageUrl'] as String?;
 
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return Uri.encodeFull(imageUrl);
@@ -361,7 +384,8 @@ class FirestoreService {
 
   Future<String> getUserUsername(String uid) async {
     DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
-    return (userDoc.data() as Map<String, dynamic>)['username'] as String? ?? 'Unknown';
+    return (userDoc.data() as Map<String, dynamic>)['username'] as String? ??
+        'Unknown';
   }
 
   Future<List<String>> getParticipantUsernames(List<String> participants) async {
@@ -373,7 +397,8 @@ class FirestoreService {
     return usernames;
   }
 
-  Future<String?> getFirstParticipantImageUrl(List<String> participants, String currentUserUid) async {
+  Future<String?> getFirstParticipantImageUrl(
+      List<String> participants, String currentUserUid) async {
     for (String uid in participants) {
       if (uid != currentUserUid) {
         String? imageUrl = await getUserImageUrl(uid);

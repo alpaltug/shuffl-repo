@@ -14,7 +14,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
 
 class CreateProfile extends StatefulWidget {
-  const CreateProfile({super.key});
+  const CreateProfile({Key? key}) : super(key: key);
 
   @override
   _CreateProfileState createState() => _CreateProfileState();
@@ -34,6 +34,36 @@ class _CreateProfileState extends State<CreateProfile> {
   String? _imageUrl;
   String? _errorMessage;
   final filter = ProfanityFilter();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUserProfile();
+  }
+
+  Future<void> _loadCurrentUserProfile() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      DocumentSnapshot userDoc =
+          await _firestoreService.getUserDocument(user.uid);
+      if (userDoc.exists) {
+        Map<String, dynamic>? userData =
+            userDoc.data() as Map<String, dynamic>?;
+        if (userData != null) {
+          setState(() {
+            _fullNameController.text = userData['fullName'] ?? '';
+            _userNameController.text = userData['username'] ?? '';
+            _descriptionController.text = userData['description'] ?? '';
+            _ageController.text = userData['age'] != null
+                ? userData['age'].toString()
+                : '';
+            _sexAssignedAtBirth = userData['sexAssignedAtBirth'] ?? null;
+            _imageUrl = userData['imageUrl'];
+          });
+        }
+      }
+    }
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source);
@@ -146,20 +176,21 @@ class _CreateProfileState extends State<CreateProfile> {
     }
 
     try {
-      bool usernameExists =
-          await _firestoreService.checkIfUsernameExists(_userNameController.text);
-      if (usernameExists) {
-        setState(() {
-          _errorMessage =
-              'The username already exists. Please choose a different username.';
-        });
-        return;
-      }
-
-      await _uploadImage();
-
       User? user = _auth.currentUser;
       if (user != null) {
+        String? existingUid =
+            await _firestoreService.getUidByUsername(_userNameController.text);
+
+        if (existingUid != null && existingUid != user.uid) {
+          setState(() {
+            _errorMessage =
+                'The username already exists. Please choose a different username.';
+          });
+          return;
+        }
+
+        await _uploadImage();
+
         // Update user profile
         await _firestoreService.updateUserProfile(
           user.uid,
@@ -267,8 +298,9 @@ class _CreateProfileState extends State<CreateProfile> {
                       radius: 45,
                       backgroundImage: _imageFile != null
                           ? FileImage(_imageFile!)
-                          : const AssetImage('assets/icons/ShuffleLogo.jpeg')
-                              as ImageProvider,
+                          : _imageUrl != null
+                              ? NetworkImage(_imageUrl!) as ImageProvider
+                              : const AssetImage('assets/icons/ShuffleLogo.jpeg'),
                     ),
                     const SizedBox(height: 8),
                     TextButton(
@@ -313,8 +345,8 @@ class _CreateProfileState extends State<CreateProfile> {
                         'Prefer Not To Say'
                       ]
                           .map((label) => DropdownMenuItem(
-                                child: Text(label),
                                 value: label,
+                                child: Text(label),
                               ))
                           .toList(),
                       decoration: InputDecoration(
@@ -329,8 +361,7 @@ class _CreateProfileState extends State<CreateProfile> {
                       ),
                       onChanged: (value) {
                         setState(() {
-                          _sexAssignedAtBirth =
-                              value; // Consider renaming this variable to _gender for clarity
+                          _sexAssignedAtBirth = value;
                         });
                       },
                       dropdownColor: Colors.grey[800],
@@ -416,4 +447,3 @@ class _CreateProfileState extends State<CreateProfile> {
     );
   }
 }
-
