@@ -4,8 +4,13 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:azlistview/azlistview.dart';
 import 'package:intl/intl.dart';
-import 'package:my_flutter_app/constants.dart'; // Ensure kBackgroundColor is defined here.
+import 'package:my_flutter_app/constants.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 
 class ContactInfo extends ISuspensionBean {
@@ -35,6 +40,7 @@ class _InviteContactsScreenState extends State<InviteContactsScreen> {
   List<ContactInfo> _contacts = [];
   List<ContactInfo> _filteredContacts = [];
   List<ContactInfo> _selectedContacts = [];
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _searchController = TextEditingController();
 
   final ItemScrollController _itemScrollController = ItemScrollController();
@@ -81,6 +87,55 @@ class _InviteContactsScreenState extends State<InviteContactsScreen> {
       await _handleInvalidPermissions(permissionStatus);
     }
   }
+
+  Future<String> _getReferralCode() async {
+    String? referralCode;
+    String uid = _auth.currentUser!.uid;
+
+    // Check if the user already has a referral code
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    if (userDoc.exists && userDoc['referralCode'] != null) {
+        referralCode = userDoc['referralCode'];
+    } else {
+        // Generate a unique referral code
+        referralCode = await _generateUniqueReferralCode();
+
+        // Save the referral code to the user's document
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'referralCode': referralCode,
+        });
+
+        // Create a new referral code document
+        await FirebaseFirestore.instance.collection('referralCodes').doc(referralCode).set({
+        'creatorParticipant': uid,
+        'users': [],
+        });
+    }
+    return referralCode!;
+}
+
+String _generateReferralCode() {
+  const String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  Random random = Random();
+  return String.fromCharCodes(Iterable.generate(6, (_) => chars.codeUnitAt(random.nextInt(chars.length))));
+}
+
+Future<String> _generateUniqueReferralCode() async {
+  String code;
+  bool exists = true;
+
+  do {
+    code = _generateReferralCode();
+    DocumentSnapshot doc = await FirebaseFirestore.instance.collection('referralCodes').doc(code).get();
+    exists = doc.exists;
+  } while (exists);
+
+  return code;
+}
+
+
+
+  
 
   Future<PermissionStatus> _getContactPermission() async {
     PermissionStatus permission = await Permission.contacts.status;
@@ -165,20 +220,22 @@ class _InviteContactsScreenState extends State<InviteContactsScreen> {
     });
   }
 
-  void _sendInvitations() {
+  void _sendInvitations() async {
     if (_selectedContacts.isEmpty) {
         _showNoContactsSelectedDialog();
         return;
     }
 
+    String referralCode = await _getReferralCode();
+
     String message =
-        'Shuffl lets you split rideshare costs! It is a carpool app that matches you with others that will be heading the same way as you at the same time based on your preferences. Download the app here: https://apps.apple.com/us/app/shuffl-mobility/id6670162779';
+        'Shuffl lets you split rideshare costs! It is a carpool app that matches you with others that will be heading the same way as you at the same time based on your preferences. Use my referral code $referralCode when signing up to get rewards! Download the app here: https://apps.apple.com/us/app/shuffl-mobility/id6670162779';
 
     Share.share(
         message,
-        subject: 'Join me on this awesome app!',
+        subject: 'Join me on Shuffl!',
     );
-    }
+}
 
   void _showNoContactsSelectedDialog() {
     showCupertinoDialog(

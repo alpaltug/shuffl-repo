@@ -53,6 +53,34 @@ class FirestoreService {
     });
   }
 
+  Future<bool> checkIfReferralCodeExists(String code) async {
+    DocumentSnapshot doc = await _db.collection('referral_codes').doc(code).get();
+    return doc.exists;
+  }
+
+  Future<void> createReferralCode(String code, String creatorUid) async {
+    await _db.collection('referral_codes').doc(code).set({
+      'creatorParticipant': creatorUid,
+      'users': [],
+    });
+  }
+
+  Future<void> updateUserReferralCode(String uid, String code) async {
+    await _db.collection('users').doc(uid).set({
+      'referralCode': code,
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> addUserToReferralCode(String code, String uid) async {
+    await _db.collection('referral_codes').doc(code).update({
+      'users': FieldValue.arrayUnion([uid]),
+    });
+  }
+
+  Future<DocumentSnapshot> getUserDocument(String uid) async {
+    return await _db.collection('users').doc(uid).get();
+  }
+
   Future<bool> checkIfUserExists(String uid) async {
     DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
     return doc.exists;

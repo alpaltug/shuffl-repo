@@ -1001,16 +1001,16 @@ Widget build(BuildContext context) {
           //     );
           //   },
           // ),
-          ListTile(
-            leading: const Icon(Icons.contacts),
-            title: const Text('Invite Contacts'),
-            onTap: () {
-              Navigator.push(
-                context,
-                CupertinoPageRoute(builder: (context) => InviteContactsScreen()),
-              );
-            },
-          ),
+          // ListTile(
+          //   leading: const Icon(Icons.contacts),
+          //   title: const Text('Invite Contacts'),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       CupertinoPageRoute(builder: (context) => InviteContactsScreen()),
+          //     );
+          //   },
+          // ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.privacy_tip),
