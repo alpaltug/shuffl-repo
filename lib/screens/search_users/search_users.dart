@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/constants.dart';
+import 'package:my_flutter_app/widgets/invite_button_widget.dart'; // Import the InviteButtonWidget
 
 class SearchUsers extends StatefulWidget {
   const SearchUsers({super.key});
@@ -20,6 +21,7 @@ class _SearchUsersState extends State<SearchUsers> {
   bool _isLoading = false;
   String? _errorMessage;
   User? _currentUser;
+  final InviteButtonWidget _inviteButton = InviteButtonWidget(); // Instantiate the InviteButtonWidget
 
   @override
   void initState() {
@@ -28,46 +30,47 @@ class _SearchUsersState extends State<SearchUsers> {
   }
 
   void _searchUsers(String query) async {
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-  try {
-    // Fetch the current user's document to check for the 'blockedBy' field
-    DocumentSnapshot currentUserDoc = await _firestore.collection('users').doc(_currentUser?.uid).get();
-    
-    // Check if the 'blockedBy' field exists for the current user
-    List blockedBy = currentUserDoc.data().toString().contains('blockedBy') 
-        ? (currentUserDoc['blockedBy'] ?? [])
-        : [];
+    try {
+      // Fetch the current user's document to check for the 'blockedBy' field
+      DocumentSnapshot currentUserDoc =
+          await _firestore.collection('users').doc(_currentUser?.uid).get();
 
-    QuerySnapshot result = await _firestore
-        .collection('users')
-        .where('username', isGreaterThanOrEqualTo: query)
-        .where('username', isLessThanOrEqualTo: '$query\uf8ff')
-        .get();
+      // Check if the 'blockedBy' field exists for the current user
+      List blockedBy = currentUserDoc.data().toString().contains('blockedBy')
+          ? (currentUserDoc['blockedBy'] ?? [])
+          : [];
 
-    // Filter out the users that the current user has blocked or has been blocked by
-    List<DocumentSnapshot> filteredUsers = [];
-    for (var user in result.docs) {
-      // Exclude users that have blocked the current user
-      if (!blockedBy.contains(user.id)) {
-        filteredUsers.add(user);
+      QuerySnapshot result = await _firestore
+          .collection('users')
+          .where('username', isGreaterThanOrEqualTo: query)
+          .where('username', isLessThanOrEqualTo: '$query\uf8ff')
+          .get();
+
+      // Filter out the users that the current user has blocked or has been blocked by
+      List<DocumentSnapshot> filteredUsers = [];
+      for (var user in result.docs) {
+        // Exclude users that have blocked the current user
+        if (!blockedBy.contains(user.id)) {
+          filteredUsers.add(user);
+        }
       }
-    }
 
-    setState(() {
-      _users = filteredUsers;
-      _isLoading = false;
-    });
-  } catch (e) {
-    setState(() {
-      _errorMessage = 'Error searching users: $e';
-      _isLoading = false;
-    });
+      setState(() {
+        _users = filteredUsers;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error searching users: $e';
+        _isLoading = false;
+      });
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -76,12 +79,19 @@ class _SearchUsersState extends State<SearchUsers> {
         title: const Text(
           'Search Users',
           style: TextStyle(
-            color: Colors.white, 
-            fontWeight: FontWeight.bold, 
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: kBackgroundColor, 
-        iconTheme: const IconThemeData(color: Colors.black), 
+        backgroundColor: kBackgroundColor,
+        iconTheme: const IconThemeData(color: Colors.black),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Invite Friends',
+            onPressed: () => _inviteButton.sendInvitations(context),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
