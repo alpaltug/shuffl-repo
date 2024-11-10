@@ -30,13 +30,15 @@ class _InviteContactsScreenState extends State<InviteContactsScreen> {
   Future<PermissionStatus> _getContactPermission() async {
     PermissionStatus permission = await Permission.contacts.status;
     if (permission != PermissionStatus.granted &&
-        permission != PermissionStatus.permanentlyDenied) {
-      PermissionStatus status = await Permission.contacts.request();
-      return status;
+        permission != PermissionStatus.permanentlyDenied &&
+        permission != PermissionStatus.limited) {
+        PermissionStatus status = await Permission.contacts.request();
+        return status;
     } else {
-      return permission;
+        return permission;
     }
-  }
+}
+
 
   void _handleInvalidPermissions(PermissionStatus status) {
     if (status == PermissionStatus.denied) {
