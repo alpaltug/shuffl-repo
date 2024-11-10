@@ -4,7 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_flutter_app/screens/view_user_profile/view_user_profile.dart';
 import 'package:my_flutter_app/screens/user_profile/user_profile.dart';
 import 'package:my_flutter_app/constants.dart';
-import 'package:my_flutter_app/widgets/invite_button_widget.dart'; // Import the InviteButtonWidget
+import 'package:my_flutter_app/widgets/invite_button.dart';
+
+import 'package:my_flutter_app/services/invite_service.dart';
+
 
 class SearchUsers extends StatefulWidget {
   const SearchUsers({super.key});
@@ -21,7 +24,6 @@ class _SearchUsersState extends State<SearchUsers> {
   bool _isLoading = false;
   String? _errorMessage;
   User? _currentUser;
-  final InviteButtonWidget _inviteButton = InviteButtonWidget(); // Instantiate the InviteButtonWidget
 
   @override
   void initState() {
@@ -86,10 +88,13 @@ class _SearchUsersState extends State<SearchUsers> {
         backgroundColor: kBackgroundColor,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            tooltip: 'Invite Friends',
-            onPressed: () => _inviteButton.sendInvitations(context),
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: IconButton(
+              icon: const Icon(Icons.share),
+              tooltip: 'Invite Friends',
+              onPressed: () => InviteService.sendInvitations(context),
+            ),
           ),
         ],
       ),

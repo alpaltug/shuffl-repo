@@ -54,12 +54,12 @@ class FirestoreService {
   }
 
   Future<bool> checkIfReferralCodeExists(String code) async {
-    DocumentSnapshot doc = await _db.collection('referral_codes').doc(code).get();
+    DocumentSnapshot doc = await _db.collection('user_codes').doc(code).get();
     return doc.exists;
   }
 
   Future<void> createReferralCode(String code, String creatorUid) async {
-    await _db.collection('referral_codes').doc(code).set({
+    await _db.collection('user_codes').doc(code).set({
       'creatorParticipant': creatorUid,
       'users': [],
     });
@@ -72,7 +72,7 @@ class FirestoreService {
   }
 
   Future<void> addUserToReferralCode(String code, String uid) async {
-    await _db.collection('referral_codes').doc(code).update({
+    await _db.collection('user_codes').doc(code).update({
       'users': FieldValue.arrayUnion([uid]),
     });
   }
