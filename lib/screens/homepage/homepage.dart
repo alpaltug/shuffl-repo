@@ -10,6 +10,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:my_flutter_app/widgets/invite_button_widget.dart';
+
+
 import 'package:my_flutter_app/screens/invite_contacts_screen/invite_contacts_screen.dart';
 
 import 'package:geolocator/geolocator.dart';
@@ -83,6 +86,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
   final LatLng _center = const LatLng(37.8715, -122.2730); // our campus :)
   StreamSubscription<Position>? _positionStreamSubscription;
   final _notificationService = NotificationService();
+
+  final InviteButtonWidget _inviteButton = InviteButtonWidget();
 
   Map<String, DateTime> markerTimestamps = {}; // To track the last update time for each marker
 
@@ -893,6 +898,12 @@ Widget build(BuildContext context) {
                 ),
               ),
           ],
+        ),
+        // Invite Friends Icon
+        IconButton(
+          icon: const Icon(Icons.share),
+          tooltip: 'Invite Friends',
+          onPressed: () => _inviteButton.sendInvitations(context),
         ),
       ],
     ),

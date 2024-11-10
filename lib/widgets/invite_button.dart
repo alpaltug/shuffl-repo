@@ -2,23 +2,14 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart'; // Needed for Colors
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:math';
 
-class InviteButtonWidget extends StatefulWidget {
-  const InviteButtonWidget({Key? key}) : super(key: key);
-
-  @override
-  _InviteButtonWidgetState createState() => _InviteButtonWidgetState();
-}
-
-class _InviteButtonWidgetState extends State<InviteButtonWidget> {
+class InviteButtonWidget {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String? _errorMessage;
-  bool _isLoading = false;
 
   // Generates a unique referral code
   Future<String> _generateUniqueReferralCode() async {
@@ -43,9 +34,7 @@ class _InviteButtonWidgetState extends State<InviteButtonWidget> {
     try {
       User? user = _auth.currentUser;
       if (user == null) {
-        setState(() {
-          _errorMessage = 'User not authenticated.';
-        });
+        // Handle unauthenticated user
         return null;
       }
 
@@ -70,28 +59,30 @@ class _InviteButtonWidgetState extends State<InviteButtonWidget> {
         return referralCode;
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to generate referral code: $e';
-      });
+      // Handle exceptions
       return null;
     }
   }
 
   // Sends the invitation message
-  Future<void> _sendInvitations() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<void> sendInvitations(BuildContext context) async {
     try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
       String? referralCode = await _getReferralCode();
 
+      Navigator.of(context).pop(); // Close the loading indicator
+
       if (referralCode == null) {
-        // Error message is already set in _getReferralCode
-        setState(() {
-          _isLoading = false;
-        });
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to generate referral code.')),
+        );
         return;
       }
 
@@ -103,53 +94,13 @@ class _InviteButtonWidgetState extends State<InviteButtonWidget> {
         subject: 'Join me on Shuffl!',
       );
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to send invitations: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
+      // Close the loading indicator if still open
+      Navigator.of(context).pop();
 
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Invite Icon Button
-        Positioned(
-          top: 0,
-          right: 0,
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            child: _isLoading
-                ? const CupertinoActivityIndicator()
-                : const Icon(
-                    CupertinoIcons.share,
-                    color: CupertinoColors.black,
-                  ),
-            onPressed: _sendInvitations,
-          ),
-        ),
-        // Error Message Display
-        if (_errorMessage != null)
-          Positioned(
-            top: 50,
-            right: 10,
-            child: Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                color: Colors.redAccent.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              child: Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-      ],
-    );
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send invitations: $e')),
+      );
+    }
   }
 }
