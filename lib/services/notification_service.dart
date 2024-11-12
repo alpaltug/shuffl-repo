@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -27,7 +26,6 @@ class NotificationService {
       await _configureFCM();
     } catch (e) {
       print('Error during notification service initialization: $e');
-      // Handle initialization error appropriately
     }
   }
 
@@ -64,7 +62,8 @@ class NotificationService {
         requestBadgePermission: false,
         requestSoundPermission: false,
       );
-      final InitializationSettings initializationSettings = InitializationSettings(
+      final InitializationSettings initializationSettings =
+          InitializationSettings(
         android: initializationSettingsAndroid,
         iOS: initializationSettingsIOS,
       );
@@ -73,17 +72,27 @@ class NotificationService {
         initializationSettings,
         onDidReceiveNotificationResponse: _onNotificationTap,
       );
+
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'default_channel_id', 
+        'Default Channel', 
+        description: 'This channel is used for important notifications.',
+        importance: Importance.high,
+      );
+
+      await _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
     } catch (e) {
       print('Error initializing local notifications: $e');
-      // Handle initialization error
     }
   }
 
   Future<void> _configureFCM() async {
     try {
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-      FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
 
       String? token = await _fcm.getToken();
       if (token != null) {
@@ -132,56 +141,59 @@ class NotificationService {
     print('Message data: ${message.data}');
     print('Message notification: ${message.notification}');
 
-    // Get current user ID
-    String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    String? currentUserId = _auth.currentUser?.uid;
 
-    // Get sender ID from message data
     String senderId = message.data['senderId'] ?? '';
 
-    // Skip if the message is from the current user
     if (senderId == currentUserId) {
       print('Message is from the current user. Skipping notification.');
       return;
     }
 
-    // Skip showing local notification if the system has already displayed it
-    if (message.notification != null) {
-      print('System notification already displayed. Skipping local notification.');
-      return;
-    }
-
     String notificationType = message.data['type'] ?? '';
+
+    String? notificationTitle = message.notification?.title;
+    String? notificationBody = message.notification?.body;
 
     if (notificationType == 'friend_request') {
       // Friend request notification
-      String body = message.data['body'] ?? '';
+      String body = message.data['body'] ?? notificationBody ?? '';
       await _showLocalNotification(title: 'New Friend Request', body: body);
     } else if (notificationType == 'new_participant') {
       // Waiting Room notification
-      String body = message.data['body'] ?? '';
+      String body = message.data['body'] ?? notificationBody ?? '';
       await _showLocalNotification(title: 'New Ride Participant', body: body);
-    } else if (notificationType == 'chat_message' || notificationType == 'ride_chat_message') {
+    } else if (notificationType == 'chat_message' ||
+        notificationType == 'ride_chat_message') {
       // Chat message notifications
       String senderUsername = message.data['senderUsername'] ?? 'Unknown';
-      String content = message.data['content'] ?? '';
+      String content = message.data['content'] ?? notificationBody ?? '';
       await _showLocalNotification(title: '@$senderUsername', body: content);
+    } else {
+      // Handle other notification types
+      String title = notificationTitle ?? 'New Notification';
+      String body = notificationBody ?? '';
+      await _showLocalNotification(title: title, body: body);
     }
   }
 
-  Future<void> _showLocalNotification({required String title, required String body}) async {
+  Future<void> _showLocalNotification(
+      {required String title, required String body}) async {
     try {
-      AndroidNotificationDetails androidDetails = const AndroidNotificationDetails(
-        'high_importance_channel',
-        'High Importance Notifications',
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+        'default_channel_id', // Must match the channel ID created
+        'Default Channel',
+        channelDescription: 'This channel is used for important notifications.',
         importance: Importance.max,
         priority: Priority.high,
       );
-      DarwinNotificationDetails iOSDetails = const DarwinNotificationDetails(
+      const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
       );
-      NotificationDetails platformDetails = NotificationDetails(
+      const NotificationDetails platformDetails = NotificationDetails(
         android: androidDetails,
         iOS: iOSDetails,
       );
@@ -195,24 +207,18 @@ class NotificationService {
       );
     } catch (e) {
       print('Error showing local notification: $e');
-      // Handle notification display error
     }
   }
 
-  void _handleBackgroundMessage(RemoteMessage message) {
-    print('Handling a background message: ${message.messageId}');
-    // Implement any specific background message handling here
+  Future<void> _handleMessageOpenedApp(RemoteMessage message) async {
+    print('App opened from notification: ${message.messageId}');
+    // Handle the message and navigate to desired screen
+    // Implement navigation logic here
   }
 
   void _onNotificationTap(NotificationResponse response) {
-    // Handle notification tap here
     print('Notification tapped: ${response.payload}');
+    // Handle notification tap and navigate if necessary
+    // Implement navigation logic here
   }
-}
-
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  print("Handling a background message: ${message.messageId}");
-  // Implement any specific background message handling here
 }

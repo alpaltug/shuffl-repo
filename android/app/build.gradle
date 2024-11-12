@@ -23,6 +23,7 @@ def flutterVersionName = localProperties.getProperty("flutter.versionName")
 if (flutterVersionName == null) {
     flutterVersionName = "1.0"
 }
+
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
@@ -67,7 +68,6 @@ android {
 
     buildTypes {
         release {
-
             signingConfig signingConfigs.release
             minifyEnabled false
             shrinkResources false
@@ -91,6 +91,7 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     implementation platform('com.google.firebase:firebase-bom:32.5.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }
 
 configurations.all {
@@ -107,3 +108,5 @@ secrets {
     ignoreList.add("keyToIgnore")
     ignoreList.add("sdk.*")
 }
+
+apply plugin: 'com.google.gms.google-services'
