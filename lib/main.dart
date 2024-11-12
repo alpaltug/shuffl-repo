@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_flutter_app/screens/homepage/homepage.dart';
 import 'package:my_flutter_app/screens/create_profile/create_profile.dart';
 import 'package:my_flutter_app/screens/verification/verification_screen.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -19,60 +18,6 @@ final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   print("Handling a background message: ${message.messageId}");
-
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  final DarwinInitializationSettings initializationSettingsIOS =
-      DarwinInitializationSettings();
-
-  final InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: initializationSettingsIOS,
-  );
-
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'default_channel_id', 
-    'Default Channel', 
-    description: 'This channel is used for important notifications.',
-    importance: Importance.high,
-  );
-
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
-
-  RemoteNotification? notification = message.notification;
-  AndroidNotification? android = message.notification?.android;
-
-  String? title = notification?.title ?? 'New Notification';
-  String? body = notification?.body ?? 'You have a new message.';
-
-  if (notification != null && android != null) {
-    await flutterLocalNotificationsPlugin.show(
-      notification.hashCode,
-      title,
-      body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel.id,
-          channel.name,
-          channelDescription: channel.description,
-          icon: '@mipmap/ic_launcher',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      payload: 'Default_Sound',
-    );
-  }
 }
 
 void main() async {
@@ -82,7 +27,6 @@ void main() async {
   );
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
   final notificationService = NotificationService();
   await notificationService.init();
 
@@ -113,19 +57,22 @@ class _MyAppState extends State<MyApp> {
     await _checkRememberMe();
     FirebaseAuth.instance.authStateChanges().listen((User? user) async {
       if (user != null) {
+        // Determine if the user signed in with email/password
         List<UserInfo> providers = user.providerData;
         _isEmailPasswordUser =
             providers.any((provider) => provider.providerId == 'password');
 
         if (_isEmailPasswordUser && !user.emailVerified) {
+          // User signed in with email/password and hasn't verified email
           setState(() {
             _user = user;
             _isProfileComplete = false;
             _isLoading = false;
           });
-          return; 
+          return; // Exit early to stay on VerificationScreen
         }
 
+        // For Google, Apple, or email/password users with verified email, check Firestore
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
