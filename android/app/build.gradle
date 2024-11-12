@@ -109,4 +109,3 @@ secrets {
     ignoreList.add("sdk.*")
 }
 
-apply plugin: 'com.google.gms.google-services'
