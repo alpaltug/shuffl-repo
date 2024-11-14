@@ -12,14 +12,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:my_flutter_app/widgets/loading_widget.dart';
-
 import 'package:my_flutter_app/functions/homepage_functions.dart'; 
-
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
-
 
 final google_maps_api_key = 'AIzaSyBvD12Z_T8Sw4fjgy25zvsF1zlXdV7bVfk';
 
@@ -653,6 +649,8 @@ Future<void> _updateDirections() async {
   }
 
   Future<void> _initRide(DocumentReference rideDocRef) async {
+    List<String> participantIds = []; // Declare outside the transaction
+
     try {
       // Perform the transaction to ensure atomicity
       await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -677,6 +675,9 @@ Future<void> _updateDirections() async {
           return;
         }
 
+        // Get participant IDs
+        participantIds = List<String>.from(rideData['participants']);
+
         // Calculate the midpoint of pickup locations
         List<LatLng> pickupLocations = [];
         Map<String, String> pickupLocationsMap = Map<String, String>.from(rideData['pickupLocations']);
@@ -697,7 +698,7 @@ Future<void> _updateDirections() async {
         };
         rideData['startTime'] = FieldValue.serverTimestamp();
         rideData['status'] = 'active';
-        rideData['endRideParticipants'] = [];  // Initialize the endRideParticipants field
+        rideData['endRideParticipants'] = []; // Initialize the endRideParticipants field
 
         // Create a reference for the active ride document
         DocumentReference activeRideDocRef = FirebaseFirestore.instance
@@ -707,6 +708,7 @@ Future<void> _updateDirections() async {
         // Set the active ride document and transfer the group chat messages
         transaction.set(activeRideDocRef, rideData);
 
+        // Transfer group chat messages
         QuerySnapshot messagesSnapshot = await rideDocRef.collection('groupChat').get();
         for (var messageDoc in messagesSnapshot.docs) {
           transaction.set(
@@ -718,6 +720,9 @@ Future<void> _updateDirections() async {
         // Remove the ride from the 'rides' collection
         transaction.delete(rideDocRef);
       });
+
+      // After the transaction completes, delete notifications for all participants
+      await _deleteNotificationsForParticipants(participantIds, rideDocRef.id);
 
       // Navigate to the ActiveRidesPage after initializing the ride
       if (mounted) {
@@ -737,7 +742,7 @@ Future<void> _updateDirections() async {
     }
   }
 
-
+  // Updated _leaveGroup method
   Future<void> _leaveGroup() async {
     User? user = _auth.currentUser;
     if (user == null) return;
@@ -757,10 +762,15 @@ Future<void> _updateDirections() async {
       'dropoffLocations.${user.uid}': FieldValue.delete(),
     });
 
+    // Remove the user from the group chat participants
     await rideDocRef.collection('groupChat').doc(widget.rideId).update({
-    'participants': FieldValue.arrayRemove([user.uid]),
-  });
+      'participants': FieldValue.arrayRemove([user.uid]),
+    });
 
+    // Delete notifications related to this ride for the current user
+    await _deleteNotificationsForUser(user.uid, widget.rideId);
+
+    // Update ride completeness
     rideDoc = await rideDocRef.get();
     List<String> participants = List<String>.from(rideDoc['participants']);
 
@@ -792,26 +802,28 @@ Future<void> _updateDirections() async {
         MaterialPageRoute(builder: (context) => HomePage()),
       );
     }
-    Future<void> _createGroupChat() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
-    DocumentReference rideDocRef = FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
-    DocumentSnapshot rideDoc = await rideDocRef.get();
-
-    if (!rideDoc.exists) {
-      print('Ride document does not exist.');
-      return;
-    }
-
-    List<String> participantUids = List<String>.from(rideDoc['participants']);
-
-    await rideDocRef.collection('groupChat').doc(widget.rideId).set({
-      'participants': participantUids,
-      'groupTitle': 'Ride Group Chat',
-    });
   }
-}
+
+  // Helper method to delete notifications for all participants
+  Future<void> _deleteNotificationsForParticipants(List<String> participantIds, String rideId) async {
+    for (String userId in participantIds) {
+      await _deleteNotificationsForUser(userId, rideId);
+    }
+  }
+
+  // Helper method to delete notifications for a single user
+  Future<void> _deleteNotificationsForUser(String userId, String rideId) async {
+    QuerySnapshot notificationsSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('notifications')
+        .where('rideId', isEqualTo: rideId)
+        .get();
+
+    for (DocumentSnapshot notificationDoc in notificationsSnapshot.docs) {
+      await notificationDoc.reference.delete();
+    }
+  }
 
 
 // Function to fetch directions from Google Directions API
